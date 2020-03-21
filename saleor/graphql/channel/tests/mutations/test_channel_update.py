@@ -624,4 +624,256 @@ def test_channel_update_mutation_remove_warehouse(
     # ensure warehouse from index 1 has not been deleted from shipping zone
     # with JPY channel
     assert warehouses[1] in shipping_zones[0].warehouses.all()
-    # ensure warehouse fro
+    # ensure warehouse from index 1 has been deleted from shipping zone
+    # without JPY channel
+    assert warehouses[1] not in shipping_zones[1].warehouses.all()
+
+
+def test_channel_update_mutation_add_and_remove_warehouse(
+    permission_manage_channels,
+    staff_api_client,
+    channel_USD,
+    warehouses,
+    warehouse,
+):
+    # given
+    channel_USD.warehouses.add(*warehouses)
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+    name = "newName"
+    slug = "new_slug"
+    remove_warehouse = graphene.Node.to_global_id("Warehouse", warehouses[0].pk)
+    add_warehouse = graphene.Node.to_global_id("Warehouse", warehouse.pk)
+    variables = {
+        "id": channel_id,
+        "input": {
+            "name": name,
+            "slug": slug,
+            "addWarehouses": [add_warehouse],
+            "removeWarehouses": [remove_warehouse],
+        },
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        CHANNEL_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_channels,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["channelUpdate"]
+    assert not data["errors"]
+    channel_data = data["channel"]
+    channel_USD.refresh_from_db()
+    assert channel_data["name"] == channel_USD.name == name
+    assert channel_data["slug"] == channel_USD.slug == slug
+    assert channel_data["currencyCode"] == channel_USD.currency_code == "USD"
+    assert {
+        warehouse_data["slug"] for warehouse_data in channel_data["warehouses"]
+    } == {warehouse.slug for warehouse in warehouses[1:] + [warehouse]}
+
+
+def test_channel_update_mutation_duplicated_warehouses(
+    permission_manage_channels,
+    staff_api_client,
+    channel_USD,
+    warehouses,
+    warehouse,
+):
+    # given
+    channel_USD.warehouses.add(*warehouses)
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+    name = "newName"
+    slug = "new_slug"
+    remove_warehouse = graphene.Node.to_global_id("Warehouse", warehouses[0].pk)
+    add_warehouse = graphene.Node.to_global_id("Warehouse", warehouse.pk)
+    variables = {
+        "id": channel_id,
+        "input": {
+            "name": name,
+            "slug": slug,
+            "addWarehouses": [add_warehouse],
+            "removeWarehouses": [remove_warehouse, add_warehouse],
+        },
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        CHANNEL_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_channels,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["channelUpdate"]
+    assert not data["channel"]
+    errors = data["errors"]
+    assert len(errors) == 1
+    assert errors[0]["field"] == "warehouses"
+    assert errors[0]["code"] == ChannelErrorCode.DUPLICATED_INPUT_ITEM.name
+    assert errors[0]["warehouses"] == [add_warehouse]
+
+
+def test_channel_update_order_settings_manage_orders(
+    permission_manage_orders,
+    staff_api_client,
+    channel_USD,
+):
+    # given
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+    variables = {
+        "id": channel_id,
+        "input": {
+            "orderSettings": {
+                "automaticallyConfirmAllNewOrders": False,
+                "automaticallyFulfillNonShippableGiftCard": False,
+            },
+        },
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        CHANNEL_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_orders,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["channelUpdate"]
+    assert not data["errors"]
+    channel_data = data["channel"]
+    assert channel_data["orderSettings"]["automaticallyConfirmAllNewOrders"] is False
+    assert (
+        channel_data["orderSettings"]["automaticallyFulfillNonShippableGiftCard"]
+        is False
+    )
+
+
+def test_channel_update_order_settings_empty_order_settings(
+    permission_manage_orders,
+    staff_api_client,
+    channel_USD,
+):
+    # given
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+    variables = {
+        "id": channel_id,
+        "input": {
+            "orderSettings": {},
+        },
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        CHANNEL_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_orders,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["channelUpdate"]
+    assert not data["errors"]
+    channel_data = data["channel"]
+    assert channel_data["orderSettings"]["automaticallyConfirmAllNewOrders"] is True
+    assert (
+        channel_data["orderSettings"]["automaticallyFulfillNonShippableGiftCard"]
+        is True
+    )
+
+
+def test_channel_update_order_settings_manage_orders_as_app(
+    permission_manage_orders,
+    app_api_client,
+    channel_USD,
+):
+    # given
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+    variables = {
+        "id": channel_id,
+        "input": {
+            "orderSettings": {
+                "automaticallyConfirmAllNewOrders": False,
+                "automaticallyFulfillNonShippableGiftCard": False,
+            },
+        },
+    }
+
+    # when
+    response = app_api_client.post_graphql(
+        CHANNEL_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_orders,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["channelUpdate"]
+    assert not data["errors"]
+    channel_data = data["channel"]
+    assert channel_data["orderSettings"]["automaticallyConfirmAllNewOrders"] is False
+    assert (
+        channel_data["orderSettings"]["automaticallyFulfillNonShippableGiftCard"]
+        is False
+    )
+
+
+def test_channel_update_order_settings_manage_orders_permission_denied(
+    permission_manage_orders,
+    staff_api_client,
+    channel_USD,
+):
+    # given
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+    variables = {
+        "id": channel_id,
+        "input": {
+            "name": "newNAme",
+            "orderSettings": {
+                "automaticallyConfirmAllNewOrders": False,
+                "automaticallyFulfillNonShippableGiftCard": False,
+            },
+        },
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        CHANNEL_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_orders,),
+    )
+
+    # then
+    assert_no_permission(response)
+
+
+def test_channel_update_order_settings_manage_orders_as_app_permission_denied(
+    permission_manage_orders,
+    app_api_client,
+    channel_USD,
+):
+    # given
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+    variables = {
+        "id": channel_id,
+        "input": {
+            "name": "newNAme",
+            "orderSettings": {
+                "automaticallyConfirmAllNewOrders": False,
+                "automaticallyFulfillNonShippableGiftCard": False,
+            },
+        },
+    }
+
+    # when
+    response = app_api_client.post_graphql(
+        CHANNEL_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_orders,),
+    )
+
+    # then
+    assert_no_permission(response)
