@@ -247,4 +247,114 @@ def test_get_or_create_user_from_payload_assigns_sub(customer_user):
     sub_id = "oauth|1234"
 
     user_from_payload = get_or_create_user_from_payload(
-        payload={
+        payload={"sub": sub_id, "email": customer_user.email},
+        oauth_url=oauth_url,
+    )
+
+    assert user_from_payload.id == customer_user.id
+    assert user_from_payload.private_metadata[f"oidc-{oauth_url}"] == sub_id
+
+
+def test_get_or_create_user_from_payload_creates_user_with_sub():
+    oauth_url = "https://saleor.io/oauth"
+    sub_id = "oauth|1234"
+    customer_email = "email.customer@example.com"
+
+    user_from_payload = get_or_create_user_from_payload(
+        payload={"sub": sub_id, "email": customer_email},
+        oauth_url=oauth_url,
+    )
+
+    assert user_from_payload.email == customer_email
+    assert user_from_payload.private_metadata[f"oidc-{oauth_url}"] == sub_id
+    assert not user_from_payload.has_usable_password()
+
+
+def test_get_or_create_user_from_payload_multiple_subs(customer_user, admin_user):
+    oauth_url = "https://saleor.io/oauth"
+    sub_id = "oauth|1234"
+
+    customer_user.private_metadata = {f"oidc-{oauth_url}": sub_id}
+    customer_user.save()
+
+    admin_user.private_metadata = {f"oidc-{oauth_url}": sub_id}
+    admin_user.save()
+
+    with warnings.catch_warnings(record=True):
+        user_from_payload = get_or_create_user_from_payload(
+            payload={"sub": sub_id, "email": customer_user.email},
+            oauth_url=oauth_url,
+        )
+
+    assert user_from_payload.email == customer_user.email
+    assert user_from_payload.private_metadata[f"oidc-{oauth_url}"] == sub_id
+
+
+def test_get_or_create_user_from_payload_different_email(customer_user):
+    oauth_url = "https://saleor.io/oauth"
+    sub_id = "oauth|1234"
+    new_customer_email = "new.customer@example.com"
+
+    customer_user.private_metadata = {f"oidc-{oauth_url}": sub_id}
+    customer_user.save()
+
+    user_from_payload = get_or_create_user_from_payload(
+        payload={"sub": sub_id, "email": new_customer_email},
+        oauth_url=oauth_url,
+    )
+
+    customer_user.refresh_from_db()
+    assert user_from_payload.id == customer_user.id
+    assert customer_user.email == new_customer_email
+    assert customer_user.private_metadata[f"oidc-{oauth_url}"] == sub_id
+
+
+@freeze_time("2019-03-18 12:00:00")
+def test_get_or_create_user_from_payload_with_last_login(customer_user, settings):
+    settings.TIME_ZONE = "UTC"
+    current_ts = int(time.time())
+
+    oauth_url = "https://saleor.io/oauth"
+    sub_id = "oauth|1234"
+
+    customer_user.last_login = make_aware(
+        datetime.fromtimestamp(current_ts - 10), timezone=pytz.timezone("UTC")
+    )
+    customer_user.save()
+
+    user_from_payload = get_or_create_user_from_payload(
+        payload={"sub": sub_id, "email": customer_user.email},
+        oauth_url=oauth_url,
+        last_login=current_ts,
+    )
+
+    customer_user.refresh_from_db()
+    assert customer_user.last_login == make_aware(
+        datetime.fromtimestamp(current_ts), timezone=pytz.timezone("UTC")
+    )
+    assert user_from_payload.email == customer_user.email
+    assert user_from_payload.private_metadata[f"oidc-{oauth_url}"] == sub_id
+
+
+def test_jwt_token_without_expiration_claim(monkeypatch, decoded_access_token):
+    monkeypatch.setattr(
+        "saleor.plugins.openid_connect.utils.get_user_info_from_cache_or_fetch",
+        lambda *args, **kwargs: {
+            "email": "test@example.org",
+            "sub": token_payload["sub"],
+            "scope": token_payload["scope"],
+        },
+    )
+    decoded_access_token.pop("exp")
+    token_payload = JWTClaims(
+        decoded_access_token,
+        {},
+    )
+    user = get_user_from_oauth_access_token_in_jwt_format(
+        token_payload,
+        "https://example.com",
+        access_token="fake-token",
+        use_scope_permissions=False,
+        audience="",
+    )
+    assert user.email == "test@example.org"
