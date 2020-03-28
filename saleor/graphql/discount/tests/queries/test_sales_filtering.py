@@ -248,4 +248,14 @@ def test_query_sales_with_filter_search(
     values = [123, 123, 69]
     SaleChannelListing.objects.bulk_create(
         [
-            SaleChannelListing
+            SaleChannelListing(channel=channel_USD, discount_value=values[i], sale=sale)
+            for i, sale in enumerate(sales)
+        ]
+    )
+    variables = {"filter": sale_filter}
+    response = staff_api_client.post_graphql(
+        QUERY_SALES_WITH_FILTER, variables, permissions=[permission_manage_discounts]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["sales"]["edges"]
+    assert len(data) == count
