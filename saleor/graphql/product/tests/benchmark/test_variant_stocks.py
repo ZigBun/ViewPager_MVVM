@@ -437,3 +437,30 @@ def test_query_product_variants_stocks(
             stocks{
                 quantity
             }
+        }
+    }
+    """
+
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    second_warehouse = Warehouse.objects.get(pk=warehouse.pk)
+    second_warehouse.slug = "second warehouse"
+    second_warehouse.pk = None
+    second_warehouse.save()
+
+    Stock.objects.bulk_create(
+        [
+            Stock(product_variant=variant, warehouse=warehouse, quantity=10),
+            Stock(product_variant=variant, warehouse=second_warehouse, quantity=140),
+        ]
+    )
+
+    variables = {"id": variant_id}
+    response = staff_api_client.post_graphql(
+        query,
+        variables,
+        permissions=[permission_manage_products],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["productVariant"]
+    assert len(data["stocks"]) == variant.stocks.count()
