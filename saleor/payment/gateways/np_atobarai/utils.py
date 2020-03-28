@@ -140,4 +140,17 @@ def create_refunded_lines(
     current_fulfillment_refund_lines = (
         (f_variant_id, line1.quantity)
         for line1 in fulfillment_lines_to_refund
-        if (f_variant_id := line1.line.order_line.variant_
+        if (f_variant_id := line1.line.order_line.variant_id)
+    )
+
+    refund_lines = chain(
+        previous_refund_lines,
+        current_order_refund_lines,
+        current_fulfillment_refund_lines,
+    )
+    summed_refund_lines: Dict[int, int] = defaultdict(int)
+
+    for variant_id, quantity in refund_lines:
+        summed_refund_lines[variant_id] += quantity
+
+    return dict(summed_refund_lines)
