@@ -1,0 +1,14 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.33.0
+      X-Stripe-Client-Telemetry:
+      - '{"last_request
