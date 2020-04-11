@@ -206,4 +206,239 @@ def test_gift_cards_create(
         quantity=line_1.quantity,
         stock=line_1.allocations.get().stock,
     )
-    fulfillment_lin
+    fulfillment_line_2 = fulfillment.lines.create(
+        order_line=line_2,
+        quantity=line_2.quantity,
+        stock=line_2.allocations.get().stock,
+    )
+    lines_data = [
+        GiftCardLineData(
+            quantity=1,
+            order_line=line_1,
+            variant=line_1.variant,
+            fulfillment_line=fulfillment_line_1,
+        ),
+        GiftCardLineData(
+            quantity=1,
+            order_line=line_2,
+            variant=line_2.variant,
+            fulfillment_line=fulfillment_line_2,
+        ),
+    ]
+
+    # when
+    gift_cards = gift_cards_create(
+        order, lines_data, site_settings, staff_user, None, manager
+    )
+
+    # then
+    assert len(gift_cards) == len(lines_data)
+
+    shippable_gift_card = gift_cards[0]
+    shippable_price = gift_card_shippable_order_line.unit_price_gross
+    assert shippable_gift_card.initial_balance == shippable_price
+    assert shippable_gift_card.current_balance == shippable_price
+    assert shippable_gift_card.created_by == order.user
+    assert shippable_gift_card.created_by_email == user_email
+    assert shippable_gift_card.expiry_date is None
+    assert shippable_gift_card.fulfillment_line == fulfillment_line_1
+
+    bought_event_for_shippable_card = GiftCardEvent.objects.get(
+        gift_card=shippable_gift_card
+    )
+    assert bought_event_for_shippable_card.user == staff_user
+    assert bought_event_for_shippable_card.app is None
+    assert bought_event_for_shippable_card.type == GiftCardEvents.BOUGHT
+    assert bought_event_for_shippable_card.order == order
+    assert bought_event_for_shippable_card.parameters == {
+        "expiry_date": None,
+    }
+
+    non_shippable_gift_card = gift_cards[1]
+    non_shippable_price = gift_card_non_shippable_order_line.total_price_gross
+    assert non_shippable_gift_card.initial_balance == non_shippable_price
+    assert non_shippable_gift_card.current_balance == non_shippable_price
+    assert non_shippable_gift_card.created_by == order.user
+    assert non_shippable_gift_card.created_by_email == user_email
+    assert non_shippable_gift_card.expiry_date is None
+    assert non_shippable_gift_card.fulfillment_line == fulfillment_line_2
+
+    non_shippable_event = GiftCardEvent.objects.get(
+        gift_card=non_shippable_gift_card, type=GiftCardEvents.BOUGHT
+    )
+    assert non_shippable_event.user == staff_user
+    assert non_shippable_event.app is None
+    assert non_shippable_event.order == order
+    assert non_shippable_event.parameters == {
+        "expiry_date": None,
+    }
+
+    flush_post_commit_hooks()
+
+    send_notification_mock.assert_called_once_with(
+        staff_user,
+        None,
+        order.user,
+        user_email,
+        non_shippable_gift_card,
+        manager,
+        order.channel.slug,
+        resending=False,
+    )
+
+
+@patch("saleor.giftcard.utils.send_gift_card_notification")
+def test_gift_cards_create_expiry_date_set(
+    send_notification_mock,
+    order,
+    gift_card_shippable_order_line,
+    gift_card_non_shippable_order_line,
+    site_settings,
+    staff_user,
+):
+    # given
+    manager = get_plugins_manager()
+    site_settings.gift_card_expiry_type = GiftCardSettingsExpiryType.EXPIRY_PERIOD
+    site_settings.gift_card_expiry_period_type = TimePeriodType.WEEK
+    site_settings.gift_card_expiry_period = 20
+    site_settings.save(
+        update_fields=[
+            "gift_card_expiry_type",
+            "gift_card_expiry_period_type",
+            "gift_card_expiry_period",
+        ]
+    )
+    line_1 = gift_card_non_shippable_order_line
+    user_email = order.user_email
+    fulfillment = order.fulfillments.create(tracking_number="123")
+    fulfillment_line_1 = fulfillment.lines.create(
+        order_line=line_1,
+        quantity=line_1.quantity,
+        stock=line_1.allocations.get().stock,
+    )
+    lines_data = [
+        GiftCardLineData(
+            quantity=1,
+            order_line=line_1,
+            variant=line_1.variant,
+            fulfillment_line=fulfillment_line_1,
+        )
+    ]
+
+    # when
+    gift_cards = gift_cards_create(
+        order, lines_data, site_settings, staff_user, None, manager
+    )
+
+    # then
+    assert len(gift_cards) == len(lines_data)
+
+    gift_card = gift_cards[0]
+    price = gift_card_non_shippable_order_line.total_price_gross
+    assert gift_card.initial_balance == price
+    assert gift_card.current_balance == price
+    assert gift_card.created_by == order.user
+    assert gift_card.created_by_email == user_email
+    assert gift_card.expiry_date
+    assert gift_card.fulfillment_line == fulfillment_line_1
+
+    event = GiftCardEvent.objects.get(gift_card=gift_card, type=GiftCardEvents.BOUGHT)
+    assert event.user == staff_user
+    assert event.app is None
+    assert event.order == order
+    assert event.parameters == {
+        "expiry_date": gift_card.expiry_date.isoformat(),
+    }
+
+    flush_post_commit_hooks()
+
+    send_notification_mock.assert_called_once_with(
+        staff_user,
+        None,
+        order.user,
+        user_email,
+        gift_card,
+        manager,
+        order.channel.slug,
+        resending=False,
+    )
+
+
+@patch("saleor.giftcard.utils.send_gift_card_notification")
+def test_gift_cards_create_multiple_quantity(
+    send_notification_mock,
+    order,
+    gift_card_non_shippable_order_line,
+    site_settings,
+    staff_user,
+):
+    # given
+    manager = get_plugins_manager()
+    quantity = 3
+    gift_card_non_shippable_order_line.quantity = quantity
+    gift_card_non_shippable_order_line.save(update_fields=["quantity"])
+    fulfillment = order.fulfillments.create(tracking_number="123")
+    stock = gift_card_non_shippable_order_line.allocations.get().stock
+    fulfillment_line = fulfillment.lines.create(
+        order_line=gift_card_non_shippable_order_line, quantity=quantity, stock=stock
+    )
+    lines_data = [
+        GiftCardLineData(
+            quantity=quantity,
+            order_line=gift_card_non_shippable_order_line,
+            variant=gift_card_non_shippable_order_line.variant,
+            fulfillment_line=fulfillment_line,
+        )
+    ]
+
+    # when
+    gift_cards = gift_cards_create(
+        order, lines_data, site_settings, staff_user, None, manager
+    )
+
+    # then
+    flush_post_commit_hooks()
+    assert len(gift_cards) == quantity
+    price = gift_card_non_shippable_order_line.unit_price_gross
+    for gift_card in gift_cards:
+        assert gift_card.initial_balance == price
+        assert gift_card.current_balance == price
+        assert gift_card.fulfillment_line == fulfillment_line
+
+    assert GiftCardEvent.objects.filter(type=GiftCardEvents.BOUGHT).count() == quantity
+    assert send_notification_mock.call_count == quantity
+
+
+@freeze_time("2022-05-12 12:00:00")
+@patch("saleor.plugins.webhook.plugin.get_webhooks_for_event")
+@patch("saleor.plugins.webhook.plugin.trigger_webhooks_async")
+@patch("saleor.giftcard.utils.send_gift_card_notification")
+def test_gift_cards_create_trigger_webhook(
+    send_notification_mock,
+    mocked_webhook_trigger,
+    mocked_get_webhooks_for_event,
+    any_webhook,
+    webhook_app,
+    settings,
+    order,
+    gift_card_shippable_order_line,
+    gift_card_non_shippable_order_line,
+    site_settings,
+    staff_user,
+):
+    # given
+    mocked_get_webhooks_for_event.return_value = [any_webhook]
+    settings.PLUGINS = ["saleor.plugins.webhook.plugin.WebhookPlugin"]
+
+    manager = get_plugins_manager()
+    line_1, line_2 = gift_card_shippable_order_line, gift_card_non_shippable_order_line
+    fulfillment = order.fulfillments.create(tracking_number="123")
+    fulfillment_line_1 = fulfillment.lines.create(
+        order_line=line_1,
+        quantity=line_1.quantity,
+        stock=line_1.allocations.get().stock,
+    )
+    fulfillment_line_2 = fulfillment.lines.create(
+        order_line=line_2,
+        quantity=line_2.quantity,
+        s
