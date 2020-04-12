@@ -60,4 +60,14 @@ class Migration(migrations.Migration):
                     ("INVOICE_UPDATED", "invoice_updated"),
                     ("INVOICE_SENT", "invoice_sent"),
                     ("FULFILLMENT_CANCELED", "fulfillment_canceled"),
-                    ("FULFILLMEN
+                    ("FULFILLMENT_RESTOCKED_ITEMS", "fulfillment_restocked_items"),
+                    ("FULFILLMENT_FULFILLED_ITEMS", "fulfillment_fulfilled_items"),
+                    ("FULFILLMENT_REFUNDED", "fulfillment_refunded"),
+                    ("TRACKING_UPDATED", "tracking_updated"),
+                    ("NOTE_ADDED", "note_added"),
+                    ("OTHER", "other"),
+                ],
+                max_length=255,
+            ),
+        ),
+    ]
