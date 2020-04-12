@@ -709,4 +709,141 @@ def test_fulfill_gift_card_lines_lack_of_stock(
 
     # when
     with pytest.raises(GiftCardNotApplicable):
-        fulfill_gift_card_lines(lines, staff_user, N
+        fulfill_gift_card_lines(lines, staff_user, None, order, site_settings, manager)
+
+
+def test_deactivate_order_gift_cards(
+    gift_card, gift_card_expiry_date, gift_card_created_by_staff, order, staff_user
+):
+    # given
+    bought_cards = [gift_card, gift_card_expiry_date]
+    events.gift_cards_bought_event(bought_cards, order, staff_user, None)
+
+    for card in [gift_card, gift_card_expiry_date, gift_card_created_by_staff]:
+        assert card.is_active
+
+    # when
+    deactivate_order_gift_cards(order.id, staff_user, None)
+
+    # then
+    for card in bought_cards:
+        card.refresh_from_db()
+        assert not card.is_active
+        assert card.events.filter(type=GiftCardEvents.DEACTIVATED)
+
+    assert gift_card_created_by_staff.is_active
+    assert not gift_card_created_by_staff.events.filter(type=GiftCardEvents.DEACTIVATED)
+
+
+def test_deactivate_order_gift_cards_no_order_gift_cards(
+    gift_card, gift_card_expiry_date, gift_card_created_by_staff, order, staff_user
+):
+    # given
+    cards = [gift_card, gift_card_expiry_date, gift_card_created_by_staff]
+    for card in cards:
+        assert card.is_active
+
+    # when
+    deactivate_order_gift_cards(order.id, staff_user, None)
+
+    # then
+    for card in cards:
+        card.refresh_from_db()
+        assert card.is_active
+
+
+def test_order_has_gift_card_lines_true(gift_card_shippable_order_line):
+    order = gift_card_shippable_order_line.order
+    assert order_has_gift_card_lines(order) is True
+
+
+def test_order_has_gift_card_lines_false(order):
+    assert order_has_gift_card_lines(order) is False
+
+
+def test_assign_user_gift_cards(
+    customer_user,
+    gift_card,
+    gift_card_expiry_date,
+    gift_card_used,
+    gift_card_created_by_staff,
+):
+    # given
+    card_ids = [
+        card.id
+        for card in [
+            gift_card,
+            gift_card_expiry_date,
+            gift_card_created_by_staff,
+            gift_card_used,
+        ]
+    ]
+    GiftCard.objects.filter(id__in=card_ids).update(created_by=None)
+
+    gift_card_used.used_by = None
+    gift_card_used.save(update_fields=["used_by"])
+
+    # when
+    assign_user_gift_cards(customer_user)
+
+    # then
+    for card in [gift_card, gift_card_expiry_date]:
+        card.refresh_from_db()
+        assert card.created_by == customer_user
+
+    gift_card_used.refresh_from_db()
+    assert gift_card_used.used_by == customer_user
+    assert not gift_card_used.created_by
+
+
+def test_assign_user_gift_cards_no_gift_cards_to_assign(
+    customer_user, gift_card_created_by_staff
+):
+    # given
+    gift_card_created_by_staff.created_by = None
+    gift_card_created_by_staff.save(update_fields=["created_by"])
+
+    # when
+    assign_user_gift_cards(customer_user)
+
+    # then
+    gift_card_created_by_staff.refresh_from_db()
+    assert not gift_card_created_by_staff.created_by
+
+
+def test_is_gift_card_expired_never_expired_gift_card(gift_card):
+    # given
+    assert not gift_card.expiry_date
+
+    # when
+    result = is_gift_card_expired(gift_card)
+
+    # then
+    assert result is False
+
+
+def test_is_gift_card_expired_true(gift_card):
+    # given
+    gift_card.expiry_date = date.today() - timedelta(days=1)
+    gift_card.save(update_fields=["expiry_date"])
+
+    # when
+    result = is_gift_card_expired(gift_card)
+
+    # then
+    assert result is True
+
+
+@pytest.mark.parametrize(
+    "expiry_date", [timezone.now().date(), timezone.now().date() + timedelta(days=1)]
+)
+def test_is_gift_card_expired_false(expiry_date, gift_card):
+    # given
+    gift_card.expiry_date = expiry_date
+    gift_card.save(update_fields=["expiry_date"])
+
+    # when
+    result = is_gift_card_expired(gift_card)
+
+    # then
+    assert result is False
