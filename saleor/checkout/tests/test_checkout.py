@@ -905,4 +905,249 @@ def test_get_discount_for_checkout_shipping_voucher_all_countries(
         manager, voucher, checkout_info, [], None, None
     )
 
-    assert discount 
+    assert discount == Money(5, "USD")
+
+
+def test_get_discount_for_checkout_shipping_voucher_limited_countries(
+    monkeypatch, channel_USD
+):
+    subtotal = Money(100, "USD")
+    shipping_total = TaxedMoney(net=Money(10, "USD"), gross=Money(10, "USD"))
+    monkeypatch.setattr(
+        "saleor.checkout.utils.base_calculations.base_checkout_subtotal",
+        lambda *args: subtotal,
+    )
+    checkout = Mock(
+        get_subtotal=Mock(return_value=subtotal),
+        channel=channel_USD,
+        is_shipping_required=Mock(return_value=True),
+        shipping_method=Mock(get_total=Mock(return_value=shipping_total)),
+        shipping_address=Mock(country=Country("PL")),
+    )
+    voucher = Voucher.objects.create(
+        code="unique",
+        type=VoucherType.SHIPPING,
+        discount_value_type=DiscountValueType.PERCENTAGE,
+        countries=["UK", "DE"],
+    )
+    VoucherChannelListing.objects.create(
+        voucher=voucher,
+        channel=channel_USD,
+        discount=Money(50, channel_USD.currency_code),
+    )
+
+    checkout_info = CheckoutInfo(
+        checkout=checkout,
+        delivery_method_info=get_delivery_method_info(None, None),
+        shipping_address=Mock(spec=Address, country=Mock(code="PL")),
+        billing_address=None,
+        channel=channel_USD,
+        user=None,
+        tax_configuration=channel_USD.tax_configuration,
+        valid_pick_up_points=[],
+        all_shipping_methods=[],
+    )
+    manager = get_plugins_manager()
+    with pytest.raises(NotApplicable):
+        get_voucher_discount_for_checkout(manager, voucher, checkout_info, [], None, [])
+
+
+@pytest.mark.parametrize(
+    "is_shipping_required, shipping_method_data, discount_value, discount_type,"
+    "countries, min_spent_amount, min_checkout_items_quantity, subtotal,"
+    "total_quantity, error_msg",
+    [
+        (
+            True,
+            ShippingMethodData("1", "test", Money(10, "USD")),
+            10,
+            DiscountValueType.FIXED,
+            ["US"],
+            None,
+            None,
+            Money(10, "USD"),
+            10,
+            "This offer is not valid in your country.",
+        ),
+        (
+            True,
+            None,
+            10,
+            DiscountValueType.FIXED,
+            [],
+            None,
+            None,
+            Money(10, "USD"),
+            10,
+            "Please select a delivery method first.",
+        ),
+        (
+            False,
+            None,
+            10,
+            DiscountValueType.FIXED,
+            [],
+            None,
+            None,
+            Money(10, "USD"),
+            10,
+            "Your order does not require shipping.",
+        ),
+        (
+            True,
+            ShippingMethodData("1", "test", Money(10, "USD")),
+            10,
+            DiscountValueType.FIXED,
+            [],
+            5,
+            None,
+            Money(2, "USD"),
+            10,
+            "This offer is only valid for orders over $5.00.",
+        ),
+        (
+            True,
+            ShippingMethodData("1", "test", Money(10, "USD")),
+            10,
+            DiscountValueType.FIXED,
+            [],
+            5,
+            10,
+            Money(5, "USD"),
+            9,
+            "This offer is only valid for orders with a minimum of 10 quantity.",
+        ),
+        (
+            True,
+            ShippingMethodData("1", "test", Money(10, "USD")),
+            10,
+            DiscountValueType.FIXED,
+            [],
+            5,
+            10,
+            Money(2, "USD"),
+            9,
+            "This offer is only valid for orders over $5.00.",
+        ),
+    ],
+)
+def test_get_discount_for_checkout_shipping_voucher_not_applicable(
+    is_shipping_required,
+    shipping_method,
+    shipping_method_data,
+    discount_value,
+    discount_type,
+    countries,
+    min_spent_amount,
+    min_checkout_items_quantity,
+    subtotal,
+    total_quantity,
+    error_msg,
+    monkeypatch,
+    channel_USD,
+):
+    monkeypatch.setattr(
+        "saleor.checkout.base_calculations.base_checkout_subtotal",
+        lambda *args: subtotal,
+    )
+    monkeypatch.setattr(
+        "saleor.checkout.utils.is_shipping_required", lambda lines: is_shipping_required
+    )
+    checkout = Mock(
+        is_shipping_required=Mock(return_value=is_shipping_required),
+        shipping_method=shipping_method,
+        shipping_address=Mock(spec=Address, country=Mock(code="PL")),
+        quantity=total_quantity,
+        spec=Checkout,
+        channel=channel_USD,
+    )
+
+    voucher = Voucher.objects.create(
+        code="unique",
+        type=VoucherType.SHIPPING,
+        discount_value_type=discount_type,
+        min_checkout_items_quantity=min_checkout_items_quantity,
+        countries=countries,
+    )
+    manager = get_plugins_manager()
+    VoucherChannelListing.objects.create(
+        voucher=voucher,
+        channel=channel_USD,
+        discount=Money(discount_value, channel_USD.currency_code),
+        min_spent_amount=(min_spent_amount if min_spent_amount is not None else None),
+    )
+    checkout_info = CheckoutInfo(
+        checkout=checkout,
+        delivery_method_info=get_delivery_method_info(shipping_method_data),
+        shipping_address=Mock(spec=Address, country=Mock(code="PL")),
+        billing_address=None,
+        channel=channel_USD,
+        user=None,
+        tax_configuration=channel_USD.tax_configuration,
+        valid_pick_up_points=[],
+        all_shipping_methods=[],
+    )
+    with pytest.raises(NotApplicable) as e:
+        get_voucher_discount_for_checkout(
+            manager,
+            voucher,
+            checkout_info,
+            [],
+            checkout.shipping_address,
+            None,
+        )
+    assert str(e.value) == error_msg
+
+
+def test_get_voucher_for_checkout_info(checkout_with_voucher, voucher):
+    manager = get_plugins_manager()
+    checkout_info = fetch_checkout_info(checkout_with_voucher, [], [], manager)
+    checkout_voucher = get_voucher_for_checkout_info(checkout_info)
+    assert checkout_voucher == voucher
+
+
+def test_get_voucher_for_checkout_info_expired_voucher(checkout_with_voucher, voucher):
+    date_yesterday = timezone.now() - datetime.timedelta(days=1)
+    voucher.end_date = date_yesterday
+    voucher.save()
+    manager = get_plugins_manager()
+    checkout_info = fetch_checkout_info(checkout_with_voucher, [], [], manager)
+    checkout_voucher = get_voucher_for_checkout_info(checkout_info)
+    assert checkout_voucher is None
+
+
+def test_get_voucher_for_checkout_info_no_voucher_code(checkout):
+    manager = get_plugins_manager()
+    checkout_info = fetch_checkout_info(checkout, [], [], manager)
+    checkout_voucher = get_voucher_for_checkout_info(checkout_info)
+    assert checkout_voucher is None
+
+
+def test_remove_voucher_from_checkout(checkout_with_voucher, voucher_translation_fr):
+    checkout = checkout_with_voucher
+    remove_voucher_from_checkout(checkout)
+
+    assert not checkout.voucher_code
+    assert not checkout.discount_name
+    assert not checkout.translated_discount_name
+    assert isinstance(checkout.discount_amount, Decimal)
+    assert checkout.discount == zero_money(checkout.channel.currency_code)
+
+
+def test_checkout_discount_amount_should_be_decimal():
+    checkout = Checkout()
+    assert isinstance(checkout.discount_amount, Decimal)
+
+
+def test_recalculate_checkout_discount(
+    checkout_with_voucher,
+    voucher,
+    voucher_translation_fr,
+    settings,
+    channel_USD,
+):
+    settings.LANGUAGE_CODE = "fr"
+    voucher.channel_listings.filter(channel=channel_USD).update(discount_value=10)
+
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(check
