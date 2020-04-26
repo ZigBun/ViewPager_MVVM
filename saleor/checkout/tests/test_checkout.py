@@ -1572,4 +1572,189 @@ def test_is_fully_paid_mg_payments(checkout_with_item, payment_dummy):
     )
     payment = payment_dummy
     payment.is_active = True
-    p
+    payment.order = None
+    payment.total = total.gross.amount - 1
+    payment.currency = total.gross.currency
+    payment.checkout = checkout
+    payment.save()
+    payment2 = payment_dummy
+    payment2.pk = None
+    payment2.is_active = True
+    payment2.order = None
+    payment2.total = 1
+    payment2.currency = total.gross.currency
+    payment2.checkout = checkout
+    payment2.save()
+    is_paid = is_fully_paid(manager, checkout_info, lines, None)
+    assert is_paid
+
+
+def test_is_fully_paid_partially_paid(checkout_with_item, payment_dummy):
+    checkout = checkout_with_item
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    total = calculations.checkout_total(
+        manager=manager,
+        checkout_info=checkout_info,
+        lines=lines,
+        address=checkout.shipping_address,
+    )
+    payment = payment_dummy
+    payment.is_active = True
+    payment.order = None
+    payment.total = total.gross.amount - 1
+    payment.currency = total.gross.currency
+    payment.checkout = checkout
+    payment.save()
+    is_paid = is_fully_paid(manager, checkout_info, lines, None)
+    assert not is_paid
+
+
+def test_is_fully_paid_no_payment(checkout_with_item):
+    checkout = checkout_with_item
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    is_paid = is_fully_paid(manager, checkout_info, lines, None)
+    assert not is_paid
+
+
+def test_cancel_active_payments(checkout_with_payments):
+    # given
+    checkout = checkout_with_payments
+    count_active = checkout.payments.filter(is_active=True).count()
+    assert count_active != 0
+
+    # when
+    cancel_active_payments(checkout)
+
+    # then
+    assert checkout.payments.filter(is_active=True).count() == 0
+
+
+def test_checkout_without_delivery_method_creates_empty_delivery_method(
+    checkout_with_item,
+):
+    checkout = checkout_with_item
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    delivery_method_info = checkout_info.delivery_method_info
+
+    assert isinstance(delivery_method_info, DeliveryMethodBase)
+    assert not delivery_method_info.is_valid_delivery_method()
+    assert not delivery_method_info.is_local_collection_point
+    assert not delivery_method_info.is_method_in_valid_methods(checkout_info)
+
+
+def test_manage_external_shipping_id(checkout):
+    app_shipping_id = "abcd"
+    initial_private_metadata = {"test": 123}
+    checkout.metadata_storage.private_metadata = initial_private_metadata
+    checkout.metadata_storage.save()
+
+    set_external_shipping_id(checkout, app_shipping_id)
+    assert PRIVATE_META_APP_SHIPPING_ID in checkout.metadata_storage.private_metadata
+
+    shipping_id = get_external_shipping_id(checkout)
+    assert shipping_id == app_shipping_id
+
+    delete_external_shipping_id(checkout)
+    assert checkout.metadata_storage.private_metadata == initial_private_metadata
+
+
+def test_checkout_total_setter():
+    # given
+    currency = "USD"
+    net_amount = Decimal(10)
+    net = Money(net_amount, currency)
+    gross_amount = Decimal(15)
+    gross = Money(gross_amount, currency)
+
+    # when
+    price = TaxedMoney(net=net, gross=gross)
+    checkout = Checkout()
+    checkout.total = price
+
+    # then
+    assert checkout.currency == currency
+    assert checkout.total_net_amount == net_amount
+    assert checkout.total.net == net
+    assert checkout.total_gross_amount == gross_amount
+    assert checkout.total.gross == gross
+    assert checkout.total.tax == gross - net
+
+
+def test_checkout_subtotal_setter():
+    # given
+    currency = "USD"
+    net_amount = Decimal(10)
+    net = Money(net_amount, currency)
+    gross_amount = Decimal(15)
+    gross = Money(gross_amount, currency)
+
+    # when
+    price = TaxedMoney(net=net, gross=gross)
+    checkout = Checkout()
+    checkout.subtotal = price
+
+    # then
+    assert checkout.currency == currency
+    assert checkout.subtotal_net_amount == net_amount
+    assert checkout.subtotal.net == net
+    assert checkout.subtotal_gross_amount == gross_amount
+    assert checkout.subtotal.gross == gross
+    assert checkout.subtotal.tax == gross - net
+
+
+def test_checkout_shipping_price_setter():
+    # given
+    currency = "USD"
+    net_amount = Decimal(10)
+    net = Money(net_amount, currency)
+    gross_amount = Decimal(15)
+    gross = Money(gross_amount, currency)
+
+    # when
+    price = TaxedMoney(net=net, gross=gross)
+    checkout = Checkout()
+    checkout.shipping_price = price
+
+    # then
+    assert checkout.currency == currency
+    assert checkout.shipping_price_net_amount == net_amount
+    assert checkout.shipping_price.net == net
+    assert checkout.shipping_price_gross_amount == gross_amount
+    assert checkout.shipping_price.gross == gross
+    assert checkout.shipping_price.tax == gross - net
+
+
+def test_checkout_line_total_price_setter():
+    # given
+    currency = "USD"
+    net_amount = Decimal(10)
+    net = Money(net_amount, currency)
+    gross_amount = Decimal(15)
+    gross = Money(gross_amount, currency)
+
+    # when
+    price = TaxedMoney(net=net, gross=gross)
+    checkout_line = CheckoutLine()
+    checkout_line.total_price = price
+
+    # then
+    assert checkout_line.currency == currency
+    assert checkout_line.total_price_net_amount == net_amount
+    assert checkout_line.total_price.net == net
+    assert checkout_line.total_price_gross_amount == gross_amount
+    assert checkout_line.total_price.gross == gross
+    assert checkout_line.total_price.tax == gross - net
+
+
+def test_checkout_has_currency(checkout):
+    assert hasattr(checkout, "currency")
+
+
+def test_checkout_line_has_currency(checkout_line):
+    assert hasattr(checkout_line, "currency")

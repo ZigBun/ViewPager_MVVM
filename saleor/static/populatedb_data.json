@@ -1,0 +1,1005 @@
+
+[
+  {
+    "model": "discount.sale",
+    "pk": 56,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "name": "Seasonal sale",
+      "type": "percentage",
+      "start_date": "2022-05-14T22:00:00Z",
+      "end_date": null,
+      "created_at": "2022-05-16T12:35:53.164Z",
+      "updated_at": "2022-05-16T12:35:53.164Z",
+      "categories": [],
+      "collections": [],
+      "products": [128, 137, 126, 141, 143],
+      "variants": []
+    }
+  },
+  {
+    "model": "discount.salechannellisting",
+    "pk": 111,
+    "fields": {
+      "sale": 56,
+      "channel": 2,
+      "discount_value": "10.000",
+      "currency": "PLN"
+    }
+  },
+  {
+    "model": "discount.salechannellisting",
+    "pk": 112,
+    "fields": {
+      "sale": 56,
+      "channel": 1,
+      "discount_value": "10.000",
+      "currency": "USD"
+    }
+  },
+  {
+    "model": "giftcard.giftcardtag",
+    "pk": 1,
+    "fields": { "name": "issued-gift-cards" }
+  },
+  {
+    "model": "product.category",
+    "pk": 25,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Accessories",
+      "slug": "accessories",
+      "description": null,
+      "description_plaintext": "",
+      "parent": null,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 1,
+      "rght": 8,
+      "tree_id": 1,
+      "level": 0
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 26,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Audiobooks",
+      "slug": "audiobooks",
+      "description": null,
+      "description_plaintext": "",
+      "parent": 25,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 2,
+      "rght": 3,
+      "tree_id": 1,
+      "level": 1
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 27,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Apparel",
+      "slug": "apparel",
+      "description": null,
+      "description_plaintext": "",
+      "parent": null,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 1,
+      "rght": 28,
+      "tree_id": 2,
+      "level": 0
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 28,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Sneakers",
+      "slug": "sneakers",
+      "description": null,
+      "description_plaintext": "",
+      "parent": 27,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 2,
+      "rght": 3,
+      "tree_id": 2,
+      "level": 1
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 29,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Sweatshirts",
+      "slug": "sweatshirts",
+      "description": null,
+      "description_plaintext": "",
+      "parent": 27,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 4,
+      "rght": 5,
+      "tree_id": 2,
+      "level": 1
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 33,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Headware",
+      "slug": "headware",
+      "description": null,
+      "description_plaintext": "",
+      "parent": 27,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 14,
+      "rght": 21,
+      "tree_id": 2,
+      "level": 1
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 35,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Beanies",
+      "slug": "beanies",
+      "description": null,
+      "description_plaintext": "",
+      "parent": 33,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 15,
+      "rght": 16,
+      "tree_id": 2,
+      "level": 2
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 36,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Scarfs",
+      "slug": "scarfs",
+      "description": null,
+      "description_plaintext": "",
+      "parent": 33,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 17,
+      "rght": 18,
+      "tree_id": 2,
+      "level": 2
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 37,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Sunglasses",
+      "slug": "sunglasses",
+      "description": null,
+      "description_plaintext": "",
+      "parent": 33,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 19,
+      "rght": 20,
+      "tree_id": 2,
+      "level": 2
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 38,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Shirts",
+      "slug": "shirts",
+      "description": null,
+      "description_plaintext": "",
+      "parent": 27,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 22,
+      "rght": 27,
+      "tree_id": 2,
+      "level": 1
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 39,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "T-shirts",
+      "slug": "t-shirts",
+      "description": null,
+      "description_plaintext": "",
+      "parent": 38,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 23,
+      "rght": 24,
+      "tree_id": 2,
+      "level": 2
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 40,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Polo shirts",
+      "slug": "polo-shirts-2",
+      "description": null,
+      "description_plaintext": "",
+      "parent": 38,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 25,
+      "rght": 26,
+      "tree_id": 2,
+      "level": 2
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 41,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Homewares",
+      "slug": "homewares",
+      "description": {
+        "time": 1652606793760,
+        "blocks": [
+          {
+            "id": "ckre1-oB3I",
+            "data": {
+              "text": "Everything a programmer's comfort requires&nbsp;"
+            },
+            "type": "paragraph"
+          }
+        ],
+        "version": "2.22.2"
+      },
+      "description_plaintext": "Everything a programmer's comfort requires&nbsp;",
+      "parent": 25,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 4,
+      "rght": 5,
+      "tree_id": 1,
+      "level": 1
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 42,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Groceries",
+      "slug": "groceries",
+      "description": null,
+      "description_plaintext": "",
+      "parent": null,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 1,
+      "rght": 4,
+      "tree_id": 3,
+      "level": 0
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 43,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Juices",
+      "slug": "juices",
+      "description": null,
+      "description_plaintext": "",
+      "parent": 42,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 2,
+      "rght": 3,
+      "tree_id": 3,
+      "level": 1
+    }
+  },
+  {
+    "model": "product.category",
+    "pk": 44,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "name": "Gift cards",
+      "slug": "gift-cards",
+      "description": null,
+      "description_plaintext": "",
+      "parent": 25,
+      "background_image": "",
+      "background_image_alt": "",
+      "lft": 6,
+      "rght": 7,
+      "tree_id": 1,
+      "level": 1
+    }
+  },
+  {
+    "model": "product.producttype",
+    "pk": 17,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "name": "Audiobook",
+      "slug": "audiobook",
+      "kind": "normal",
+      "has_variants": true,
+      "is_shipping_required": false,
+      "is_digital": false,
+      "weight": "0.0:g"
+    }
+  },
+  {
+    "model": "product.producttype",
+    "pk": 18,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "name": "Shoe",
+      "slug": "shoe",
+      "kind": "normal",
+      "has_variants": true,
+      "is_shipping_required": true,
+      "is_digital": false,
+      "weight": "1000.0:g"
+    }
+  },
+  {
+    "model": "product.producttype",
+    "pk": 19,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "name": "Sweatshirt",
+      "slug": "sweatshirt",
+      "kind": "normal",
+      "has_variants": false,
+      "is_shipping_required": true,
+      "is_digital": false,
+      "weight": "1000.0:g"
+    }
+  },
+  {
+    "model": "product.producttype",
+    "pk": 20,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "name": "Top",
+      "slug": "shirt",
+      "kind": "normal",
+      "has_variants": true,
+      "is_shipping_required": true,
+      "is_digital": false,
+      "weight": "1000.0:g"
+    }
+  },
+  {
+    "model": "product.producttype",
+    "pk": 21,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "name": "Beanies & Scarfs",
+      "slug": "beanie",
+      "kind": "normal",
+      "has_variants": false,
+      "is_shipping_required": true,
+      "is_digital": false,
+      "weight": "1000.0:g"
+    }
+  },
+  {
+    "model": "product.producttype",
+    "pk": 22,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "name": "Simple",
+      "slug": "simple",
+      "kind": "normal",
+      "has_variants": false,
+      "is_shipping_required": false,
+      "is_digital": false,
+      "weight": "0.0:g"
+    }
+  },
+  {
+    "model": "product.producttype",
+    "pk": 23,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "name": "Juice",
+      "slug": "juice",
+      "kind": "normal",
+      "has_variants": false,
+      "is_shipping_required": true,
+      "is_digital": false,
+      "weight": "100.0:g"
+    }
+  },
+  {
+    "model": "product.producttype",
+    "pk": 24,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "name": "Simple Gift Card",
+      "slug": "gift-card",
+      "kind": "gift_card",
+      "has_variants": false,
+      "is_shipping_required": false,
+      "is_digital": false,
+      "weight": "0.0:g"
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 126,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "Headless + Omnichannel",
+      "seo_description": "Launch new markets fast",
+      "product_type": 17,
+      "name": "Headless + Omnichannel in a pill",
+      "slug": "headless-omnichannel-commerce",
+      "description": {
+        "time": 1652952009724,
+        "blocks": [
+          {
+            "id": "32SKrcyWwb",
+            "data": { "text": "Launch <b>new markets fast</b>" },
+            "type": "paragraph"
+          }
+        ],
+        "version": "2.22.2"
+      },
+      "description_plaintext": "Launch new markets fast",
+      "search_document": "",
+      "search_vector": "'audio':11B 'digit':10B 'fast':9C 'headless':1A,13A 'headless-omnichannel-mp3':12A 'launch':6C 'market':8C 'mp3':15A,16A,17B 'new':7C 'omnichannel':2A,14A 'pill':5A",
+      "category": 26,
+      "created_at": "2022-05-12T22:07:58.327Z",
+      "updated_at": "2022-05-19T09:20:18.453Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 127,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "White Plimsolls",
+      "seo_description": "PE at school wouldn’t have been such a drag with these on your feet. Slip on the style and stride tall with Saleor branded plimsolls. PE now stands for pretty elegant shoes.",
+      "product_type": 18,
+      "name": "White Plimsolls",
+      "slug": "white-plimsolls",
+      "description": {
+        "time": 1653425999878,
+        "blocks": [
+          {
+            "id": "zUV4oz05zN",
+            "data": {
+              "text": "<b>PE at school wouldn’t have been such a drag</b> with these on your feet. Slip on the style and stride tall with Saleor branded plimsolls. PE now stands for pretty elegant."
+            },
+            "type": "paragraph"
+          }
+        ],
+        "version": "2.22.2"
+      },
+      "description_plaintext": "PE at school wouldn’t have been such a drag with these on your feet. Slip on the style and stride tall with Saleor branded plimsolls. PE now stands for pretty elegant.",
+      "search_document": "",
+      "search_vector": "'39':36A,49B '40':38A,50B '41':40A,51B '42':42A,52B '43':44A,53B '44':46A,54B '45':48A,55B '918223582':35A '918223583':37A '918223584':39A '918223585':41A '918223586':43A '918223587':45A '918223588':47A 'brand':27C 'drag':12C 'eleg':34C 'feet':17C 'pe':3C,29C 'plimsol':2A,28C 'pretti':33C 'saleor':26C 'school':5C 'slip':18C 'stand':31C 'stride':23C 'style':21C 'tall':24C 'white':1A 'wouldn':6C",
+      "category": 28,
+      "created_at": "2022-05-13T14:34:39.934Z",
+      "updated_at": "2022-05-13T20:11:18.993Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 128,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 18,
+      "name": "Blue Plimsolls",
+      "slug": "blue-plimsolls",
+      "description": {
+        "time": 1653426057314,
+        "blocks": [
+          {
+            "id": "b8HYevCTpU",
+            "data": {
+              "text": "<b>Step into summer with Saleor.</b> Every time your head goes down, you see these beauties, and your mood bounces right back up."
+            },
+            "type": "paragraph"
+          }
+        ],
+        "version": "2.22.2"
+      },
+      "description_plaintext": "Step into summer with Saleor. Every time your head goes down, you see these beauties, and your mood bounces right back up.",
+      "search_document": "",
+      "search_vector": "'40':25A,30B '41':27A,31B '42':29A,32B '818223582':24A '818223583':26A '818223584':28A 'back':23C 'beauti':17C 'blue':1A 'bounc':21C 'everi':8C 'goe':12C 'head':11C 'mood':20C 'plimsol':2A 'right':22C 'saleor':7C 'see':15C 'step':3C 'summer':5C 'time':9C",
+      "category": 28,
+      "created_at": "2022-05-13T20:14:01.299Z",
+      "updated_at": "2022-05-13T20:39:54.551Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 129,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 18,
+      "name": "Dash Force",
+      "slug": "dash-force",
+      "description": {
+        "time": 1653426379418,
+        "blocks": [
+          {
+            "id": "N0VISDl8_2",
+            "data": {
+              "text": "<b>Step into summer with the right balance.</b>&nbsp;Every time your head goes down, you see these beauties, and your mood bounces right back up."
+            },
+            "type": "paragraph"
+          }
+        ],
+        "version": "2.22.2"
+      },
+      "description_plaintext": "Step into summer with the right balance.&nbsp;Every time your head goes down, you see these beauties, and your mood bounces right back up.",
+      "search_document": "",
+      "search_vector": "'118223581':28A '118223582':30A '118223583':32A '118223584':34A '118223585':36A '39':29A,38B '40':31A,39B '41':33A,40B '42':35A,41B '420':4A '45':37A,42B 'back':27C 'balanc':3A,11C 'beauti':21C 'bounc':25C 'everi':12C 'goe':16C 'head':15C 'mood':24C 'paul':1A 'right':10C,26C 'see':19C 'step':5C 'summer':7C 'time':13C",
+      "category": 28,
+      "created_at": "2022-05-13T20:44:05.403Z",
+      "updated_at": "2022-05-13T20:47:18.902Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 130,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 18,
+      "name": "Paul's Balance 420",
+      "slug": "balance-trail-720",
+      "description": {
+        "time": 1653426379418,
+        "blocks": [
+          {
+            "id": "N0VISDl8_2",
+            "data": {
+              "text": "<b>Step into summer with the right balance.</b>&nbsp;Every time your head goes down, you see these beauties, and your mood bounces right back up."
+            },
+            "type": "paragraph"
+          }
+        ],
+        "version": "2.22.2"
+      },
+      "description_plaintext": "Step into summer with the right balance.&nbsp;Every time your head goes down, you see these beauties, and your mood bounces right back up.",
+      "search_document": "",
+      "search_vector": "'118223581':28A '118223582':30A '118223583':32A '118223584':34A '118223585':36A '39':29A,38B '40':31A,39B '41':33A,40B '42':35A,41B '420':4A '45':37A,42B 'back':27C 'balanc':3A,11C 'beauti':21C 'bounc':25C 'everi':12C 'goe':16C 'head':15C 'mood':24C 'paul':1A 'right':10C,26C 'see':19C 'step':5C 'summer':7C 'time':13C",
+      "category": 28,
+      "created_at": "2022-05-13T20:50:54.123Z",
+      "updated_at": "2022-05-13T21:15:21.592Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 131,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 19,
+      "name": "Grey Hoodie",
+      "slug": "grey-hoodie",
+      "description": null,
+      "description_plaintext": "",
+      "search_document": "",
+      "search_vector": "'cotton':3B 'grey':1A 'hoodi':2A 'uhjvzhvjdfzhcmlhbnq6mzq1':4A",
+      "category": 29,
+      "created_at": "2022-05-13T21:07:45.009Z",
+      "updated_at": "2022-05-13T21:10:33.993Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 132,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 19,
+      "name": "Blue Hoodie",
+      "slug": "blue-hoodie",
+      "description": null,
+      "description_plaintext": "",
+      "search_document": "",
+      "search_vector": "'blue':1A 'hoodi':2A 'polyest':3B 'uhjvzhvjdfzhcmlhbnq6mzq2':4A",
+      "category": 29,
+      "created_at": "2022-05-13T21:11:28.525Z",
+      "updated_at": "2022-05-16T16:40:43.118Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 133,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 19,
+      "name": "White Hoodie",
+      "slug": "white-hoodie",
+      "description": null,
+      "description_plaintext": "",
+      "search_document": "",
+      "search_vector": "'cotton':3B 'hoodi':2A 'uhjvzhvjdfzhcmlhbnq6mzq3':4A 'white':1A",
+      "category": 29,
+      "created_at": "2022-05-13T21:13:28.944Z",
+      "updated_at": "2022-05-13T21:14:28.328Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 134,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 20,
+      "name": "Monospace Tee",
+      "slug": "ascii-tee",
+      "description": {
+        "time": 1653425587889,
+        "blocks": [
+          {
+            "id": "HVJ8gMNIXY",
+            "data": {
+              "text": "<b>Your t-shirt is your second skin.</b> It’s the version of you that you show to the world. Wear the Monospace one that flows with your command line kung-fu moves!&nbsp;"
+            },
+            "type": "paragraph"
+          }
+        ],
+        "version": "2.22.2"
+      },
+      "description_plaintext": "Your t-shirt is your second skin. It’s the version of you that you show to the world. Wear the Monospace one that flows with your command line kung-fu moves!&nbsp;",
+      "search_document": "",
+      "search_vector": "'328223580':38A '328223581':39A '328223582':41A '328223583':43A '328223584':45A 'command':31C 'cotton':37B 'flow':28C 'fu':35C 'kung':34C 'kung-fu':33C 'l':42A,48B 'line':32C 'm':40A,47B 'monospac':1A,25C 'move':36C 'one':26C 'second':9C 'shirt':6C 'show':19C 'skin':10C 't-shirt':4C 'tee':2A 'version':14C 'wear':23C 'world':22C 'xl':44A,49B 'xxl':46A,50B",
+      "category": 39,
+      "created_at": "2022-05-13T21:20:59.727Z",
+      "updated_at": "2022-05-15T09:38:17.179Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 135,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 20,
+      "name": "Team Shirt",
+      "slug": "team-shirt",
+      "description": {
+        "time": 1653425391562,
+        "blocks": [
+          {
+            "id": "fMdfe0Bfpe",
+            "data": {
+              "text": "<b>One style fits all.</b> Get a look that works even when you are taking it easy. Relaxed wear for the fans."
+            },
+            "type": "paragraph"
+          }
+        ],
+        "version": "2.22.2"
+      },
+      "description_plaintext": "One style fits all. Get a look that works even when you are taking it easy. Relaxed wear for the fans.",
+      "search_document": "",
+      "search_vector": "'128223580':25A '128223581':26A '128223582':28A '128223583':30A '128223584':32A 'easi':18C 'elastan':24B 'even':12C 'fan':23C 'fit':5C 'get':7C 'l':29A,35B 'look':9C 'm':27A,34B 'one':3C 'relax':19C 'shirt':2A 'style':4C 'take':16C 'team':1A 'wear':20C 'work':11C 'xl':31A,36B 'xxl':33A,37B",
+      "category": 39,
+      "created_at": "2022-05-13T21:29:38.009Z",
+      "updated_at": "2022-05-14T21:37:02.094Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 136,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 20,
+      "name": "Darko Polo",
+      "slug": "darko-polo",
+      "description": {
+        "time": 1653425959030,
+        "blocks": [
+          {
+            "id": "Bw6qwwACo6",
+            "data": {
+              "text": "<b>Ever have those days where you feel a bit geometric?</b>&nbsp;Can't quite shape yourself up right? Show your different sides with a Saleor styles."
+            },
+            "type": "paragraph"
+          }
+        ],
+        "version": "2.22.2"
+      },
+      "description_plaintext": "Ever have those days where you feel a bit geometric?&nbsp;Can't quite shape yourself up right? Show your different sides with a Saleor styles.",
+      "search_document": "",
+      "search_vector": "'111223580':29A '111223581':30A '111223582':32A 'bit':11C 'cotton':28B 'darko':1A 'day':6C 'differ':22C 'ever':3C 'feel':9C 'geometr':12C 'm':31A,34B 'polo':2A 'quit':15C 'right':19C 'saleor':26C 'shape':16C 'show':20C 'side':23C 'style':27C 'xxl':33A,35B",
+      "category": 40,
+      "created_at": "2022-05-13T21:37:35.753Z",
+      "updated_at": "2022-05-14T21:36:42.372Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 137,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 20,
+      "name": "Blue Polygon Shirt",
+      "slug": "blue-polygon-shirt",
+      "description": {
+        "time": 1653425319677,
+        "blocks": [
+          {
+            "id": "sMEIn2NR8s",
+            "data": {
+              "text": "<b>Ever have those days where you feel a bit geometric?</b> Can't quite shape yourself up right? Show your different sides with a Saleor styles."
+            },
+            "type": "paragraph"
+          }
+        ],
+        "version": "2.22.2"
+      },
+      "description_plaintext": "Ever have those days where you feel a bit geometric? Can't quite shape yourself up right? Show your different sides with a Saleor styles.",
+      "search_document": "",
+      "search_vector": "'218223580':30A '218223581':32A '218223582':34A 'bit':12C 'blue':1A 'cotton':29B 'day':7C 'differ':23C 'ever':4C 'feel':10C 'geometr':13C 'l':33A,37B 'm':31A,36B 'polygon':2A 'quit':16C 'right':20C 'saleor':27C 'shape':17C 'shirt':3A 'show':21C 'side':24C 'style':28C 'xl':35A,38B",
+      "category": 39,
+      "created_at": "2022-05-13T21:41:46.295Z",
+      "updated_at": "2022-05-14T21:36:18.923Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 138,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 20,
+      "name": "Dark Polygon Tee",
+      "slug": "dark-polygon-tee",
+      "description": {
+        "time": 1653425300293,
+        "blocks": [
+          {
+            "id": "DBlOMRDzk_",
+            "data": {
+              "text": "<b>Ever have those days where you feel a bit geometric?</b> Can't quite shape yourself up right? Show your different sides with a Saleor styles."
+            },
+            "type": "paragraph"
+          }
+        ],
+        "version": "2.22.2"
+      },
+      "description_plaintext": "Ever have those days where you feel a bit geometric? Can't quite shape yourself up right? Show your different sides with a Saleor styles.",
+      "search_document": "",
+      "search_vector": "'112223580':30A '112223581':31A '112223582':33A 'bit':12C 'cotton':29B 'dark':1A 'day':7C 'differ':23C 'ever':4C 'feel':10C 'geometr':13C 'l':34A,36B 'm':32A,35B 'polygon':2A 'quit':16C 'right':20C 'saleor':27C 'shape':17C 'show':21C 'side':24C 'style':28C 'tee':3A",
+      "category": 39,
+      "created_at": "2022-05-13T21:44:02.972Z",
+      "updated_at": "2022-05-14T21:36:31.780Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 141,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 21,
+      "name": "Pirate's Beanie",
+      "slug": "pirates-beanie",
+      "description": null,
+      "description_plaintext": "",
+      "search_document": "",
+      "search_vector": "'beani':3A 'cotton':4B 'pirat':1A 'uhjvzhvjdfzhcmlhbnq6mzy4':5A",
+      "category": 35,
+      "created_at": "2022-05-13T23:50:16.297Z",
+      "updated_at": "2022-05-14T21:33:36.545Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 143,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 21,
+      "name": "Neck Warmer",
+      "slug": "tactical-neck-warmer",
+      "description": null,
+      "description_plaintext": "",
+      "search_document": "",
+      "search_vector": "'neck':1A 'uhjvzhvjdfzhcmlhbnq6mzcw':4A 'warmer':2A 'wool':3B",
+      "category": 36,
+      "created_at": "2022-05-14T21:10:01.383Z",
+      "updated_at": "2022-05-14T21:33:04.263Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 144,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 22,
+      "name": "DRY Sunglasses",
+      "slug": "dry-sunglasses",
+      "description": null,
+      "description_plaintext": "",
+      "search_document": "",
+      "search_vector": "'dri':1A 'sunglass':2A 'uhjvzhvjdfzhcmlhbnq6mzcx':3A",
+      "category": 37,
+      "created_at": "2022-05-14T21:24:57.725Z",
+      "updated_at": "2022-05-14T21:25:09.229Z",
+      "weight": null,
+      "rating": 0.0
+    }
+  },
+  {
+    "model": "product.product",
+    "pk": 145,
+    "fields": {
+      "private_metadata": {},
+      "metadata": {},
+      "seo_title": "",
+      "seo_description": "",
+      "product_type": 17,
+      "name": "Battle-tested at brands like Lush",
+      "slug": "battle-tested-at-brands-like-lush",
+      "description": {
+        "time": 1652811542659,
+        "blocks": [
+          {
+            "id": "g2sLxZcLZa",
+            "data": { "text": "Scale <b>effortlessly</b>" },
+            "type": "paragraph"
+          }
+        ],
+        "version": "2.22.2"
+      },
