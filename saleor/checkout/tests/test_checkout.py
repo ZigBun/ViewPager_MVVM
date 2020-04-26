@@ -1150,4 +1150,215 @@ def test_recalculate_checkout_discount(
     voucher.channel_listings.filter(channel=channel_USD).update(discount_value=10)
 
     manager = get_plugins_manager()
-    lines, _ = fetch_checkout_lines(check
+    lines, _ = fetch_checkout_lines(checkout_with_voucher)
+    checkout_info = fetch_checkout_info(checkout_with_voucher, lines, [], manager)
+
+    recalculate_checkout_discount(manager, checkout_info, lines, None)
+    assert (
+        checkout_with_voucher.translated_discount_name == voucher_translation_fr.name
+    )  # noqa
+    assert checkout_with_voucher.discount == Money("10.00", "USD")
+
+
+def test_recalculate_checkout_discount_percentage(
+    priced_checkout_with_voucher_percentage,
+):
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(priced_checkout_with_voucher_percentage)
+    checkout_info = fetch_checkout_info(
+        priced_checkout_with_voucher_percentage, lines, [], manager
+    )
+
+    recalculate_checkout_discount(manager, checkout_info, lines, None)
+    assert priced_checkout_with_voucher_percentage.discount == Money(
+        Decimal("3.00"), "USD"
+    )
+
+
+def test_recalculate_checkout_discount_with_sale(
+    checkout_with_voucher_percentage,
+    discount_info,
+):
+    checkout = checkout_with_voucher_percentage
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+
+    recalculate_checkout_discount(manager, checkout_info, lines, [discount_info])
+    assert checkout.discount == Money("1.50", "USD")
+
+    checkout.price_expiration = timezone.now()
+    checkout.save()
+    assert calculations.checkout_total(
+        manager=manager,
+        checkout_info=checkout_info,
+        lines=lines,
+        address=checkout.shipping_address,
+        discounts=[discount_info],
+    ).gross == Money("13.50", "USD")
+
+
+def test_recalculate_checkout_discount_voucher_not_applicable(
+    checkout_with_voucher, voucher, channel_USD
+):
+    checkout = checkout_with_voucher
+    voucher.channel_listings.filter(channel=channel_USD).update(min_spent_amount=100)
+
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    recalculate_checkout_discount(manager, checkout_info, lines, None)
+
+    assert not checkout.voucher_code
+    assert not checkout.discount_name
+    assert checkout.discount == zero_money(checkout.channel.currency_code)
+
+
+def test_recalculate_checkout_discount_expired_voucher(checkout_with_voucher, voucher):
+    checkout = checkout_with_voucher
+    date_yesterday = timezone.now() - datetime.timedelta(days=1)
+    voucher.end_date = date_yesterday
+    voucher.save()
+
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    recalculate_checkout_discount(manager, checkout_info, lines, None)
+
+    assert not checkout.voucher_code
+    assert not checkout.discount_name
+    assert checkout.discount == zero_money(checkout.channel.currency_code)
+
+
+def test_recalculate_checkout_discount_free_shipping_subtotal_less_than_shipping(
+    checkout_with_voucher_free_shipping,
+    shipping_method,
+    channel_USD,
+):
+    checkout = checkout_with_voucher_free_shipping
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    channel_listing = shipping_method.channel_listings.get(channel_id=channel_USD.id)
+    channel_listing.price = calculations.checkout_subtotal(
+        manager=manager,
+        checkout_info=checkout_info,
+        lines=lines,
+        address=checkout.shipping_address,
+    ).gross + Money("10.00", "USD")
+    channel_listing.save()
+
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    recalculate_checkout_discount(manager, checkout_info, lines, None)
+
+    assert checkout.discount == channel_listing.price
+    assert checkout.discount_name == "Free shipping"
+    checkout_total = calculations.checkout_total(
+        manager=manager,
+        checkout_info=checkout_info,
+        lines=lines,
+        address=checkout.shipping_address,
+    )
+    checkout_subtotal = calculations.checkout_subtotal(
+        manager=manager,
+        checkout_info=checkout_info,
+        lines=lines,
+        address=checkout.shipping_address,
+    )
+    assert checkout_total == checkout_subtotal
+
+
+def test_recalculate_checkout_discount_free_shipping_subtotal_bigger_than_shipping(
+    checkout_with_voucher_free_shipping,
+    shipping_method,
+    channel_USD,
+):
+    checkout = checkout_with_voucher_free_shipping
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    channel_listing = shipping_method.channel_listings.get(channel=channel_USD)
+    channel_listing.price = calculations.checkout_subtotal(
+        manager=manager,
+        checkout_info=checkout_info,
+        lines=lines,
+        address=checkout.shipping_address,
+    ).gross - Money("1.00", "USD")
+    channel_listing.save()
+
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    recalculate_checkout_discount(manager, checkout_info, lines, None)
+
+    assert checkout.discount == channel_listing.price
+    assert checkout.discount_name == "Free shipping"
+    checkout_total = calculations.checkout_total(
+        manager=manager,
+        checkout_info=checkout_info,
+        lines=lines,
+        address=checkout.shipping_address,
+    )
+    checkout_subtotal = calculations.checkout_subtotal(
+        manager=manager,
+        checkout_info=checkout_info,
+        lines=lines,
+        address=checkout.shipping_address,
+    )
+    assert checkout_total == checkout_subtotal
+
+
+def test_recalculate_checkout_discount_free_shipping_for_checkout_without_shipping(
+    checkout_with_voucher_percentage, voucher_free_shipping
+):
+    checkout = checkout_with_voucher_percentage
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    recalculate_checkout_discount(manager, checkout_info, lines, None)
+
+    assert not checkout.discount_name
+    assert not checkout.voucher_code
+    assert checkout.discount == zero_money(checkout.channel.currency_code)
+
+
+def test_change_address_in_checkout(checkout, address):
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+
+    shipping_updated_fields = change_shipping_address_in_checkout(
+        checkout_info,
+        address,
+        lines,
+        [],
+        manager,
+        checkout.channel.shipping_method_listings.all(),
+    )
+    billing_updated_fields = change_billing_address_in_checkout(checkout, address)
+    checkout.save(update_fields=shipping_updated_fields + billing_updated_fields)
+
+    checkout.refresh_from_db()
+    assert checkout.shipping_address == address
+    assert checkout.billing_address == address
+    assert checkout_info.shipping_address == address
+
+
+def test_change_address_in_checkout_to_none(checkout, address):
+    checkout.shipping_address = address
+    checkout.billing_address = address.get_copy()
+    checkout.save()
+
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    shipping_updated_fields = change_shipping_address_in_checkout(
+        checkout_info,
+        None,
+        lines,
+        [],
+        manager,
+        checkout.channel.shipping_method_listings.all(),
+    )
+    billing_updated_fields = change_billing_address_in_checkout(checkout, None)
+    checkout.save(update_fields=shipping_updated_fields + billing_updated_fields)
+
+    check
