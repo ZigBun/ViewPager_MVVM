@@ -1361,4 +1361,215 @@ def test_change_address_in_checkout_to_none(checkout, address):
     billing_updated_fields = change_billing_address_in_checkout(checkout, None)
     checkout.save(update_fields=shipping_updated_fields + billing_updated_fields)
 
-    check
+    checkout.refresh_from_db()
+    assert checkout.shipping_address is None
+    assert checkout.billing_address is None
+    assert checkout_info.shipping_address is None
+
+
+def test_change_address_in_checkout_to_same(checkout, address):
+    checkout.shipping_address = address
+    checkout.billing_address = address.get_copy()
+    checkout.save(update_fields=["shipping_address", "billing_address"])
+    shipping_address_id = checkout.shipping_address.id
+    billing_address_id = checkout.billing_address.id
+
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    shipping_updated_fields = change_shipping_address_in_checkout(
+        checkout_info,
+        address,
+        lines,
+        [],
+        manager,
+        checkout.channel.shipping_method_listings.all(),
+    )
+    billing_updated_fields = change_billing_address_in_checkout(checkout, address)
+    checkout.save(update_fields=shipping_updated_fields + billing_updated_fields)
+
+    checkout.refresh_from_db()
+    assert checkout.shipping_address.id == shipping_address_id
+    assert checkout.billing_address.id == billing_address_id
+    assert checkout_info.shipping_address == address
+
+
+def test_change_address_in_checkout_to_other(checkout, address):
+    address_id = address.id
+    checkout.shipping_address = address
+    checkout.billing_address = address.get_copy()
+    checkout.save(update_fields=["shipping_address", "billing_address"])
+    other_address = Address.objects.create(country=Country("DE"))
+
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    shipping_updated_fields = change_shipping_address_in_checkout(
+        checkout_info,
+        other_address,
+        lines,
+        [],
+        manager,
+        checkout.channel.shipping_method_listings.all(),
+    )
+    billing_updated_fields = change_billing_address_in_checkout(checkout, other_address)
+    checkout.save(update_fields=shipping_updated_fields + billing_updated_fields)
+
+    checkout.refresh_from_db()
+    assert checkout.shipping_address == other_address
+    assert checkout.billing_address == other_address
+    assert not Address.objects.filter(id=address_id).exists()
+    assert checkout_info.shipping_address == other_address
+
+
+def test_change_address_in_checkout_from_user_address_to_other(
+    checkout, customer_user, address
+):
+    address_id = address.id
+    checkout.user = customer_user
+    checkout.shipping_address = address
+    checkout.billing_address = address.get_copy()
+    checkout.save(update_fields=["shipping_address", "billing_address"])
+    other_address = Address.objects.create(country=Country("DE"))
+
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    shipping_updated_fields = change_shipping_address_in_checkout(
+        checkout_info,
+        other_address,
+        lines,
+        [],
+        manager,
+        checkout.channel.shipping_method_listings.all(),
+    )
+    billing_updated_fields = change_billing_address_in_checkout(checkout, other_address)
+    checkout.save(update_fields=shipping_updated_fields + billing_updated_fields)
+
+    checkout.refresh_from_db()
+    assert checkout.shipping_address == other_address
+    assert checkout.billing_address == other_address
+    assert Address.objects.filter(id=address_id).exists()
+    assert checkout_info.shipping_address == other_address
+
+
+def test_add_voucher_to_checkout(checkout_with_item, voucher):
+    assert checkout_with_item.voucher_code is None
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout_with_item)
+    checkout_info = fetch_checkout_info(checkout_with_item, lines, [], manager)
+    add_voucher_to_checkout(manager, checkout_info, lines, voucher)
+    assert checkout_with_item.voucher_code == voucher.code
+
+
+def test_add_staff_voucher_to_anonymous_checkout(checkout_with_item, voucher):
+    voucher.only_for_staff = True
+    voucher.save()
+
+    assert checkout_with_item.voucher_code is None
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout_with_item)
+    checkout_info = fetch_checkout_info(checkout_with_item, lines, [], manager)
+    with pytest.raises(NotApplicable):
+        add_voucher_to_checkout(manager, checkout_info, lines, voucher)
+
+
+def test_add_staff_voucher_to_customer_checkout(
+    checkout_with_item, voucher, customer_user
+):
+    checkout_with_item.user = customer_user
+    checkout_with_item.save()
+    voucher.only_for_staff = True
+    voucher.save()
+
+    assert checkout_with_item.voucher_code is None
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout_with_item)
+    checkout_info = fetch_checkout_info(checkout_with_item, lines, [], manager)
+    with pytest.raises(NotApplicable):
+        add_voucher_to_checkout(manager, checkout_info, lines, voucher)
+
+
+def test_add_staff_voucher_to_staff_checkout(checkout_with_item, voucher, staff_user):
+    checkout_with_item.user = staff_user
+    checkout_with_item.save()
+    voucher.only_for_staff = True
+    voucher.save()
+
+    assert checkout_with_item.voucher_code is None
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout_with_item)
+    checkout_info = fetch_checkout_info(checkout_with_item, lines, [], manager)
+
+    add_voucher_to_checkout(manager, checkout_info, lines, voucher)
+
+
+def test_add_voucher_to_checkout_fail(
+    checkout_with_item, voucher_with_high_min_spent_amount
+):
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout_with_item)
+    checkout_info = fetch_checkout_info(checkout_with_item, lines, [], manager)
+    with pytest.raises(NotApplicable):
+        add_voucher_to_checkout(
+            manager,
+            checkout_info,
+            lines,
+            voucher_with_high_min_spent_amount,
+            False,
+        )
+
+    assert checkout_with_item.voucher_code is None
+
+
+def test_get_last_active_payment(checkout_with_payments):
+    # given
+    payment = Payment.objects.create(
+        gateway="mirumee.payments.dummy",
+        is_active=True,
+        checkout=checkout_with_payments,
+    )
+
+    # when
+    last_payment = checkout_with_payments.get_last_active_payment()
+
+    # then
+    assert last_payment.pk == payment.pk
+
+
+def test_is_fully_paid(checkout_with_item, payment_dummy):
+    checkout = checkout_with_item
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    total = calculations.checkout_total(
+        manager=manager,
+        checkout_info=checkout_info,
+        lines=lines,
+        address=checkout.shipping_address,
+    )
+    payment = payment_dummy
+    payment.is_active = True
+    payment.order = None
+    payment.total = total.gross.amount
+    payment.currency = total.gross.currency
+    payment.checkout = checkout
+    payment.save()
+    is_paid = is_fully_paid(manager, checkout_info, lines, None)
+    assert is_paid
+
+
+def test_is_fully_paid_mg_payments(checkout_with_item, payment_dummy):
+    checkout = checkout_with_item
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+    total = calculations.checkout_total(
+        manager=manager,
+        checkout_info=checkout_info,
+        lines=lines,
+        address=checkout.shipping_address,
+    )
+    payment = payment_dummy
+    payment.is_active = True
+    p
