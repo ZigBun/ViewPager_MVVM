@@ -8766,3 +8766,514 @@
       "quantity_allocated": 0
     }
   },
+  {
+    "model": "warehouse.stock",
+    "pk": 3966,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 329,
+      "quantity": 500,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3967,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 330,
+      "quantity": 500,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3968,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 331,
+      "quantity": 500,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3969,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 332,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3970,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 333,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3971,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 334,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3972,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 335,
+      "quantity": 300,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3973,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 336,
+      "quantity": 300,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3974,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 337,
+      "quantity": 300,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3975,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 338,
+      "quantity": 300,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3976,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 339,
+      "quantity": 300,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3977,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 340,
+      "quantity": 400,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3978,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 341,
+      "quantity": 400,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3979,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 342,
+      "quantity": 400,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3980,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 343,
+      "quantity": 400,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3981,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 344,
+      "quantity": 400,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3982,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 348,
+      "quantity": 200,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3983,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 349,
+      "quantity": 200,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3984,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 350,
+      "quantity": 200,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3985,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 351,
+      "quantity": 200,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3986,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 352,
+      "quantity": 200,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3987,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 353,
+      "quantity": 400,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3988,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 354,
+      "quantity": 400,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3989,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 355,
+      "quantity": 400,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3990,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 356,
+      "quantity": 400,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3991,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 357,
+      "quantity": 400,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3992,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 358,
+      "quantity": 800,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3993,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 359,
+      "quantity": 800,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3994,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 360,
+      "quantity": 800,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3995,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 361,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3996,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 362,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3997,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 363,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3998,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 364,
+      "quantity": 695,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 3999,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 365,
+      "quantity": 695,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4000,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 366,
+      "quantity": 695,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4002,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 372,
+      "quantity": 500,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4003,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 373,
+      "quantity": 700,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4004,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 374,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4005,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 375,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4006,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 376,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4007,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 377,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4008,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 378,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4009,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 379,
+      "quantity": 0,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4010,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 380,
+      "quantity": 0,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4011,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 389,
+      "quantity": 994,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4012,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 390,
+      "quantity": 994,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4013,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 394,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4014,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 395,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4015,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 396,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4016,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 397,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  },
+  {
+    "model": "warehouse.stock",
+    "pk": 4017,
+    "fields": {
+      "warehouse": "43bea6af-8cea-40cd-9760-cab77416f207",
+      "product_variant": 398,
+      "quantity": 1000,
+      "quantity_allocated": 0
+    }
+  }
+]
