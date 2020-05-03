@@ -242,4 +242,235 @@ def create_payment(
     gateway: str,
     total: Decimal,
     currency: str,
-    email: st
+    email: str,
+    customer_ip_address: Optional[str] = None,
+    payment_token: Optional[str] = None,
+    extra_data: Optional[Dict] = None,
+    checkout: Optional[Checkout] = None,
+    order: Optional[Order] = None,
+    return_url: Optional[str] = None,
+    external_reference: Optional[str] = None,
+    store_payment_method: str = StorePaymentMethod.NONE,
+    metadata: Optional[Dict[str, str]] = None,
+) -> Payment:
+    """Create a payment instance.
+
+    This method is responsible for creating payment instances that works for
+    both Django views and GraphQL mutations.
+    """
+
+    if extra_data is None:
+        extra_data = {}
+
+    data = {
+        "is_active": True,
+        "customer_ip_address": customer_ip_address or "",
+        "extra_data": json.dumps(extra_data),
+        "token": payment_token or "",
+    }
+
+    if checkout:
+        data["checkout"] = checkout
+        billing_address = checkout.billing_address
+    elif order:
+        data["order"] = order
+        billing_address = order.billing_address
+    else:
+        raise TypeError("Must provide checkout or order to create a payment.")
+
+    if not billing_address:
+        raise PaymentError(
+            "Order does not have a billing address.",
+            code=PaymentErrorCode.BILLING_ADDRESS_NOT_SET.value,
+        )
+
+    defaults = {
+        "billing_email": email,
+        "billing_first_name": billing_address.first_name,
+        "billing_last_name": billing_address.last_name,
+        "billing_company_name": billing_address.company_name,
+        "billing_address_1": billing_address.street_address_1,
+        "billing_address_2": billing_address.street_address_2,
+        "billing_city": billing_address.city,
+        "billing_postal_code": billing_address.postal_code,
+        "billing_country_code": billing_address.country.code,
+        "billing_country_area": billing_address.country_area,
+        "currency": currency,
+        "gateway": gateway,
+        "total": total,
+        "return_url": return_url,
+        "partial": False,
+        "psp_reference": external_reference or "",
+        "store_payment_method": store_payment_method,
+        "metadata": {} if metadata is None else metadata,
+    }
+
+    payment, _ = Payment.objects.get_or_create(defaults=defaults, **data)
+    return payment
+
+
+def get_already_processed_transaction(
+    payment: "Payment", gateway_response: GatewayResponse
+):
+    transaction = payment.transactions.filter(
+        is_success=gateway_response.is_success,
+        action_required=gateway_response.action_required,
+        token=gateway_response.transaction_id,
+        kind=gateway_response.kind,
+        amount=gateway_response.amount,
+        currency=gateway_response.currency,
+    ).last()
+    return transaction
+
+
+@overload
+def create_transaction(
+    payment: Payment,
+    *,
+    kind: str,
+    payment_information: PaymentData,
+    action_required: bool = False,
+    gateway_response: Optional[GatewayResponse] = None,
+    error_msg=None,
+    is_success=False,
+) -> Transaction:
+    ...
+
+
+@overload
+def create_transaction(
+    payment: Payment,
+    *,
+    kind: str,
+    payment_information: Optional[PaymentData],
+    action_required: bool = False,
+    gateway_response: GatewayResponse,
+    error_msg=None,
+    is_success=False,
+) -> Transaction:
+    ...
+
+
+def create_transaction(
+    payment: Payment,
+    *,
+    kind: str,
+    payment_information: Optional[PaymentData],
+    action_required: bool = False,
+    gateway_response: Optional[GatewayResponse] = None,
+    error_msg=None,
+    is_success=False,
+) -> Transaction:
+    """Create a transaction based on transaction kind and gateway response."""
+    # Default values for token, amount, currency are only used in cases where
+    # response from gateway was invalid or an exception occurred
+    if not gateway_response:
+        if not payment_information:
+            raise ValueError("Payment information is required to create a transaction.")
+        gateway_response = GatewayResponse(
+            kind=kind,
+            action_required=False,
+            transaction_id=payment_information.token or "",
+            is_success=is_success,
+            amount=payment_information.amount,
+            currency=payment_information.currency,
+            error=error_msg,
+            raw_response={},
+        )
+
+    txn = Transaction.objects.create(
+        payment=payment,
+        action_required=action_required,
+        kind=gateway_response.kind,
+        token=gateway_response.transaction_id,
+        is_success=gateway_response.is_success,
+        amount=gateway_response.amount,
+        currency=gateway_response.currency,
+        error=gateway_response.error,
+        customer_id=gateway_response.customer_id,
+        gateway_response=gateway_response.raw_response or {},
+        action_required_data=gateway_response.action_required_data or {},
+    )
+    return txn
+
+
+def get_already_processed_transaction_or_create_new_transaction(
+    payment: Payment,
+    kind: str,
+    payment_information: PaymentData,
+    action_required: bool = False,
+    gateway_response: Optional[GatewayResponse] = None,
+    error_msg=None,
+) -> Transaction:
+    if gateway_response and gateway_response.transaction_already_processed:
+        txn = get_already_processed_transaction(payment, gateway_response)
+        if txn:
+            return txn
+    return create_transaction(
+        payment,
+        kind=kind,
+        payment_information=payment_information,
+        action_required=action_required,
+        gateway_response=gateway_response,
+        error_msg=error_msg,
+    )
+
+
+def clean_capture(payment: Payment, amount: Decimal):
+    """Check if payment can be captured."""
+    if amount <= 0:
+        raise PaymentError("Amount should be a positive number.")
+    if not payment.can_capture():
+        raise PaymentError("This payment cannot be captured.")
+    if amount > payment.total or amount > (payment.total - payment.captured_amount):
+        raise PaymentError("Unable to charge more than un-captured amount.")
+
+
+def clean_authorize(payment: Payment):
+    """Check if payment can be authorized."""
+    if not payment.can_authorize():
+        raise PaymentError("Charged transactions cannot be authorized again.")
+
+
+def validate_gateway_response(response: GatewayResponse):
+    """Validate response to be a correct format for Saleor to process."""
+    if not isinstance(response, GatewayResponse):
+        raise GatewayError("Gateway needs to return a GatewayResponse obj")
+
+    if response.kind not in ALLOWED_GATEWAY_KINDS:
+        raise GatewayError(
+            "Gateway response kind must be one of {}".format(
+                sorted(ALLOWED_GATEWAY_KINDS)
+            )
+        )
+
+    try:
+        json.dumps(response.raw_response, cls=DjangoJSONEncoder)
+    except (TypeError, ValueError):
+        raise GatewayError("Gateway response needs to be json serializable")
+
+
+@traced_atomic_transaction()
+def gateway_postprocess(transaction, payment: Payment):
+    changed_fields: List[str] = []
+
+    if not transaction.is_success or transaction.already_processed:
+        if changed_fields:
+            # FIXME: verify that we actually want to save the payment here
+            # as with empty changed_fields it won't be saved
+            payment.save(update_fields=changed_fields)
+        return
+
+    if transaction.action_required:
+        payment.to_confirm = True
+        changed_fields.append("to_confirm")
+        payment.save(update_fields=changed_fields)
+        return
+
+    # to_confirm is defined by the transaction.action_required. Payment doesn't
+    # require confirmation when we got action_required == False
+    if payment.to_confirm:
+        payment.to_confirm = False
+        changed_fields.append("to_confirm")
+
+    update_payment_ch
