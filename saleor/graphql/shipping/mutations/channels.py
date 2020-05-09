@@ -188,4 +188,84 @@ class ShippingMethodChannelListingUpdate(BaseChannelListingMutation):
                     error.params = {
                         "channels": [channel_id],
                     }
-     
+                    errors["minimum_order_price"].append(error)
+
+            if "maximum_order_price" in channel_input:
+                max_price = channel_input.pop("maximum_order_price")
+                channel_input["maximum_order_price_amount"] = max_price
+            if max_price is not None:
+                try:
+                    validate_price_precision(
+                        max_price, channel_input["channel"].currency_code
+                    )
+                    validate_decimal_max_value(max_price)
+                except ValidationError as error:
+                    error.code = ShippingErrorCode.INVALID.value
+                    error.params = {
+                        "channels": [channel_id],
+                    }
+                    errors["maximum_order_price"].append(error)
+
+            if (
+                min_price is not None
+                and max_price is not None
+                and max_price <= min_price
+            ):
+                errors["maximum_order_price"].append(
+                    ValidationError(
+                        (
+                            "Maximum order price should be larger than "
+                            "the minimum order price."
+                        ),
+                        code=ShippingErrorCode.MAX_LESS_THAN_MIN.value,
+                        params={"channels": [channel_id]},
+                    )
+                )
+
+        return data
+
+    @classmethod
+    def clean_add_channels(cls, shipping_method, input):
+        """Ensure that only channels allowed in the method's shipping zone are added."""
+        channels = {data.get("channel").id for data in input}
+        available_channels = set(
+            shipping_method.shipping_zone.channels.values_list("id", flat=True)
+        )
+        not_valid_channels = channels - available_channels
+        if not_valid_channels:
+            channel_ids = [
+                graphene.Node.to_global_id("Channel", id) for id in not_valid_channels
+            ]
+            raise ValidationError(
+                {
+                    "add_channels": ValidationError(
+                        "Cannot add channels that are not assigned "
+                        "to the method's shipping zone.",
+                        code=ShippingErrorCode.INVALID.value,
+                        params={"channels": channel_ids},
+                    )
+                }
+            )
+
+    @classmethod
+    def perform_mutation(  # type: ignore[override]
+        cls, _root, info: ResolveInfo, /, *, id, input
+    ):
+        shipping_method = get_shipping_model_by_object_id(id)
+
+        errors: defaultdict[str, List[ValidationError]] = defaultdict(list)
+        clean_channels = cls.clean_channels(
+            info, input, errors, ShippingErrorCode.DUPLICATED_INPUT_ITEM.value
+        )
+        cleaned_input = cls.clean_input(clean_channels, shipping_method, errors)
+
+        if errors:
+            raise ValidationError(errors)
+
+        cls.save(info, shipping_method, cleaned_input)
+        manager = get_plugin_manager_promise(info.context).get()
+        cls.call_event(manager.shipping_price_updated, shipping_method)
+
+        return ShippingMethodChannelListingUpdate(
+            shipping_method=ChannelContext(node=shipping_method, channel_slug=None)
+        )
