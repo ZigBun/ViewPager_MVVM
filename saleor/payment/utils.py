@@ -473,4 +473,203 @@ def gateway_postprocess(transaction, payment: Payment):
         payment.to_confirm = False
         changed_fields.append("to_confirm")
 
-    update_payment_ch
+    update_payment_charge_status(payment, transaction, changed_fields)
+
+
+def update_payment_charge_status(payment, transaction, changed_fields=None):
+    changed_fields = changed_fields or []
+
+    transaction_kind = transaction.kind
+    if transaction_kind in {
+        TransactionKind.CAPTURE,
+        TransactionKind.REFUND_REVERSED,
+    }:
+        payment.captured_amount += transaction.amount
+        payment.is_active = True
+        # Set payment charge status to fully charged
+        # only if there is no more amount needs to charge
+        payment.charge_status = ChargeStatus.PARTIALLY_CHARGED
+        if payment.get_charge_amount() <= 0:
+            payment.charge_status = ChargeStatus.FULLY_CHARGED
+        changed_fields += ["charge_status", "captured_amount", "modified_at"]
+
+    elif transaction_kind == TransactionKind.VOID:
+        payment.is_active = False
+        changed_fields += ["is_active", "modified_at"]
+
+    elif transaction_kind == TransactionKind.REFUND:
+        changed_fields += ["captured_amount", "modified_at"]
+        payment.captured_amount -= transaction.amount
+        payment.charge_status = ChargeStatus.PARTIALLY_REFUNDED
+        if payment.captured_amount <= 0:
+            payment.captured_amount = Decimal("0.0")
+            payment.charge_status = ChargeStatus.FULLY_REFUNDED
+            payment.is_active = False
+        changed_fields += ["charge_status", "is_active"]
+    elif transaction_kind == TransactionKind.PENDING:
+        payment.charge_status = ChargeStatus.PENDING
+        changed_fields += ["charge_status"]
+    elif transaction_kind == TransactionKind.CANCEL:
+        payment.charge_status = ChargeStatus.CANCELLED
+        payment.is_active = False
+        changed_fields += ["charge_status", "is_active"]
+    elif transaction_kind == TransactionKind.CAPTURE_FAILED:
+        if payment.charge_status in {
+            ChargeStatus.PARTIALLY_CHARGED,
+            ChargeStatus.FULLY_CHARGED,
+        }:
+            payment.captured_amount -= transaction.amount
+            payment.charge_status = ChargeStatus.PARTIALLY_CHARGED
+            if payment.captured_amount <= 0:
+                payment.charge_status = ChargeStatus.NOT_CHARGED
+            changed_fields += ["charge_status", "captured_amount", "modified_at"]
+    if changed_fields:
+        payment.save(update_fields=changed_fields)
+    transaction.already_processed = True
+    transaction.save(update_fields=["already_processed"])
+    if "captured_amount" in changed_fields and payment.order_id:
+        update_order_charge_data(payment.order)
+    if transaction_kind == TransactionKind.AUTH and payment.order_id:
+        update_order_authorize_data(payment.order)
+
+
+def fetch_customer_id(user: User, gateway: str):
+    """Retrieve users customer_id stored for desired gateway."""
+    meta_key = prepare_key_for_gateway_customer_id(gateway)
+    return user.get_value_from_private_metadata(key=meta_key)
+
+
+def store_customer_id(user: User, gateway: str, customer_id: str):
+    """Store customer_id in users private meta for desired gateway."""
+    meta_key = prepare_key_for_gateway_customer_id(gateway)
+    user.store_value_in_private_metadata(items={meta_key: customer_id})
+    user.save(update_fields=["private_metadata", "updated_at"])
+
+
+def prepare_key_for_gateway_customer_id(gateway_name: str) -> str:
+    return (gateway_name.strip().upper()) + ".customer_id"
+
+
+def update_payment(payment: "Payment", gateway_response: "GatewayResponse"):
+    changed_fields = []
+    if psp_reference := gateway_response.psp_reference:
+        payment.psp_reference = psp_reference
+        changed_fields.append("psp_reference")
+
+    if gateway_response.payment_method_info:
+        update_payment_method_details(
+            payment, gateway_response.payment_method_info, changed_fields
+        )
+
+    if changed_fields:
+        payment.save(update_fields=changed_fields)
+
+
+def update_payment_method_details(
+    payment: "Payment",
+    payment_method_info: Optional["PaymentMethodInfo"],
+    changed_fields: List[str],
+):
+    if not payment_method_info:
+        return
+    if payment_method_info.brand:
+        payment.cc_brand = payment_method_info.brand
+        changed_fields.append("cc_brand")
+    if payment_method_info.last_4:
+        payment.cc_last_digits = payment_method_info.last_4
+        changed_fields.append("cc_last_digits")
+    if payment_method_info.exp_year:
+        payment.cc_exp_year = payment_method_info.exp_year
+        changed_fields.append("cc_exp_year")
+    if payment_method_info.exp_month:
+        payment.cc_exp_month = payment_method_info.exp_month
+        changed_fields.append("cc_exp_month")
+    if payment_method_info.type:
+        payment.payment_method_type = payment_method_info.type
+        changed_fields.append("payment_method_type")
+
+
+def get_payment_token(payment: Payment):
+    auth_transaction = payment.transactions.filter(
+        kind=TransactionKind.AUTH, is_success=True
+    ).first()
+    if auth_transaction is None:
+        raise PaymentError("Cannot process unauthorized transaction")
+    return auth_transaction.token
+
+
+def is_currency_supported(currency: str, gateway_id: str, manager: "PluginsManager"):
+    """Return true if the given gateway supports given currency."""
+    available_gateways = manager.list_payment_gateways(currency=currency)
+    return any([gateway.id == gateway_id for gateway in available_gateways])
+
+
+def price_from_minor_unit(value: str, currency: str):
+    """Convert minor unit (smallest unit of currency) to decimal value.
+
+    (value: 1000, currency: USD) will be converted to 10.00
+    """
+
+    value = Decimal(value)
+    precision = get_currency_precision(currency)
+    number_places = Decimal(10) ** -precision
+    return value * number_places
+
+
+def price_to_minor_unit(value: Decimal, currency: str):
+    """Convert decimal value to the smallest unit of currency.
+
+    Take the value, discover the precision of currency and multiply value by
+    Decimal('10.0'), then change quantization to remove the comma.
+    Decimal(10.0) -> str(1000)
+    """
+    value = quantize_price(value, currency=currency)
+    precision = get_currency_precision(currency)
+    number_places = Decimal("10.0") ** precision
+    value_without_comma = value * number_places
+    return str(value_without_comma.quantize(Decimal("1")))
+
+
+def get_channel_slug_from_payment(payment: Payment) -> Optional[str]:
+    channel_slug = None
+
+    if payment.checkout:
+        channel_slug = payment.checkout.channel.slug
+    elif payment.order:
+        channel_slug = payment.order.channel.slug
+
+    return channel_slug
+
+
+def try_void_or_refund_inactive_payment(
+    payment: Payment, transaction: Transaction, manager: "PluginsManager"
+):
+    """Handle refund or void inactive payments.
+
+    In case when we have open multiple payments for single checkout but only one is
+    active. Some payment methods don't required confirmation so we can receive delayed
+    webhook when we have order already paid.
+    """
+    from .gateway import payment_refund_or_void
+
+    if not transaction.is_success:
+        return
+
+    if not transaction.already_processed:
+        update_payment_charge_status(payment, transaction)
+    channel_slug = get_channel_slug_from_payment(payment)
+    try:
+        payment_refund_or_void(payment, manager, channel_slug=channel_slug)
+    except PaymentError:
+        logger.exception(
+            "Unable to void/refund an inactive payment %s, %s.",
+            payment.id,
+            payment.psp_reference,
+        )
+
+
+def payment_owned_by_user(payment_pk: int, user) -> bool:
+    if not user:
+        return False
+    return (
+        Payment.ob
