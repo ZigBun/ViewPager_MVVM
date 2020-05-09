@@ -672,4 +672,8 @@ def payment_owned_by_user(payment_pk: int, user) -> bool:
     if not user:
         return False
     return (
-        Payment.ob
+        Payment.objects.filter(
+            (Q(order__user=user) | Q(checkout__user=user)) & Q(pk=payment_pk)
+        ).first()
+        is not None
+    )
