@@ -120,4 +120,84 @@ def get_excluded_shipping_methods_or_fetch(
         if response_data:
             excluded_methods.extend(
                 get_excluded_shipping_methods_from_response(response_data)
-     
+            )
+    cache.set(cache_key, (payload, excluded_methods), CACHE_EXCLUDED_SHIPPING_TIME)
+    return parse_excluded_shipping_methods(excluded_methods)
+
+
+def get_excluded_shipping_data(
+    event_type: str,
+    previous_value: List[ExcludedShippingMethod],
+    payload_fun: Callable[[], str],
+    cache_key: str,
+    subscribable_object: Optional[Union["Order", "Checkout"]],
+) -> List[ExcludedShippingMethod]:
+    """Exclude not allowed shipping methods by sync webhook.
+
+    Fetch excluded shipping methods from sync webhooks and return them as a list of
+    excluded shipping methods.
+    The function uses a cache_key to reduce the number of
+    requests which we call to the external APIs. In case when we have the same payload
+    in a cache as we're going to send now, we will skip an additional request and use
+    the response fetched from cache.
+    The function will fetch the payload only in the case that we have any defined
+    webhook.
+    """
+
+    excluded_methods_map: Dict[str, List[ExcludedShippingMethod]] = defaultdict(list)
+    webhooks = get_webhooks_for_event(event_type)
+    if webhooks:
+        payload = payload_fun()
+
+        excluded_methods_map = get_excluded_shipping_methods_or_fetch(
+            webhooks, event_type, payload, cache_key, subscribable_object
+        )
+
+    # Gather responses for previous plugins
+    for method in previous_value:
+        excluded_methods_map[method.id].append(method)
+
+    # Return a list of excluded methods, unique by id
+    excluded_methods = []
+    for method_id, methods in excluded_methods_map.items():
+        reason = None
+        if reasons := [m.reason for m in methods if m.reason]:
+            reason = " ".join(reasons)
+        excluded_methods.append(ExcludedShippingMethod(id=method_id, reason=reason))
+    return excluded_methods
+
+
+def get_excluded_shipping_methods_from_response(
+    response_data: dict,
+) -> List[dict]:
+    excluded_methods = []
+    for method_data in response_data.get("excluded_methods", []):
+        try:
+            type_name, method_id = from_global_id_or_error(method_data["id"])
+            if type_name not in (APP_ID_PREFIX, str(ShippingMethod)):
+                logger.warning(
+                    "Invalid type received. Expected ShippingMethod, got %s", type_name
+                )
+                continue
+
+        except (KeyError, ValueError, TypeError, GraphQLError) as e:
+            logger.warning("Malformed ShippingMethod id was provided: %s", e)
+            continue
+        excluded_methods.append(
+            {"id": method_id, "reason": method_data.get("reason", "")}
+        )
+    return excluded_methods
+
+
+def parse_excluded_shipping_methods(
+    excluded_methods: List[dict],
+) -> Dict[str, List[ExcludedShippingMethod]]:
+    excluded_methods_map = defaultdict(list)
+    for excluded_method in excluded_methods:
+        method_id = excluded_method["id"]
+        excluded_methods_map[method_id].append(
+            ExcludedShippingMethod(
+                id=method_id, reason=excluded_method.get("reason", "")
+            )
+        )
+    return excluded_methods_map
