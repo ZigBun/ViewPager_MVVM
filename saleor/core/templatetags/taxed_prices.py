@@ -17,4 +17,14 @@ def _get_display_price(
             base = MoneyRange(start=base.start.net, stop=base.stop.net)
 
     if isinstance(base, TaxedMoney):
-        base = base.gross if display_gross else base.n
+        base = base.gross if display_gross else base.net
+    return base
+
+
+@register.inclusion_tag("price.html")
+def price(base, display_gross, html=True):
+    if isinstance(base, (TaxedMoney, TaxedMoneyRange)):
+        base = _get_display_price(base, display_gross)
+
+    is_range = isinstance(base, MoneyRange)
+    return {"price": base, "is_range": is_range, "html": html}
