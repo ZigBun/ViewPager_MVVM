@@ -217,4 +217,46 @@ class AttributeWhere(MetadataFilterBase):
     slug = OperationObjectTypeFilter(
         input_class=StringFilterInput, method=filter_attribute_slug
     )
-    with_choices = django_filters.BooleanFilter(method=filter_w
+    with_choices = django_filters.BooleanFilter(method=filter_with_choices)
+    input_type = OperationObjectTypeFilter(
+        AttributeInputTypeEnumFilterInput, method=filter_attribute_input_type
+    )
+    entity_type = OperationObjectTypeFilter(
+        AttributeEntityTypeEnumFilterInput, method=filter_attribute_entity_type
+    )
+    type = OperationObjectTypeFilter(
+        AttributeTypeEnumFilterInput, method=filter_attribute_type
+    )
+    unit = OperationObjectTypeFilter(
+        MeasurementUnitsEnumFilterInput, method=filter_attribute_unit
+    )
+    in_collection = GlobalIDFilter(method="filter_in_collection")
+    in_category = GlobalIDFilter(method="filter_in_category")
+
+    class Meta:
+        model = Attribute
+        fields = [
+            "value_required",
+            "visible_in_storefront",
+            "filterable_in_dashboard",
+        ]
+
+    def filter_in_collection(self, qs, name, value):
+        requestor = get_user_or_app_from_context(self.request)
+        channel_slug = get_channel_slug_from_filter_data(self.data)
+        return filter_attributes_by_product_types(
+            qs, name, value, requestor, channel_slug
+        )
+
+    def filter_in_category(self, qs, name, value):
+        requestor = get_user_or_app_from_context(self.request)
+        channel_slug = get_channel_slug_from_filter_data(self.data)
+        return filter_attributes_by_product_types(
+            qs, name, value, requestor, channel_slug
+        )
+
+
+class AttributeWhereInput(WhereInputObjectType):
+    class Meta:
+        filterset_class = AttributeWhere
+        description = "Where filtering options." + ADDED_IN_311 + PREVIEW_FEATURE
