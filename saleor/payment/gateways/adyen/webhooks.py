@@ -1153,3 +1153,55 @@ def handle_api_response(
         is_success=is_success,
         action_required=action_required,
         kind=TransactionKind.ACTION_TO_CONFIRM,
+        amount=payment_data.amount,
+        currency=payment_data.currency,
+        transaction_id=response.message.get("pspReference", ""),
+        error=error_message,
+        raw_response=response.message,
+        action_required_data=response.message.get("action"),
+        psp_reference=response.message.get("pspReference", ""),
+    )
+
+    create_transaction(
+        payment=payment,
+        kind=TransactionKind.ACTION_TO_CONFIRM,
+        action_required=action_required,
+        payment_information=payment_data,
+        gateway_response=gateway_response,
+    )
+    if is_success and not action_required and not payment.order and checkout:
+        manager = get_plugins_manager()
+
+        confirm_payment_and_set_back_to_confirm(payment, manager, channel_slug)
+        payment.refresh_from_db()  # refresh charge_status
+
+        adyen_partial_payments = get_or_create_adyen_partial_payments(
+            response.message, payment
+        )
+
+        create_order(payment, checkout, manager)
+
+        if adyen_partial_payments:
+            create_order_event_about_adyen_partial_payments(
+                adyen_partial_payments, payment
+            )
+
+
+def confirm_payment_and_set_back_to_confirm(payment, manager, channel_slug):
+    # The workaround for refund payments when something will crash in
+    # `create_order` function before processing a payment.
+    # At this moment we have a payment processed on Adyen side but we have to do
+    # something more on Saleor side (ACTION_TO_CONFIRM), it's create an order in
+    # this case, so before try to create the order we have to confirm the payment
+    # and force change the flag to_confirm to True again.
+    #
+    # This is because we have to handle 2 flows:
+    # 1. Having confirmed payment to refund easily when we can't create an order.
+    # 2. Do not process payment again when `complete_checkout` logic will execute
+    #    in `create_order` without errors. We just receive a processed transaction
+    #    then.
+    #
+    # This fix is related to SALEOR-4777. PR #8471
+    gateway.confirm(payment, manager, channel_slug)
+    payment.to_confirm = True
+    payment.save(update_fields=["to_confirm"])
