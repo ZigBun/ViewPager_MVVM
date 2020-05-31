@@ -275,4 +275,68 @@ class Payment(ModelWithMetadata):
         return self.charge_status == ChargeStatus.NOT_CHARGED
 
     def can_authorize(self):
-        return self.
+        return self.is_active and self.not_charged
+
+    def can_capture(self):
+        if not (self.is_active and self.not_charged):
+            return False
+        return True
+
+    def can_void(self):
+        return self.not_charged and self.is_authorized
+
+    def can_refund(self):
+        can_refund_charge_status = (
+            ChargeStatus.PARTIALLY_CHARGED,
+            ChargeStatus.FULLY_CHARGED,
+            ChargeStatus.PARTIALLY_REFUNDED,
+        )
+        return self.charge_status in can_refund_charge_status
+
+    def can_confirm(self):
+        return self.is_active and self.not_charged
+
+    def is_manual(self):
+        return self.gateway == CustomPaymentChoices.MANUAL
+
+
+class Transaction(models.Model):
+    """Represents a single payment operation.
+
+    Transaction is an attempt to transfer money between your store
+    and your customers, with a chosen payment method.
+    """
+
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    payment = models.ForeignKey(
+        Payment, related_name="transactions", on_delete=models.PROTECT
+    )
+    token = models.CharField(max_length=512, blank=True, default="")
+    kind = models.CharField(max_length=25, choices=TransactionKind.CHOICES)
+    is_success = models.BooleanField(default=False)
+    action_required = models.BooleanField(default=False)
+    action_required_data = JSONField(
+        blank=True, default=dict, encoder=DjangoJSONEncoder
+    )
+    currency = models.CharField(max_length=settings.DEFAULT_CURRENCY_CODE_LENGTH)
+    amount = models.DecimalField(
+        max_digits=settings.DEFAULT_MAX_DIGITS,
+        decimal_places=settings.DEFAULT_DECIMAL_PLACES,
+        default=Decimal("0.0"),
+    )
+    error = models.TextField(null=True)
+    customer_id = models.CharField(max_length=256, null=True)
+    gateway_response = JSONField(encoder=DjangoJSONEncoder)
+    already_processed = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ("pk",)
+
+    def __repr__(self):
+        return (
+            f"Transaction(type={self.kind}, is_success={self.is_success}, "
+            f"created={self.created_at})"
+        )
+
+    def get_amount(self):
+        return Money(self.amount, self.currency)
