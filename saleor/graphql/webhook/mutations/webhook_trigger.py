@@ -80,4 +80,55 @@ class WebhookTrigger(BaseMutation):
     @classmethod
     def validate_permissions(cls, info, event_type):
         if (
-            permission := WebhookEventAsyncType.PERMISSIONS.
+            permission := WebhookEventAsyncType.PERMISSIONS.get(event_type)
+            if event_type
+            else None
+        ):
+            codename = permission.value.split(".")[1]
+            user_permissions = [
+                perm.codename for perm in info.context.user.effective_permissions.all()
+            ]
+            if codename not in user_permissions:
+                raise_validation_error(
+                    message=f"The user doesn't have required permission: {codename}.",
+                    code=WebhookTriggerErrorCode.MISSING_PERMISSION,
+                )
+
+    @classmethod
+    def validate_input(cls, info, **data):
+        object_id = data.get("object_id")
+        webhook_id = data.get("webhook_id")
+        webhook = cls.get_node_or_error(info, webhook_id, field="webhookId")
+
+        event_type = cls.validate_subscription_query(webhook)
+        cls.validate_event_type(event_type, object_id)
+        cls.validate_permissions(info, event_type)
+
+        object = cls.get_node_or_error(info, object_id, field="objectId")
+
+        return event_type, object, webhook
+
+    @classmethod
+    def perform_mutation(cls, _root, info, **data):
+        from ....plugins.webhook.tasks import (
+            create_deliveries_for_subscriptions,
+            send_webhook_request_async,
+        )
+
+        event_type, object, webhook = cls.validate_input(info, **data)
+        delivery = None
+
+        if all([event_type, object, webhook]):
+            deliveries = create_deliveries_for_subscriptions(
+                event_type, object, [webhook]
+            )
+            if deliveries:
+                delivery = deliveries[0]
+                try:
+                    send_webhook_request_async(delivery.id)
+                    return WebhookTrigger(delivery=delivery)
+                except Retry:
+                    delivery.status = EventDeliveryStatus.FAILED
+                    delivery.save(update_fields=["status"])
+
+        return WebhookTrigger(delivery=delivery)
