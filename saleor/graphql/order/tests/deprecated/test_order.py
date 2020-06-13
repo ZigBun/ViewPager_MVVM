@@ -545,4 +545,185 @@ def test_fulfillment_return_products_order_lines_by_old_line_id(
         payment_dummy,
         ANY,
         amount=amount,
-        channel_slug=order_with_lines.chan
+        channel_slug=order_with_lines.channel.slug,
+        refund_data=RefundData(
+            order_lines_to_refund=[
+                OrderLineInfo(
+                    line=line_to_return,
+                    quantity=line_quantity_to_return,
+                    variant=line_to_return.variant,
+                ),
+            ],
+            refund_shipping_costs=True,
+        ),
+    )
+
+
+ORDER_LINE_DISCOUNT_UPDATE = """
+mutation OrderLineDiscountUpdate($input: OrderDiscountCommonInput!, $orderLineId: ID!){
+  orderLineDiscountUpdate(orderLineId: $orderLineId, input: $input){
+    orderLine{
+      unitPrice{
+        gross{
+          amount
+        }
+      }
+    }
+    errors{
+      field
+      message
+      code
+    }
+  }
+}
+"""
+
+
+@pytest.mark.parametrize("status", (OrderStatus.DRAFT, OrderStatus.UNCONFIRMED))
+def test_update_order_line_discount_old_id(
+    status,
+    draft_order_with_fixed_discount_order,
+    staff_api_client,
+    permission_manage_orders,
+):
+    order = draft_order_with_fixed_discount_order
+    order.status = status
+    order.save(update_fields=["status"])
+    line_to_discount = order.lines.first()
+    unit_price = Money(Decimal(7.3), currency="USD")
+    line_to_discount.base_unit_price = unit_price
+    line_to_discount.undiscounted_base_unit_price = unit_price
+    line_to_discount.unit_price = TaxedMoney(unit_price, unit_price)
+    line_to_discount.undiscounted_unit_price = line_to_discount.unit_price
+    total_price = line_to_discount.unit_price * line_to_discount.quantity
+    line_to_discount.total_price = total_price
+    line_to_discount.undiscounted_total_price = total_price
+    line_to_discount.old_id = 1
+    line_to_discount.save()
+
+    line_price_before_discount = line_to_discount.unit_price
+
+    value = Decimal("5")
+    reason = "New reason for unit discount"
+    variables = {
+        "orderLineId": graphene.Node.to_global_id("OrderLine", line_to_discount.old_id),
+        "input": {
+            "valueType": DiscountValueTypeEnum.FIXED.name,
+            "value": value,
+            "reason": reason,
+        },
+    }
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(ORDER_LINE_DISCOUNT_UPDATE, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["orderLineDiscountUpdate"]
+
+    line_to_discount.refresh_from_db()
+
+    errors = data["errors"]
+    assert not errors
+
+    discount = partial(
+        fixed_discount,
+        discount=Money(value, currency=order.currency),
+    )
+    expected_line_price = discount(line_price_before_discount)
+
+    assert line_to_discount.unit_price == quantize_price(expected_line_price, "USD")
+    unit_discount = line_to_discount.unit_discount
+    assert unit_discount == (line_price_before_discount - expected_line_price).gross
+
+    event = order.events.get()
+    assert event.type == OrderEvents.ORDER_LINE_DISCOUNT_UPDATED
+    parameters = event.parameters
+    lines = parameters.get("lines", {})
+    assert len(lines) == 1
+
+    line_data = lines[0]
+    assert line_data.get("line_pk") == str(line_to_discount.pk)
+    discount_data = line_data.get("discount")
+
+    assert discount_data["value"] == str(value)
+    assert discount_data["value_type"] == DiscountValueTypeEnum.FIXED.value
+    assert discount_data["amount_value"] == str(unit_discount.amount)
+
+
+ORDER_LINE_DISCOUNT_REMOVE = """
+mutation OrderLineDiscountRemove($orderLineId: ID!){
+  orderLineDiscountRemove(orderLineId: $orderLineId){
+    orderLine{
+      id
+    }
+    errors{
+      field
+      message
+      code
+    }
+  }
+}
+"""
+
+
+@patch("saleor.plugins.manager.PluginsManager.calculate_order_line_unit")
+@patch("saleor.plugins.manager.PluginsManager.calculate_order_line_total")
+def test_delete_discount_from_order_line_by_old_id(
+    mocked_calculate_order_line_total,
+    mocked_calculate_order_line_unit,
+    draft_order_with_fixed_discount_order,
+    staff_api_client,
+    permission_manage_orders,
+):
+    order = draft_order_with_fixed_discount_order
+    order.status = OrderStatus.DRAFT
+    order.save(update_fields=["status"])
+    line = order.lines.first()
+    line.old_id = 1
+
+    line.save(update_fields=["old_id"])
+
+    line_undiscounted_price = TaxedMoney(
+        line.undiscounted_base_unit_price, line.undiscounted_base_unit_price
+    )
+    line_undiscounted_total_price = line_undiscounted_price * line.quantity
+
+    mocked_calculate_order_line_unit.return_value = OrderTaxedPricesData(
+        undiscounted_price=line_undiscounted_price,
+        price_with_discounts=line_undiscounted_price,
+    )
+    mocked_calculate_order_line_total.return_value = OrderTaxedPricesData(
+        undiscounted_price=line_undiscounted_total_price,
+        price_with_discounts=line_undiscounted_total_price,
+    )
+
+    line.unit_discount_amount = Decimal("2.5")
+    line.unit_discount_type = DiscountValueType.FIXED
+    line.unit_discount_value = Decimal("2.5")
+    line.save()
+
+    variables = {
+        "orderLineId": graphene.Node.to_global_id("OrderLine", line.old_id),
+    }
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(ORDER_LINE_DISCOUNT_REMOVE, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["orderLineDiscountRemove"]
+
+    errors = data["errors"]
+    assert len(errors) == 0
+
+    line.refresh_from_db()
+
+    assert line.unit_price == line_undiscounted_price
+    assert line.total_price == line_undiscounted_total_price
+    unit_discount = line.unit_discount
+    currency = order.currency
+    assert unit_discount == Money(Decimal(0), currency=currency)
+
+    event = order.events.get()
+    assert event.type == OrderEvents.ORDER_LINE_DISCOUNT_REMOVED
+    parameters = event.parameters
+    lines = parameters.get("lines", {})
+    assert len(lines) == 1
+
+    line_data = lines[0]
+    assert line_data.get("line_pk") == str(line.pk)
