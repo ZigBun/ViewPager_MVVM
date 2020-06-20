@@ -125,3 +125,225 @@ def products_structures(category, channel_USD):
         )
         variant = product_models.ProductVariant.objects.create(
             product=product_apple, sku=product_apple.slug
+        )
+        product_models.ProductVariantChannelListing.objects.create(
+            variant=variant,
+            channel=channel_USD,
+            price_amount=Decimal(10),
+            cost_price_amount=Decimal(1),
+            currency=channel_USD.currency_code,
+        )
+    oranges = list(
+        product_models.Product.objects.bulk_create(
+            [
+                product_models.Product(
+                    name=f"{attrs[0]} Orange - {attrs[1]} ({i})",
+                    slug=f"{attrs[0]}-orange-{attrs[1]}-({i})",
+                    product_type=pt_oranges,
+                    category=category,
+                )
+                for i, attrs in enumerate(zip(COLORS, TRADEMARKS))
+            ]
+        )
+    )
+    for product_orange in oranges:
+        product_models.ProductChannelListing.objects.create(
+            product=product_orange,
+            channel=channel_USD,
+            is_published=True,
+            visible_in_listings=True,
+        )
+        variant = product_models.ProductVariant.objects.create(
+            product=product_orange, sku=product_orange.slug
+        )
+        product_models.ProductVariantChannelListing.objects.create(
+            variant=variant,
+            channel=channel_USD,
+            cost_price_amount=Decimal(1),
+            price_amount=Decimal(10),
+            currency=channel_USD.currency_code,
+        )
+    dummy = product_models.Product.objects.create(
+        name="Oopsie Dummy",
+        slug="oopsie-dummy",
+        product_type=pt_other,
+        category=category,
+    )
+    product_models.ProductChannelListing.objects.create(
+        product=dummy,
+        channel=channel_USD,
+        is_published=True,
+        visible_in_listings=True,
+    )
+    variant = product_models.ProductVariant.objects.create(
+        product=dummy, sku=dummy.slug
+    )
+    product_models.ProductVariantChannelListing.objects.create(
+        variant=variant,
+        channel=channel_USD,
+        cost_price_amount=Decimal(1),
+        price_amount=Decimal(10),
+        currency=channel_USD.currency_code,
+    )
+    other_dummy = product_models.Product.objects.create(
+        name="Another Dummy but first in ASC and has no attribute value",
+        slug="another-dummy",
+        product_type=pt_other,
+        category=category,
+    )
+    product_models.ProductChannelListing.objects.create(
+        product=other_dummy,
+        channel=channel_USD,
+        is_published=True,
+        visible_in_listings=True,
+    )
+    variant = product_models.ProductVariant.objects.create(
+        product=other_dummy, sku=other_dummy.slug
+    )
+    product_models.ProductVariantChannelListing.objects.create(
+        variant=variant,
+        channel=channel_USD,
+        cost_price_amount=Decimal(1),
+        price_amount=Decimal(10),
+        currency=channel_USD.currency_code,
+    )
+    dummy_attr_value = attr_value(dummy_attr, DUMMIES[0])
+    associate_attribute_values_to_instance(dummy, dummy_attr, *dummy_attr_value)
+
+    for products in (apples, oranges):
+        for product, attr_values in zip(products, COLORS):
+            attr_values = attr_value(colors_attr, *attr_values)
+            associate_attribute_values_to_instance(product, colors_attr, *attr_values)
+
+        for product, attr_values in zip(products, TRADEMARKS):
+            attr_values = attr_value(trademark_attr, attr_values)
+            associate_attribute_values_to_instance(
+                product, trademark_attr, *attr_values
+            )
+
+    return colors_attr, trademark_attr, dummy_attr
+
+
+def test_sort_products_cannot_sort_both_by_field_and_by_attribute(
+    api_client, channel_USD
+):
+    """Ensure one cannot both sort by a supplied field and sort by a given attribute ID
+    at the same time.
+    """
+    query = QUERY_SORT_PRODUCTS_BY_ATTRIBUTE
+    variables = {
+        "field": "NAME",
+        "attributeId": "SomeAttributeId",
+        "direction": "ASC",
+        "channel": channel_USD.slug,
+    }
+
+    response = api_client.post_graphql(query, variables)
+    response = get_graphql_content(response, ignore_errors=True)
+
+    errors = response.get("errors", [])
+
+    assert len(errors) == 1, response
+    assert errors[0]["message"] == (
+        "You must provide either `field` or `attributeId` to sort the products."
+    )
+
+
+# Ordered by the given attribute value, then by the product name.
+#
+# If the product doesn't have a value, it will be placed at the bottom of the products
+# having a value and will be ordered by their product name.
+#
+# If the product doesn't have such attribute in its product type, it will be placed
+# at the end of the other products having such attribute. They will be ordered by their
+# name as well.
+EXPECTED_SORTED_DATA_SINGLE_VALUE_ASC = [
+    {
+        "node": {
+            "attributes": [
+                {
+                    "attribute": {"slug": "colors"},
+                    "values": [{"name": "Blue"}, {"name": "Gray"}],
+                },
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "A"}]},
+            ],
+            "name": "['Blue', 'Gray'] Apple - A (1)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {
+                    "attribute": {"slug": "colors"},
+                    "values": [{"name": "Blue"}, {"name": "Gray"}],
+                },
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "A"}]},
+            ],
+            "name": "['Blue', 'Gray'] Orange - A (1)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {
+                    "attribute": {"slug": "colors"},
+                    "values": [{"name": "Blue"}, {"name": "Red"}],
+                },
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "A"}]},
+            ],
+            "name": "['Blue', 'Red'] Apple - A (0)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {
+                    "attribute": {"slug": "colors"},
+                    "values": [{"name": "Blue"}, {"name": "Red"}],
+                },
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "A"}]},
+            ],
+            "name": "['Blue', 'Red'] Orange - A (0)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "colors"}, "values": [{"name": "Pink"}]},
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "ab"}]},
+            ],
+            "name": "['Pink'] Apple - ab (2)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "colors"}, "values": [{"name": "Pink"}]},
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "ab"}]},
+            ],
+            "name": "['Pink'] Orange - ab (2)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "colors"}, "values": [{"name": "Pink"}]},
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "b"}]},
+            ],
+            "name": "['Pink'] Apple - b (3)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "colors"}, "values": [{"name": "Pink"}]},
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "b"}]},
+            ],
+            "name": "['Pink'] Orange - b (3)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "colors"}, "values": [{"name": "Green"}]},
+                {"attribute": {"slug": "trademark"}, "val
