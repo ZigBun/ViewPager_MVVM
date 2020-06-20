@@ -346,4 +346,237 @@ EXPECTED_SORTED_DATA_SINGLE_VALUE_ASC = [
         "node": {
             "attributes": [
                 {"attribute": {"slug": "colors"}, "values": [{"name": "Green"}]},
-                {"attribute": {"slug": "trademark"}, "val
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "y"}]},
+            ],
+            "name": "['Green'] Apple - y (4)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "colors"}, "values": [{"name": "Green"}]},
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "y"}]},
+            ],
+            "name": "['Green'] Orange - y (4)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [{"attribute": {"slug": "dummy"}, "values": []}],
+            "name": "Another Dummy but first in ASC and has no attribute " "value",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "dummy"}, "values": [{"name": "Oopsie"}]}
+            ],
+            "name": "Oopsie Dummy",
+        }
+    },
+]
+
+EXPECTED_SORTED_DATA_MULTIPLE_VALUES_ASC = [
+    {
+        "node": {
+            "attributes": [
+                {
+                    "attribute": {"slug": "colors"},
+                    "values": [{"name": "Blue"}, {"name": "Gray"}],
+                },
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "A"}]},
+            ],
+            "name": "['Blue', 'Gray'] Apple - A (1)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {
+                    "attribute": {"slug": "colors"},
+                    "values": [{"name": "Blue"}, {"name": "Gray"}],
+                },
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "A"}]},
+            ],
+            "name": "['Blue', 'Gray'] Orange - A (1)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {
+                    "attribute": {"slug": "colors"},
+                    "values": [{"name": "Blue"}, {"name": "Red"}],
+                },
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "A"}]},
+            ],
+            "name": "['Blue', 'Red'] Apple - A (0)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {
+                    "attribute": {"slug": "colors"},
+                    "values": [{"name": "Blue"}, {"name": "Red"}],
+                },
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "A"}]},
+            ],
+            "name": "['Blue', 'Red'] Orange - A (0)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "colors"}, "values": [{"name": "Green"}]},
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "y"}]},
+            ],
+            "name": "['Green'] Apple - y (4)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "colors"}, "values": [{"name": "Green"}]},
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "y"}]},
+            ],
+            "name": "['Green'] Orange - y (4)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "colors"}, "values": [{"name": "Pink"}]},
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "ab"}]},
+            ],
+            "name": "['Pink'] Apple - ab (2)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "colors"}, "values": [{"name": "Pink"}]},
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "b"}]},
+            ],
+            "name": "['Pink'] Apple - b (3)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "colors"}, "values": [{"name": "Pink"}]},
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "ab"}]},
+            ],
+            "name": "['Pink'] Orange - ab (2)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "colors"}, "values": [{"name": "Pink"}]},
+                {"attribute": {"slug": "trademark"}, "values": [{"name": "b"}]},
+            ],
+            "name": "['Pink'] Orange - b (3)",
+        }
+    },
+    {
+        "node": {
+            "attributes": [{"attribute": {"slug": "dummy"}, "values": []}],
+            "name": "Another Dummy but first in ASC and has no attribute " "value",
+        }
+    },
+    {
+        "node": {
+            "attributes": [
+                {"attribute": {"slug": "dummy"}, "values": [{"name": "Oopsie"}]}
+            ],
+            "name": "Oopsie Dummy",
+        }
+    },
+]
+
+
+@pytest.mark.parametrize("ascending", [True, False])
+def test_sort_product_by_attribute_single_value(
+    api_client, products_structures, ascending, channel_USD
+):
+    _, attribute, _ = products_structures
+    attribute_id: str = graphene.Node.to_global_id("Attribute", attribute.pk)
+    direction = "ASC" if ascending else "DESC"
+
+    query = QUERY_SORT_PRODUCTS_BY_ATTRIBUTE
+    variables = {
+        "attributeId": attribute_id,
+        "direction": direction,
+        "channel": channel_USD.slug,
+    }
+
+    response = get_graphql_content(api_client.post_graphql(query, variables))
+    products = response["data"]["products"]["edges"]
+
+    assert len(products) == product_models.Product.objects.count()
+
+    if ascending:
+        assert products == EXPECTED_SORTED_DATA_SINGLE_VALUE_ASC
+    else:
+        assert products == list(reversed(EXPECTED_SORTED_DATA_SINGLE_VALUE_ASC))
+
+
+@pytest.mark.parametrize("ascending", [True, False])
+def test_sort_product_by_attribute_multiple_values(
+    api_client, products_structures, ascending, channel_USD
+):
+    attribute, _, _ = products_structures
+    attribute_id: str = graphene.Node.to_global_id("Attribute", attribute.pk)
+    direction = "ASC" if ascending else "DESC"
+
+    query = QUERY_SORT_PRODUCTS_BY_ATTRIBUTE
+    variables = {
+        "attributeId": attribute_id,
+        "direction": direction,
+        "channel": channel_USD.slug,
+    }
+
+    response = get_graphql_content(api_client.post_graphql(query, variables))
+    products = response["data"]["products"]["edges"]
+
+    assert len(products) == product_models.Product.objects.count()
+
+    if ascending:
+        assert products == EXPECTED_SORTED_DATA_MULTIPLE_VALUES_ASC
+    else:
+        assert products == list(reversed(EXPECTED_SORTED_DATA_MULTIPLE_VALUES_ASC))
+
+
+def test_sort_product_not_having_attribute_data(api_client, category, count_queries):
+    """Test the case where a product has a given attribute assigned to their
+    product type but no attribute data assigned, i.e. the product's PT was changed
+    after the product creation.
+    """
+    expected_results = ["Z", "Y", "A"]
+    product_create_kwargs = {"category": category}
+
+    # Create two product types, with one forced to be at the bottom (no such attribute)
+    product_type = product_models.ProductType.objects.create(
+        name="Apples", slug="apples"
+    )
+    other_product_type = product_models.ProductType.objects.create(
+        name="Chocolates", slug="chocolates", kind=ProductTypeKind.NORMAL
+    )
+
+    # Assign an attribute to the product type
+    attribute = attribute_models.Attribute.objects.create(
+        name="Kind", slug="kind", type=AttributeType.PRODUCT_TYPE
+    )
+    value = attribute_models.AttributeValue.objects.create(
+        name="Value", slug="value", attribute=attribute
+    )
+    product_type.product_attributes.add(attribute)
+
+    # Create a product with a value
+    product_having_attr_value = product_models.Product.objects.create(
+        name="Z", slug="z", product_type=product_type, **product_create_kwargs
+    )
+    associate_attribute_values_to_instance(product_having_attr_value, attribute, value)
+
+    # Create a product having the same product type b
