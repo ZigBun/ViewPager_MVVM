@@ -579,4 +579,107 @@ def test_sort_product_not_having_attribute_data(api_client, category, count_quer
     )
     associate_attribute_values_to_instance(product_having_attr_value, attribute, value)
 
-    # Create a product having the same product type b
+    # Create a product having the same product type but no attribute data
+    product_models.Product.objects.create(
+        name="Y", slug="y", product_type=product_type, **product_create_kwargs
+    )
+
+    # Create a new product having a name that would be ordered first in ascending
+    # as the default ordering is by name for non matching products
+    product_models.Product.objects.create(
+        name="A", slug="a", product_type=other_product_type, **product_create_kwargs
+    )
+
+    # Sort the products
+    qs = product_models.Product.objects.sort_by_attribute(attribute_pk=attribute.pk)
+    qs = qs.values_list("name", flat=True)
+
+    # Compare the results
+    sorted_results = list(qs)
+    assert sorted_results == expected_results
+
+
+@pytest.mark.parametrize(
+    "attribute_id",
+    [
+        "",
+        graphene.Node.to_global_id("Attribute", -1),
+    ],
+)
+def test_sort_product_by_attribute_using_invalid_attribute_id(
+    api_client, product_list_published, attribute_id, channel_USD
+):
+    """Ensure passing an empty attribute ID as sorting field does nothing."""
+
+    query = QUERY_SORT_PRODUCTS_BY_ATTRIBUTE
+
+    # Products are ordered in descending order to ensure we
+    # are not actually trying to sort them at all
+    variables = {
+        "attributeId": attribute_id,
+        "direction": "DESC",
+        "channel": channel_USD.slug,
+    }
+
+    response = get_graphql_content(
+        api_client.post_graphql(
+            query,
+            variables,
+        ),
+        ignore_errors=True,
+    )
+    products = response["data"]["products"]["edges"]
+
+    assert len(products) == product_models.Product.objects.count()
+    assert products[0]["node"]["name"] == product_models.Product.objects.first().name
+
+
+def test_sort_product_by_attribute_using_string_as_attribute_id(
+    api_client, product_list_published, channel_USD
+):
+    """Ensure passing an invalid attribute ID as sorting field return error."""
+
+    query = QUERY_SORT_PRODUCTS_BY_ATTRIBUTE
+    variables = {
+        "attributeId": graphene.Node.to_global_id("Attribute", "not a number"),
+        "direction": "DESC",
+        "channel": channel_USD.slug,
+    }
+
+    response = api_client.post_graphql(query, variables)
+    content = get_graphql_content(response, ignore_errors=True)
+    errors = content["errors"][0]
+
+    assert errors["extensions"]["exception"]["code"] == "GraphQLError"
+
+
+@pytest.mark.parametrize("direction", ["ASC", "DESC"])
+def test_sort_product_by_attribute_using_attribute_having_no_products(
+    api_client, product_list_published, direction, channel_USD
+):
+    """Ensure passing an empty attribute ID as sorting field does nothing."""
+
+    query = QUERY_SORT_PRODUCTS_BY_ATTRIBUTE
+    attribute_without_products = attribute_models.Attribute.objects.create(
+        name="Colors 2", slug="colors-2", type=AttributeType.PRODUCT_TYPE
+    )
+
+    attribute_id: str = graphene.Node.to_global_id(
+        "Attribute", attribute_without_products.pk
+    )
+    variables = {
+        "attributeId": attribute_id,
+        "direction": direction,
+        "channel": channel_USD.slug,
+    }
+
+    response = get_graphql_content(api_client.post_graphql(query, variables))
+    products = response["data"]["products"]["edges"]
+
+    if direction == "ASC":
+        expected_first_product = product_models.Product.objects.order_by("slug").first()
+    else:
+        expected_first_product = product_models.Product.objects.order_by("slug").last()
+
+    assert len(products) == product_models.Product.objects.count()
+    assert products[0]["node"]["name"] == expected_first_product.name
