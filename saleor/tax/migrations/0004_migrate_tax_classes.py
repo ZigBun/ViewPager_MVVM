@@ -77,4 +77,82 @@ def migrate_product_tax_codes(apps, _schema_editor):
     product_types = (
         ProductType.objects.filter(query).values("id", "metadata").order_by("pk")
     )
-    for batch_pks in query
+    for batch_pks in queryset_in_batches(product_types):
+        tax_classes_from_product_types = defaultdict(list)
+        product_types = ProductType.objects.filter(pk__in=batch_pks)
+        for product_type in product_types:
+            tax_class_name, metadata = _populate_tax_class_name_and_metadata(
+                product_type
+            )
+            if tax_class_name:
+                tax_classes_from_product_types[tax_class_name].append(product_type.pk)
+                tax_class_metadata[tax_class_name] = metadata
+
+        for name, ids in tax_classes_from_product_types.items():
+            tax_class, _ = TaxClass.objects.get_or_create(
+                name=name, metadata=tax_class_metadata.get(name, {})
+            )
+            ProductType.objects.filter(id__in=ids).update(tax_class=tax_class)
+
+    products = Product.objects.filter(query).values("id", "metadata").order_by("pk")
+    tax_classes_from_products = defaultdict(list)
+    for batch_pks in queryset_in_batches(products):
+        products = Product.objects.filter(pk__in=batch_pks)
+        for product in products:
+            tax_class_name, metadata = _populate_tax_class_name_and_metadata(product)
+            if tax_class_name:
+                tax_classes_from_products[tax_class_name].append(product.pk)
+                tax_class_metadata[tax_class_name] = metadata
+
+        for name, ids in tax_classes_from_products.items():
+            tax_class, _ = TaxClass.objects.get_or_create(
+                name=name, metadata=tax_class_metadata.get(name, {})
+            )
+            Product.objects.filter(id__in=ids).update(tax_class=tax_class)
+
+
+def migrate_products_with_disabled_taxes(apps, _schema_editor):
+    Product = apps.get_model("product", "Product")
+    TaxClass = apps.get_model("tax", "TaxClass")
+    TaxClassCountryRate = apps.get_model("tax", "TaxClassCountryRate")
+
+    zero_rate_tax_class = None
+    qs = Product.objects.filter(charge_taxes=False).order_by("pk")
+    if qs.exists():
+        zero_rate_tax_class, _ = TaxClass.objects.get_or_create(
+            name=TAX_CLASS_ZERO_RATE,
+            defaults={
+                "metadata": {
+                    AVATAX_CODE_META_KEY: TAX_CODE_NON_TAXABLE_PRODUCT,
+                    AVATAX_DESCRIPTION_META_KEY: "Non-taxable product",
+                }
+            },
+        )
+
+        # Create 0% rates for all countries
+        rates = [
+            TaxClassCountryRate(tax_class=zero_rate_tax_class, rate=0, country=code)
+            for code in countries.countries.keys()
+        ]
+        TaxClassCountryRate.objects.bulk_create(rates)
+
+    # Assign products with charge_taxes=False to the 0% rate tax class
+    if zero_rate_tax_class:
+        for batch_pks in queryset_in_batches(qs):
+            Product.objects.filter(id__in=batch_pks).update(
+                tax_class=zero_rate_tax_class
+            )
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("tax", "0003_add_manage_taxes_permission"),
+        ("product", "0177_product_tax_class_producttype_tax_class"),
+    ]
+
+    operations = [
+        migrations.RunPython(migrate_product_tax_codes, migrations.RunPython.noop),
+        migrations.RunPython(
+            migrate_products_with_disabled_taxes, migrations.RunPython.noop
+        ),
+    ]
