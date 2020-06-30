@@ -120,4 +120,230 @@ class CheckoutLine(ModelObjectType[models.CheckoutLine]):
     )
     total_price = graphene.Field(
         TaxedMoney,
-        description="The
+        description="The sum of the checkout line price, taxes and discounts.",
+        required=True,
+    )
+    undiscounted_total_price = graphene.Field(
+        Money,
+        description="The sum of the checkout line price, without discounts.",
+        required=True,
+    )
+    requires_shipping = graphene.Boolean(
+        description="Indicates whether the item need to be delivered.",
+        required=True,
+    )
+
+    class Meta:
+        description = "Represents an item in the checkout."
+        interfaces = [graphene.relay.Node, ObjectWithMetadata]
+        model = models.CheckoutLine
+        metadata_since = ADDED_IN_35
+
+    @staticmethod
+    def resolve_variant(root: models.CheckoutLine, info: ResolveInfo):
+        variant = ProductVariantByIdLoader(info.context).load(root.variant_id)
+        channel = ChannelByCheckoutLineIDLoader(info.context).load(root.id)
+
+        return Promise.all([variant, channel]).then(
+            lambda data: ChannelContext(node=data[0], channel_slug=data[1].slug)
+        )
+
+    @staticmethod
+    @prevent_sync_event_circular_query
+    def resolve_unit_price(root, info: ResolveInfo):
+        def with_checkout(data):
+            checkout, manager = data
+            discounts = DiscountsByDateTimeLoader(info.context).load(
+                info.context.request_time
+            )
+            checkout_info = CheckoutInfoByCheckoutTokenLoader(info.context).load(
+                checkout.token
+            )
+            lines = CheckoutLinesInfoByCheckoutTokenLoader(info.context).load(
+                checkout.token
+            )
+
+            def calculate_line_unit_price(data):
+                (
+                    discounts,
+                    checkout_info,
+                    lines,
+                ) = data
+                for line_info in lines:
+                    if line_info.line.pk == root.pk:
+                        return calculations.checkout_line_unit_price(
+                            manager=manager,
+                            checkout_info=checkout_info,
+                            lines=lines,
+                            checkout_line_info=line_info,
+                            discounts=discounts,
+                        )
+                return None
+
+            return Promise.all(
+                [
+                    discounts,
+                    checkout_info,
+                    lines,
+                ]
+            ).then(calculate_line_unit_price)
+
+        return Promise.all(
+            [
+                CheckoutByTokenLoader(info.context).load(root.checkout_id),
+                get_plugin_manager_promise(info.context),
+            ]
+        ).then(with_checkout)
+
+    @staticmethod
+    def resolve_undiscounted_unit_price(root, info: ResolveInfo):
+        def with_checkout(checkout):
+            checkout_info = CheckoutInfoByCheckoutTokenLoader(info.context).load(
+                checkout.token
+            )
+            lines = CheckoutLinesInfoByCheckoutTokenLoader(info.context).load(
+                checkout.token
+            )
+
+            def calculate_undiscounted_unit_price(data):
+                (
+                    checkout_info,
+                    lines,
+                ) = data
+                for line_info in lines:
+                    if line_info.line.pk == root.pk:
+                        return calculate_undiscounted_base_line_unit_price(
+                            line_info, checkout_info.channel
+                        )
+
+                return None
+
+            return Promise.all(
+                [
+                    checkout_info,
+                    lines,
+                ]
+            ).then(calculate_undiscounted_unit_price)
+
+        return (
+            CheckoutByTokenLoader(info.context)
+            .load(root.checkout_id)
+            .then(with_checkout)
+        )
+
+    @staticmethod
+    @traced_resolver
+    @prevent_sync_event_circular_query
+    def resolve_total_price(root, info: ResolveInfo):
+        def with_checkout(data):
+            checkout, manager = data
+            discounts = DiscountsByDateTimeLoader(info.context).load(
+                info.context.request_time
+            )
+            checkout_info = CheckoutInfoByCheckoutTokenLoader(info.context).load(
+                checkout.token
+            )
+            lines = CheckoutLinesInfoByCheckoutTokenLoader(info.context).load(
+                checkout.token
+            )
+
+            def calculate_line_total_price(data):
+                (discounts, checkout_info, lines) = data
+                for line_info in lines:
+                    if line_info.line.pk == root.pk:
+                        return calculations.checkout_line_total(
+                            manager=manager,
+                            checkout_info=checkout_info,
+                            lines=lines,
+                            checkout_line_info=line_info,
+                            discounts=discounts,
+                        )
+                return None
+
+            return Promise.all([discounts, checkout_info, lines]).then(
+                calculate_line_total_price
+            )
+
+        return Promise.all(
+            [
+                CheckoutByTokenLoader(info.context).load(root.checkout_id),
+                get_plugin_manager_promise(info.context),
+            ]
+        ).then(with_checkout)
+
+    @staticmethod
+    def resolve_undiscounted_total_price(root, info: ResolveInfo):
+        def with_checkout(checkout):
+            checkout_info = CheckoutInfoByCheckoutTokenLoader(info.context).load(
+                checkout.token
+            )
+            lines = CheckoutLinesInfoByCheckoutTokenLoader(info.context).load(
+                checkout.token
+            )
+
+            def calculate_undiscounted_total_price(data):
+                (
+                    checkout_info,
+                    lines,
+                ) = data
+                for line_info in lines:
+                    if line_info.line.pk == root.pk:
+                        return calculate_undiscounted_base_line_total_price(
+                            line_info, checkout_info.channel
+                        )
+                return None
+
+            return Promise.all(
+                [
+                    checkout_info,
+                    lines,
+                ]
+            ).then(calculate_undiscounted_total_price)
+
+        return (
+            CheckoutByTokenLoader(info.context)
+            .load(root.checkout_id)
+            .then(with_checkout)
+        )
+
+    @staticmethod
+    def resolve_requires_shipping(root: models.CheckoutLine, info: ResolveInfo):
+        def is_shipping_required(product_type):
+            return product_type.is_shipping_required
+
+        return (
+            ProductTypeByVariantIdLoader(info.context)
+            .load(root.variant_id)
+            .then(is_shipping_required)
+        )
+
+
+class CheckoutLineCountableConnection(CountableConnection):
+    class Meta:
+        node = CheckoutLine
+
+
+class DeliveryMethod(graphene.Union):
+    class Meta:
+        description = (
+            "Represents a delivery method chosen for the checkout. "
+            '`Warehouse` type is used when checkout is marked as "click and collect" '
+            "and `ShippingMethod` otherwise." + ADDED_IN_31 + PREVIEW_FEATURE
+        )
+        types = (Warehouse, ShippingMethod)
+
+    @classmethod
+    def resolve_type(cls, instance, info: ResolveInfo):
+        if isinstance(instance, ShippingMethodData):
+            return ShippingMethod
+        if isinstance(instance, warehouse_models.Warehouse):
+            return Warehouse
+
+        return super(DeliveryMethod, cls).resolve_type(instance, info)
+
+
+class Checkout(ModelObjectType[models.Checkout]):
+    id = graphene.ID(required=True)
+    created = graphene.DateTime(required=True)
+    last_change = graphene.DateTime(required=True)
+    use
