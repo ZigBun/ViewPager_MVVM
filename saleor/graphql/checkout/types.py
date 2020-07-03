@@ -563,4 +563,213 @@ class Checkout(ModelObjectType[models.Checkout]):
                 address=address,
                 discounts=discounts,
             )
-            return max(taxed_total, zero_taxed_money(root.cur
+            return max(taxed_total, zero_taxed_money(root.currency))
+
+        address_id = root.shipping_address_id or root.billing_address_id
+        address = (
+            AddressByIdLoader(info.context).load(address_id) if address_id else None
+        )
+        lines = CheckoutLinesInfoByCheckoutTokenLoader(info.context).load(root.token)
+        checkout_info = CheckoutInfoByCheckoutTokenLoader(info.context).load(root.token)
+        discounts = DiscountsByDateTimeLoader(info.context).load(
+            info.context.request_time
+        )
+        manager = get_plugin_manager_promise(info.context)
+        return Promise.all([address, lines, checkout_info, discounts, manager]).then(
+            calculate_total_price
+        )
+
+    @staticmethod
+    @traced_resolver
+    @prevent_sync_event_circular_query
+    def resolve_subtotal_price(root: models.Checkout, info: ResolveInfo):
+        def calculate_subtotal_price(data):
+            address, lines, checkout_info, discounts, manager = data
+            return calculations.checkout_subtotal(
+                manager=manager,
+                checkout_info=checkout_info,
+                lines=lines,
+                address=address,
+                discounts=discounts,
+            )
+
+        address_id = root.shipping_address_id or root.billing_address_id
+        address = (
+            AddressByIdLoader(info.context).load(address_id) if address_id else None
+        )
+        lines = CheckoutLinesInfoByCheckoutTokenLoader(info.context).load(root.token)
+        checkout_info = CheckoutInfoByCheckoutTokenLoader(info.context).load(root.token)
+        discounts = DiscountsByDateTimeLoader(info.context).load(
+            info.context.request_time
+        )
+        manager = get_plugin_manager_promise(info.context)
+
+        return Promise.all([address, lines, checkout_info, discounts, manager]).then(
+            calculate_subtotal_price
+        )
+
+    @staticmethod
+    @traced_resolver
+    @prevent_sync_event_circular_query
+    def resolve_shipping_price(root: models.Checkout, info: ResolveInfo):
+        def calculate_shipping_price(data):
+            address, lines, checkout_info, discounts, manager = data
+            return calculations.checkout_shipping_price(
+                manager=manager,
+                checkout_info=checkout_info,
+                lines=lines,
+                address=address,
+                discounts=discounts,
+            )
+
+        address = (
+            AddressByIdLoader(info.context).load(root.shipping_address_id)
+            if root.shipping_address_id
+            else None
+        )
+        lines = CheckoutLinesInfoByCheckoutTokenLoader(info.context).load(root.token)
+        checkout_info = CheckoutInfoByCheckoutTokenLoader(info.context).load(root.token)
+        discounts = DiscountsByDateTimeLoader(info.context).load(
+            info.context.request_time
+        )
+        manager = get_plugin_manager_promise(info.context)
+
+        return Promise.all([address, lines, checkout_info, discounts, manager]).then(
+            calculate_shipping_price
+        )
+
+    @staticmethod
+    def resolve_lines(root: models.Checkout, info: ResolveInfo):
+        return CheckoutLinesByCheckoutTokenLoader(info.context).load(root.token)
+
+    @staticmethod
+    @traced_resolver
+    @prevent_sync_event_circular_query
+    def resolve_available_shipping_methods(root: models.Checkout, info: ResolveInfo):
+        return (
+            CheckoutInfoByCheckoutTokenLoader(info.context)
+            .load(root.token)
+            .then(lambda checkout_info: checkout_info.valid_shipping_methods)
+        )
+
+    @staticmethod
+    @traced_resolver
+    def resolve_available_collection_points(root: models.Checkout, info: ResolveInfo):
+        def get_available_collection_points(lines):
+            return get_valid_collection_points_for_checkout(lines, root.channel_id)
+
+        return (
+            CheckoutLinesInfoByCheckoutTokenLoader(info.context)
+            .load(root.token)
+            .then(get_available_collection_points)
+        )
+
+    @staticmethod
+    @prevent_sync_event_circular_query
+    @plugin_manager_promise_callback
+    def resolve_available_payment_gateways(
+        root: models.Checkout, _info: ResolveInfo, manager
+    ):
+        return manager.list_payment_gateways(
+            currency=root.currency, checkout=root, channel_slug=root.channel.slug
+        )
+
+    @staticmethod
+    def resolve_gift_cards(root: models.Checkout, _info):
+        return root.gift_cards.all()
+
+    @staticmethod
+    def resolve_is_shipping_required(root: models.Checkout, info: ResolveInfo):
+        def is_shipping_required(lines):
+            product_ids = [line_info.product.id for line_info in lines]
+
+            def with_product_types(product_types):
+                return any([pt.is_shipping_required for pt in product_types])
+
+            return (
+                ProductTypeByProductIdLoader(info.context)
+                .load_many(product_ids)
+                .then(with_product_types)
+            )
+
+        return (
+            CheckoutLinesInfoByCheckoutTokenLoader(info.context)
+            .load(root.token)
+            .then(is_shipping_required)
+        )
+
+    @staticmethod
+    def resolve_language_code(root, _info):
+        return LanguageCodeEnum[str_to_enum(root.language_code)]
+
+    @staticmethod
+    @traced_resolver
+    @load_site_callback
+    def resolve_stock_reservation_expires(
+        root: models.Checkout, info: ResolveInfo, site
+    ):
+        if not is_reservation_enabled(site.settings):
+            return None
+
+        def get_oldest_stock_reservation_expiration_date(reservations):
+            if not reservations:
+                return None
+
+            return min(reservation.reserved_until for reservation in reservations)
+
+        return (
+            StocksReservationsByCheckoutTokenLoader(info.context)
+            .load(root.token)
+            .then(get_oldest_stock_reservation_expiration_date)
+        )
+
+    @staticmethod
+    @one_of_permissions_required(
+        [CheckoutPermissions.MANAGE_CHECKOUTS, PaymentPermissions.HANDLE_PAYMENTS]
+    )
+    def resolve_transactions(root: models.Checkout, info: ResolveInfo):
+        return TransactionItemsByCheckoutIDLoader(info.context).load(root.pk)
+
+    @staticmethod
+    def resolve_display_gross_prices(root: models.Checkout, info: ResolveInfo):
+        tax_config = TaxConfigurationByChannelId(info.context).load(root.channel_id)
+        country_code = root.get_country()
+
+        def load_tax_country_exceptions(tax_config):
+            tax_configs_per_country = (
+                TaxConfigurationPerCountryByTaxConfigurationIDLoader(info.context).load(
+                    tax_config.id
+                )
+            )
+
+            def calculate_display_gross_prices(tax_configs_per_country):
+                tax_config_country = next(
+                    (
+                        tc
+                        for tc in tax_configs_per_country
+                        if tc.country.code == country_code
+                    ),
+                    None,
+                )
+                return get_display_gross_prices(tax_config, tax_config_country)
+
+            return tax_configs_per_country.then(calculate_display_gross_prices)
+
+        return tax_config.then(load_tax_country_exceptions)
+
+    @staticmethod
+    def resolve_metadata(root: models.Checkout, info):
+        return (
+            CheckoutMetadataByCheckoutIdLoader(info.context)
+            .load(root.pk)
+            .then(
+                lambda metadata_storage: MetaResolvers.resolve_metadata(
+                    metadata_storage.metadata
+                )
+                if metadata_storage
+                else {}
+            )
+        )
+
+    @staticmethod
+    def resolve_metafield(root: models.C
