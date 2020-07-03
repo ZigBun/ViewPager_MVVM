@@ -346,4 +346,221 @@ class Checkout(ModelObjectType[models.Checkout]):
     id = graphene.ID(required=True)
     created = graphene.DateTime(required=True)
     last_change = graphene.DateTime(required=True)
-    use
+    user = graphene.Field("saleor.graphql.account.types.User")
+    channel = graphene.Field(Channel, required=True)
+    billing_address = graphene.Field("saleor.graphql.account.types.Address")
+    shipping_address = graphene.Field("saleor.graphql.account.types.Address")
+    note = graphene.String(required=True)
+    discount = graphene.Field(Money)
+    discount_name = graphene.String()
+    translated_discount_name = graphene.String()
+    voucher_code = graphene.String()
+    available_shipping_methods = NonNullList(
+        ShippingMethod,
+        required=True,
+        description="Shipping methods that can be used with this checkout.",
+        deprecation_reason=(f"{DEPRECATED_IN_3X_FIELD} Use `shippingMethods` instead."),
+    )
+    shipping_methods = NonNullList(
+        ShippingMethod,
+        required=True,
+        description="Shipping methods that can be used with this checkout.",
+    )
+    available_collection_points = NonNullList(
+        Warehouse,
+        required=True,
+        description=(
+            "Collection points that can be used for this order."
+            + ADDED_IN_31
+            + PREVIEW_FEATURE
+        ),
+    )
+    available_payment_gateways = NonNullList(
+        PaymentGateway,
+        description="List of available payment gateways.",
+        required=True,
+    )
+    email = graphene.String(description="Email of a customer.", required=False)
+    gift_cards = NonNullList(
+        GiftCard,
+        description="List of gift cards associated with this checkout.",
+        required=True,
+    )
+    is_shipping_required = graphene.Boolean(
+        description="Returns True, if checkout requires shipping.", required=True
+    )
+    quantity = graphene.Int(description="The number of items purchased.", required=True)
+    stock_reservation_expires = graphene.DateTime(
+        description=(
+            "Date when oldest stock reservation for this checkout "
+            "expires or null if no stock is reserved." + ADDED_IN_31
+        ),
+    )
+    lines = NonNullList(
+        CheckoutLine,
+        description=(
+            "A list of checkout lines, each containing information about "
+            "an item in the checkout."
+        ),
+        required=True,
+    )
+    shipping_price = graphene.Field(
+        TaxedMoney,
+        description="The price of the shipping, with all the taxes included.",
+        required=True,
+    )
+    shipping_method = graphene.Field(
+        ShippingMethod,
+        description="The shipping method related with checkout.",
+        deprecation_reason=(f"{DEPRECATED_IN_3X_FIELD} Use `deliveryMethod` instead."),
+    )
+    delivery_method = graphene.Field(
+        DeliveryMethod,
+        description=(
+            "The delivery method selected for this checkout."
+            + ADDED_IN_31
+            + PREVIEW_FEATURE
+        ),
+    )
+    subtotal_price = graphene.Field(
+        TaxedMoney,
+        description="The price of the checkout before shipping, with taxes included.",
+        required=True,
+    )
+    tax_exemption = graphene.Boolean(
+        description=(
+            "Returns True if checkout has to be exempt from taxes."
+            + ADDED_IN_38
+            + PREVIEW_FEATURE
+        ),
+        required=True,
+    )
+    token = graphene.Field(UUID, description="The checkout's token.", required=True)
+    total_price = graphene.Field(
+        TaxedMoney,
+        description=(
+            "The sum of the the checkout line prices, with all the taxes,"
+            "shipping costs, and discounts included."
+        ),
+        required=True,
+    )
+    language_code = graphene.Field(
+        LanguageCodeEnum, description="Checkout language code.", required=True
+    )
+    transactions = NonNullList(
+        TransactionItem,
+        description=(
+            "List of transactions for the checkout. Requires one of the "
+            "following permissions: MANAGE_CHECKOUTS, HANDLE_PAYMENTS."
+            + ADDED_IN_34
+            + PREVIEW_FEATURE
+        ),
+    )
+    display_gross_prices = graphene.Boolean(
+        description=(
+            "Determines whether checkout prices should include taxes when displayed "
+            "in a storefront." + ADDED_IN_39 + PREVIEW_FEATURE
+        ),
+        required=True,
+    )
+
+    class Meta:
+        description = "Checkout object."
+        model = models.Checkout
+        interfaces = [graphene.relay.Node, ObjectWithMetadata]
+
+    @staticmethod
+    def resolve_created(root: models.Checkout, _info: ResolveInfo):
+        return root.created_at
+
+    @staticmethod
+    def resolve_id(root: models.Checkout, _info: ResolveInfo):
+        return graphene.Node.to_global_id("Checkout", root.pk)
+
+    @staticmethod
+    def resolve_shipping_address(root: models.Checkout, info: ResolveInfo):
+        if not root.shipping_address_id:
+            return
+        return AddressByIdLoader(info.context).load(root.shipping_address_id)
+
+    @staticmethod
+    def resolve_billing_address(root: models.Checkout, info: ResolveInfo):
+        if not root.billing_address_id:
+            return
+        return AddressByIdLoader(info.context).load(root.billing_address_id)
+
+    @staticmethod
+    def resolve_user(root: models.Checkout, info: ResolveInfo):
+        if not root.user_id:
+            return None
+        requestor = get_user_or_app_from_context(info.context)
+        check_is_owner_or_has_one_of_perms(
+            requestor, root.user, AccountPermissions.MANAGE_USERS
+        )
+        return root.user
+
+    @staticmethod
+    def resolve_email(root: models.Checkout, _info: ResolveInfo):
+        return root.get_customer_email()
+
+    @classmethod
+    def resolve_shipping_method(cls, root: models.Checkout, info):
+        def with_checkout_info(checkout_info):
+            delivery_method = checkout_info.delivery_method_info.delivery_method
+            if not delivery_method or not isinstance(
+                delivery_method, ShippingMethodData
+            ):
+                return
+            return delivery_method
+
+        return (
+            CheckoutInfoByCheckoutTokenLoader(info.context)
+            .load(root.token)
+            .then(with_checkout_info)
+        )
+
+    @classmethod
+    @traced_resolver
+    @prevent_sync_event_circular_query
+    def resolve_shipping_methods(cls, root: models.Checkout, info: ResolveInfo):
+        return (
+            CheckoutInfoByCheckoutTokenLoader(info.context)
+            .load(root.token)
+            .then(lambda checkout_info: checkout_info.all_shipping_methods)
+        )
+
+    @staticmethod
+    def resolve_delivery_method(root: models.Checkout, info: ResolveInfo):
+        return (
+            CheckoutInfoByCheckoutTokenLoader(info.context)
+            .load(root.token)
+            .then(
+                lambda checkout_info: checkout_info.delivery_method_info.delivery_method
+            )
+        )
+
+    @staticmethod
+    def resolve_quantity(root: models.Checkout, info: ResolveInfo):
+        checkout_info = CheckoutLinesInfoByCheckoutTokenLoader(info.context).load(
+            root.token
+        )
+
+        def calculate_quantity(lines):
+            return sum([line_info.line.quantity for line_info in lines])
+
+        return checkout_info.then(calculate_quantity)
+
+    @staticmethod
+    @traced_resolver
+    @prevent_sync_event_circular_query
+    def resolve_total_price(root: models.Checkout, info: ResolveInfo):
+        def calculate_total_price(data):
+            address, lines, checkout_info, discounts, manager = data
+            taxed_total = calculations.calculate_checkout_total_with_gift_cards(
+                manager=manager,
+                checkout_info=checkout_info,
+                lines=lines,
+                address=address,
+                discounts=discounts,
+            )
+            return max(taxed_total, zero_taxed_money(root.cur
