@@ -772,4 +772,89 @@ class Checkout(ModelObjectType[models.Checkout]):
         )
 
     @staticmethod
-    def resolve_metafield(root: models.C
+    def resolve_metafield(root: models.Checkout, info, *, key: str):
+        return (
+            CheckoutMetadataByCheckoutIdLoader(info.context)
+            .load(root.pk)
+            .then(
+                lambda metadata_storage: metadata_storage.metadata.get(key)
+                if metadata_storage
+                else {}
+            )
+        )
+
+    @staticmethod
+    def resolve_metafields(root: models.Checkout, info, *, keys=None):
+        return (
+            CheckoutMetadataByCheckoutIdLoader(info.context)
+            .load(root.pk)
+            .then(
+                lambda metadata_storage: _filter_metadata(
+                    metadata_storage.metadata, keys
+                )
+                if metadata_storage
+                else {}
+            )
+        )
+
+    @staticmethod
+    def resolve_private_metadata(root: models.Checkout, info):
+        return (
+            CheckoutMetadataByCheckoutIdLoader(info.context)
+            .load(root.pk)
+            .then(
+                lambda metadata_storage: MetaResolvers.resolve_private_metadata(
+                    metadata_storage, info
+                )
+                if metadata_storage
+                else {}
+            )
+        )
+
+    @staticmethod
+    def resolve_private_metafield(root: models.Checkout, info, *, key: str):
+        def resolve_private_metafield_with_privilege_check(metadata_storage):
+            MetaResolvers.check_private_metadata_privilege(metadata_storage, info)
+            return metadata_storage.private_metadata.get(key)
+
+        return (
+            CheckoutMetadataByCheckoutIdLoader(info.context)
+            .load(root.pk)
+            .then(
+                lambda metadata_storage: resolve_private_metafield_with_privilege_check(
+                    metadata_storage
+                )
+                if metadata_storage
+                else {}
+            )
+        )
+
+    @staticmethod
+    def resolve_private_metafields(root: models.Checkout, info, *, keys=None):
+        def resolve_private_metafields_with_privilege(metadata_storage):
+            MetaResolvers.check_private_metadata_privilege(metadata_storage, info)
+            return _filter_metadata(metadata_storage.private_metadata, keys)
+
+        return (
+            CheckoutMetadataByCheckoutIdLoader(info.context)
+            .load(root.pk)
+            .then(
+                lambda metadata_storage: resolve_private_metafields_with_privilege(
+                    metadata_storage
+                )
+                if metadata_storage
+                else {}
+            )
+        )
+
+    @classmethod
+    def resolve_type(cls, root: models.Checkout, _info):
+        item_type, _ = MetaResolvers.resolve_object_with_metadata_type(
+            root.metadata_storage
+        )
+        return item_type
+
+
+class CheckoutCountableConnection(CountableConnection):
+    class Meta:
+        node = Checkout
