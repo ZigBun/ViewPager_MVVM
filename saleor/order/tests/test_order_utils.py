@@ -254,4 +254,233 @@ def test_add_variant_to_order(
     order, customer_user, variant, site_settings, discount_info
 ):
     # given
-    
+    manager = get_plugins_manager()
+    quantity = 4
+    collections = variant.product.collections.all()
+    channel_listing = variant.channel_listings.get(channel=order.channel)
+    base_unit_price = variant.get_price(
+        variant.product, collections, order.channel, channel_listing, [discount_info]
+    )
+    unit_price = TaxedMoney(net=base_unit_price, gross=base_unit_price)
+    total_price = unit_price * quantity
+    undiscounted_base_unit_price = variant.get_price(
+        variant.product, collections, order.channel, channel_listing, []
+    )
+    undiscounted_unit_price = TaxedMoney(
+        net=undiscounted_base_unit_price, gross=undiscounted_base_unit_price
+    )
+    undiscounted_total_price = undiscounted_unit_price * quantity
+
+    # when
+    line_data = OrderLineData(
+        variant_id=str(variant.id), variant=variant, quantity=quantity
+    )
+    line = add_variant_to_order(
+        order,
+        line_data,
+        customer_user,
+        None,
+        manager,
+        [discount_info],
+    )
+
+    # then
+    assert line.unit_price == unit_price
+    assert line.total_price == total_price
+    assert line.undiscounted_unit_price == undiscounted_unit_price
+    assert line.undiscounted_total_price == undiscounted_total_price
+    assert line.unit_price != line.undiscounted_unit_price
+    assert line.undiscounted_unit_price != line.undiscounted_total_price
+
+
+def test_add_gift_cards_to_order(
+    checkout_with_item, gift_card, gift_card_expiry_date, order, staff_user
+):
+    # given
+    checkout = checkout_with_item
+    checkout.user = staff_user
+    checkout.gift_cards.add(gift_card, gift_card_expiry_date)
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+
+    # when
+    add_gift_cards_to_order(
+        checkout_info, order, Money(20, gift_card.currency), staff_user, None
+    )
+
+    # then
+    gift_card.refresh_from_db()
+    gift_card_expiry_date.refresh_from_db()
+    assert gift_card.current_balance_amount == 0
+    assert gift_card_expiry_date.current_balance_amount == 0
+    assert gift_card.used_by == staff_user
+    assert gift_card.used_by_email == staff_user.email
+
+    gift_card_events = GiftCardEvent.objects.filter(gift_card_id=gift_card.id)
+    assert gift_card_events.count() == 1
+    gift_card_event = gift_card_events[0]
+    assert gift_card_event.type == GiftCardEvents.USED_IN_ORDER
+    assert gift_card_event.user == staff_user
+    assert gift_card_event.app is None
+    assert gift_card_event.order == order
+    assert gift_card_event.parameters == {
+        "balance": {
+            "currency": "USD",
+            "current_balance": "0",
+            "old_current_balance": "10.000",
+        },
+    }
+
+    order_created_event = GiftCardEvent.objects.get(
+        gift_card_id=gift_card_expiry_date.id
+    )
+    assert order_created_event.user == staff_user
+    assert order_created_event.app is None
+    assert order_created_event.order == order
+    assert order_created_event.parameters == {
+        "balance": {
+            "currency": "USD",
+            "current_balance": "0",
+            "old_current_balance": "20.000",
+        },
+    }
+
+
+def test_add_gift_cards_to_order_no_checkout_user(
+    checkout_with_item, gift_card, gift_card_expiry_date, order, staff_user
+):
+    # given
+    checkout = checkout_with_item
+    checkout.user = None
+    checkout.email = staff_user.email
+    checkout.save(update_fields=["user", "email"])
+
+    checkout.gift_cards.add(gift_card, gift_card_expiry_date)
+    manager = get_plugins_manager()
+    lines, _ = fetch_checkout_lines(checkout)
+    checkout_info = fetch_checkout_info(checkout, lines, [], manager)
+
+    # when
+    add_gift_cards_to_order(
+        checkout_info, order, Money(20, gift_card.currency), staff_user, None
+    )
+
+    # then
+    gift_card.refresh_from_db()
+    gift_card_expiry_date.refresh_from_db()
+    assert gift_card.current_balance_amount == 0
+    assert gift_card_expiry_date.current_balance_amount == 0
+    assert gift_card.used_by == staff_user
+    assert gift_card.used_by_email == staff_user.email
+
+    gift_card_events = GiftCardEvent.objects.filter(gift_card_id=gift_card.id)
+    assert gift_card_events.count() == 1
+    gift_card_event = gift_card_events[0]
+    assert gift_card_event.type == GiftCardEvents.USED_IN_ORDER
+    assert gift_card_event.user == staff_user
+    assert gift_card_event.app is None
+    assert gift_card_event.order == order
+    assert gift_card_event.parameters == {
+        "balance": {
+            "currency": "USD",
+            "current_balance": "0",
+            "old_current_balance": "10.000",
+        },
+    }
+
+    order_created_event = GiftCardEvent.objects.get(
+        gift_card_id=gift_card_expiry_date.id
+    )
+    assert order_created_event.user == staff_user
+    assert order_created_event.app is None
+    assert order_created_event.order == order
+    assert order_created_event.parameters == {
+        "balance": {
+            "currency": "USD",
+            "current_balance": "0",
+            "old_current_balance": "20.000",
+        },
+    }
+
+
+def test_get_total_order_discount_excluding_shipping(order, voucher_shipping_type):
+    # given
+    order.discounts.create(
+        type=OrderDiscountType.VOUCHER,
+        value_type=DiscountValueType.FIXED,
+        value=Decimal("10.0"),
+        name=voucher_shipping_type.code,
+        currency="USD",
+        amount_value=Decimal("10.0"),
+    )
+    manual_discount = order.discounts.create(
+        type=OrderDiscountType.MANUAL,
+        value_type=DiscountValueType.FIXED,
+        value=Decimal("10.0"),
+        name=voucher_shipping_type.code,
+        currency="USD",
+        amount_value=Decimal("10.0"),
+    )
+    currency = order.currency
+    total = TaxedMoney(Money(10, currency), Money(10, currency))
+    order.voucher = voucher_shipping_type
+    order.total = total
+    order.undiscounted_total = total
+    order.save()
+
+    # when
+    discount_amount = get_total_order_discount_excluding_shipping(order)
+
+    # then
+    assert discount_amount == Money(manual_discount.amount_value, order.currency)
+
+
+def test_get_total_order_discount_excluding_shipping_no_shipping_discounts(
+    order, voucher
+):
+    # given
+    discount_1 = order.discounts.create(
+        type=OrderDiscountType.VOUCHER,
+        value_type=DiscountValueType.FIXED,
+        value=Decimal("10.0"),
+        name=voucher.code,
+        currency="USD",
+        amount_value=Decimal("10.0"),
+    )
+    discount_2 = order.discounts.create(
+        type=OrderDiscountType.MANUAL,
+        value_type=DiscountValueType.FIXED,
+        value=Decimal("10.0"),
+        name=voucher.code,
+        currency="USD",
+        amount_value=Decimal("10.0"),
+    )
+    currency = order.currency
+    total = TaxedMoney(Money(30, currency), Money(30, currency))
+    order.voucher = voucher
+    order.total = total
+    order.undiscounted_total = total
+    order.save()
+
+    # when
+    discount_amount = get_total_order_discount_excluding_shipping(order)
+
+    # then
+    assert discount_amount == Money(
+        discount_1.amount_value + discount_2.amount_value, order.currency
+    )
+
+
+def test_update_order_display_gross_prices_use_default_tax_settings(order):
+    # given
+    tax_config = order.channel.tax_configuration
+    tax_config.display_gross_prices = True
+    tax_config.save()
+    tax_config.country_exceptions.all().delete()
+
+    order.display_gross_prices = False
+    order.save(update_fields=["display_gross_prices"])
+
+    # when
+    update_order_d
