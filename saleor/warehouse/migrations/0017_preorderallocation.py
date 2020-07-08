@@ -41,4 +41,10 @@ class Migration(migrations.Migration):
                         to="product.productvariantchannellisting",
                     ),
                 ),
-     
+            ],
+            options={
+                "ordering": ("pk",),
+                "unique_together": {("order_line", "product_variant_channel_listing")},
+            },
+        ),
+    ]
