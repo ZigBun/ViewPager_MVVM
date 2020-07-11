@@ -79,4 +79,7 @@ class Migration(migrations.Migration):
             field=models.CharField(
                 choices=[("fixed", "fixed"), ("percentage", "%")],
                 default="fixed",
-                max_length=10
+                max_length=10,
+            ),
+        ),
+    ]
