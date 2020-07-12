@@ -1660,3 +1660,614 @@ def test_update_product_variant_with_duplicated_file_attribute(
     variant2.pk = None
     variant2.sku = str(uuid4())[:12]
     variant2.save()
+    file_attr_value = file_attribute.values.last()
+    associate_attribute_values_to_instance(variant2, file_attribute, file_attr_value)
+
+    sku = str(uuid4())[:12]
+    assert not variant.sku == sku
+
+    assert set(variant.attributes.first().values.values_list("slug", flat=True)) == {
+        "test_filetxt"
+    }
+    assert set(variant2.attributes.first().values.values_list("slug", flat=True)) == {
+        "test_filejpeg"
+    }
+
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    file_attribute_id = graphene.Node.to_global_id("Attribute", file_attribute.pk)
+    domain = site_settings.site.domain
+    file_url = f"http://{domain}{settings.MEDIA_URL}{file_attr_value.file_url}"
+
+    variables = {
+        "id": variant_id,
+        "price": 15,
+        "attributes": [{"id": file_attribute_id, "file": file_url}],
+        "sku": sku,
+    }
+
+    response = staff_api_client.post_graphql(
+        QUERY_UPDATE_VARIANT_ATTRIBUTES,
+        variables,
+        permissions=[permission_manage_products],
+    )
+    content = get_graphql_content(response)
+
+    data = content["data"]["productVariantUpdate"]
+    assert data["errors"][0] == {
+        "field": "attributes",
+        "code": ProductErrorCode.DUPLICATED_INPUT_ITEM.name,
+        "message": ANY,
+    }
+
+
+def test_update_product_variant_with_file_attribute_new_value_is_not_created(
+    staff_api_client,
+    product_with_variant_with_file_attribute,
+    file_attribute,
+    permission_manage_products,
+    site_settings,
+):
+    product = product_with_variant_with_file_attribute
+    variant = product.variants.first()
+    sku = str(uuid4())[:12]
+    assert not variant.sku == sku
+
+    existing_value = file_attribute.values.first()
+    assert variant.attributes.filter(
+        assignment__attribute=file_attribute, values=existing_value
+    ).exists()
+
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    file_attribute_id = graphene.Node.to_global_id("Attribute", file_attribute.pk)
+    domain = site_settings.site.domain
+    file_url = f"http://{domain}{settings.MEDIA_URL}{existing_value.file_url}"
+
+    variables = {
+        "id": variant_id,
+        "sku": sku,
+        "price": 15,
+        "attributes": [{"id": file_attribute_id, "file": file_url}],
+    }
+
+    response = staff_api_client.post_graphql(
+        QUERY_UPDATE_VARIANT_ATTRIBUTES,
+        variables,
+        permissions=[permission_manage_products],
+    )
+    content = get_graphql_content(response)
+
+    data = content["data"]["productVariantUpdate"]
+    assert not data["errors"]
+    variant_data = data["productVariant"]
+    assert variant_data
+    assert variant_data["sku"] == sku
+    assert len(variant_data["attributes"]) == 1
+    assert variant_data["attributes"][0]["attribute"]["slug"] == file_attribute.slug
+    assert len(variant_data["attributes"][0]["values"]) == 1
+    value_data = variant_data["attributes"][0]["values"][0]
+    assert value_data["slug"] == existing_value.slug
+    assert value_data["name"] == existing_value.name
+    assert value_data["file"]["url"] == file_url
+    assert value_data["file"]["contentType"] == existing_value.content_type
+
+
+def test_update_product_variant_with_page_reference_attribute(
+    staff_api_client,
+    product,
+    page,
+    product_type_page_reference_attribute,
+    permission_manage_products,
+):
+    variant = product.variants.first()
+    sku = str(uuid4())[:12]
+    assert not variant.sku == sku
+
+    product_type = product.product_type
+    product_type.variant_attributes.clear()
+    product_type.variant_attributes.add(product_type_page_reference_attribute)
+
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    ref_attribute_id = graphene.Node.to_global_id(
+        "Attribute", product_type_page_reference_attribute.pk
+    )
+    reference = graphene.Node.to_global_id("Page", page.pk)
+
+    variables = {
+        "id": variant_id,
+        "sku": sku,
+        "attributes": [{"id": ref_attribute_id, "references": [reference]}],
+    }
+
+    response = staff_api_client.post_graphql(
+        QUERY_UPDATE_VARIANT_ATTRIBUTES,
+        variables,
+        permissions=[permission_manage_products],
+    )
+    content = get_graphql_content(response)
+
+    data = content["data"]["productVariantUpdate"]
+    assert not data["errors"]
+    variant_data = data["productVariant"]
+    assert variant_data
+    assert variant_data["sku"] == sku
+    assert len(variant_data["attributes"]) == 1
+    assert (
+        variant_data["attributes"][0]["attribute"]["slug"]
+        == product_type_page_reference_attribute.slug
+    )
+    assert len(variant_data["attributes"][0]["values"]) == 1
+    assert (
+        variant_data["attributes"][0]["values"][0]["slug"] == f"{variant.pk}_{page.pk}"
+    )
+    assert variant_data["attributes"][0]["values"][0]["reference"] == reference
+
+
+def test_update_product_variant_with_product_reference_attribute(
+    staff_api_client,
+    product_list,
+    product_type_product_reference_attribute,
+    permission_manage_products,
+):
+    product = product_list[0]
+    product_ref = product_list[1]
+
+    variant = product.variants.first()
+    sku = str(uuid4())[:12]
+    assert not variant.sku == sku
+
+    product_type = product.product_type
+    product_type.variant_attributes.clear()
+    product_type.variant_attributes.add(product_type_product_reference_attribute)
+
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    ref_attribute_id = graphene.Node.to_global_id(
+        "Attribute", product_type_product_reference_attribute.pk
+    )
+    reference = graphene.Node.to_global_id("Product", product_ref.pk)
+
+    variables = {
+        "id": variant_id,
+        "sku": sku,
+        "attributes": [{"id": ref_attribute_id, "references": [reference]}],
+    }
+
+    response = staff_api_client.post_graphql(
+        QUERY_UPDATE_VARIANT_ATTRIBUTES,
+        variables,
+        permissions=[permission_manage_products],
+    )
+    content = get_graphql_content(response)
+
+    data = content["data"]["productVariantUpdate"]
+    assert not data["errors"]
+    variant_data = data["productVariant"]
+    assert variant_data
+    assert variant_data["sku"] == sku
+    assert len(variant_data["attributes"]) == 1
+    assert (
+        variant_data["attributes"][0]["attribute"]["slug"]
+        == product_type_product_reference_attribute.slug
+    )
+    assert len(variant_data["attributes"][0]["values"]) == 1
+    assert (
+        variant_data["attributes"][0]["values"][0]["slug"]
+        == f"{variant.pk}_{product_ref.pk}"
+    )
+    assert variant_data["attributes"][0]["values"][0]["reference"] == reference
+
+
+def test_update_product_variant_with_variant_reference_attribute(
+    staff_api_client,
+    product_list,
+    product_type_variant_reference_attribute,
+    permission_manage_products,
+):
+    # given
+    product = product_list[0]
+    variant_ref = product_list[1].variants.first()
+
+    variant = product.variants.first()
+    sku = str(uuid4())[:12]
+    assert not variant.sku == sku
+
+    product_type = product.product_type
+    product_type.variant_attributes.clear()
+    product_type.variant_attributes.add(product_type_variant_reference_attribute)
+
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    ref_attribute_id = graphene.Node.to_global_id(
+        "Attribute", product_type_variant_reference_attribute.pk
+    )
+    reference = graphene.Node.to_global_id("ProductVariant", variant_ref.pk)
+
+    variables = {
+        "id": variant_id,
+        "sku": sku,
+        "attributes": [{"id": ref_attribute_id, "references": [reference]}],
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_UPDATE_VARIANT_ATTRIBUTES,
+        variables,
+        permissions=[permission_manage_products],
+    )
+
+    # then
+    content = get_graphql_content(response)
+
+    data = content["data"]["productVariantUpdate"]
+    assert not data["errors"]
+    variant_data = data["productVariant"]
+    assert variant_data
+    assert variant_data["sku"] == sku
+    assert len(variant_data["attributes"]) == 1
+    assert (
+        variant_data["attributes"][0]["attribute"]["slug"]
+        == product_type_variant_reference_attribute.slug
+    )
+    assert len(variant_data["attributes"][0]["values"]) == 1
+    assert (
+        variant_data["attributes"][0]["values"][0]["slug"]
+        == f"{variant.pk}_{variant_ref.pk}"
+    )
+    assert variant_data["attributes"][0]["values"][0]["reference"] == reference
+
+
+def test_update_product_variant_change_attribute_values_ordering(
+    staff_api_client,
+    variant,
+    product_type_product_reference_attribute,
+    permission_manage_products,
+    product_list,
+):
+    # given
+    product_type = variant.product.product_type
+    product_type.variant_attributes.set([product_type_product_reference_attribute])
+    sku = str(uuid4())[:12]
+
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+
+    attribute_id = graphene.Node.to_global_id(
+        "Attribute", product_type_product_reference_attribute.pk
+    )
+
+    attr_value_1 = AttributeValue.objects.create(
+        attribute=product_type_product_reference_attribute,
+        name=product_list[0].name,
+        slug=f"{variant.pk}_{product_list[0].pk}",
+        reference_product=product_list[0],
+    )
+    attr_value_2 = AttributeValue.objects.create(
+        attribute=product_type_product_reference_attribute,
+        name=product_list[1].name,
+        slug=f"{variant.pk}_{product_list[1].pk}",
+        reference_product=product_list[1],
+    )
+    attr_value_3 = AttributeValue.objects.create(
+        attribute=product_type_product_reference_attribute,
+        name=product_list[2].name,
+        slug=f"{variant.pk}_{product_list[2].pk}",
+        reference_product=product_list[2],
+    )
+
+    associate_attribute_values_to_instance(
+        variant,
+        product_type_product_reference_attribute,
+        attr_value_3,
+        attr_value_2,
+        attr_value_1,
+    )
+
+    assert list(
+        variant.attributes.first().variantvalueassignment.values_list(
+            "value_id", flat=True
+        )
+    ) == [attr_value_3.pk, attr_value_2.pk, attr_value_1.pk]
+
+    new_ref_order = [product_list[1], product_list[0], product_list[2]]
+    variables = {
+        "id": variant_id,
+        "sku": sku,
+        "attributes": [
+            {
+                "id": attribute_id,
+                "references": [
+                    graphene.Node.to_global_id("Product", ref.pk)
+                    for ref in new_ref_order
+                ],
+            }
+        ],
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_UPDATE_VARIANT_ATTRIBUTES,
+        variables,
+        permissions=[permission_manage_products],
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["productVariantUpdate"]
+    assert data["errors"] == []
+
+    attributes = data["productVariant"]["attributes"]
+
+    assert len(attributes) == 1
+    values = attributes[0]["values"]
+    assert len(values) == 3
+    assert [value["id"] for value in values] == [
+        graphene.Node.to_global_id("AttributeValue", val.pk)
+        for val in [attr_value_2, attr_value_1, attr_value_3]
+    ]
+    variant.refresh_from_db()
+    assert list(
+        variant.attributes.first().variantvalueassignment.values_list(
+            "value_id", flat=True
+        )
+    ) == [attr_value_2.pk, attr_value_1.pk, attr_value_3.pk]
+
+
+@pytest.mark.parametrize(
+    "values, message, code",
+    (
+        (["one", "two"], "Attribute must take only one value.", "INVALID"),
+        (["   "], "Attribute values cannot be blank.", "REQUIRED"),
+    ),
+)
+def test_update_product_variant_requires_values(
+    staff_api_client,
+    variant,
+    product_type,
+    permission_manage_products,
+    values,
+    message,
+    code,
+):
+    """Ensures updating a variant with invalid values raise an error.
+
+    - Blank value
+    - More than one value
+    """
+
+    sku = "updated"
+
+    query = QUERY_UPDATE_VARIANT_ATTRIBUTES
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    attr_id = graphene.Node.to_global_id(
+        "Attribute", product_type.variant_attributes.first().id
+    )
+
+    variables = {
+        "id": variant_id,
+        "attributes": [{"id": attr_id, "values": values}],
+        "sku": sku,
+    }
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    variant.refresh_from_db()
+    content = get_graphql_content(response)
+    assert (
+        len(content["data"]["productVariantUpdate"]["errors"]) == 1
+    ), f"expected: {message}"
+    assert content["data"]["productVariantUpdate"]["errors"][0] == {
+        "field": "attributes",
+        "message": message,
+        "code": code,
+    }
+    assert not variant.product.variants.filter(sku=sku).exists()
+
+
+def test_update_product_variant_requires_attr_value_when_is_required(
+    staff_api_client,
+    variant,
+    product_type,
+    permission_manage_products,
+):
+    sku = "updated"
+
+    query = QUERY_UPDATE_VARIANT_ATTRIBUTES
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    attribute = product_type.variant_attributes.first()
+    attribute.value_required = True
+    attribute.save(update_fields=["value_required"])
+
+    attr_id = graphene.Node.to_global_id(
+        "Attribute", product_type.variant_attributes.first().id
+    )
+
+    variables = {
+        "id": variant_id,
+        "attributes": [{"id": attr_id, "values": []}],
+        "sku": sku,
+    }
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    variant.refresh_from_db()
+    content = get_graphql_content(response)
+    assert len(content["data"]["productVariantUpdate"]["errors"]) == 1
+    assert content["data"]["productVariantUpdate"]["errors"][0] == {
+        "field": "attributes",
+        "message": "Attribute expects a value but none were given.",
+        "code": "REQUIRED",
+    }
+    assert not variant.product.variants.filter(sku=sku).exists()
+
+
+def test_update_product_variant_with_price_does_not_raise_price_validation_error(
+    staff_api_client, variant, size_attribute, permission_manage_products
+):
+    mutation = """
+    mutation updateVariant ($id: ID!, $attributes: [AttributeValueInput!]) {
+        productVariantUpdate(
+            id: $id,
+            input: {
+            attributes: $attributes,
+        }) {
+            productVariant {
+                id
+            }
+            errors {
+                field
+                code
+            }
+        }
+    }
+    """
+    # given a product variant and an attribute
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    attribute_id = graphene.Node.to_global_id("Attribute", size_attribute.pk)
+
+    # when running the updateVariant mutation without price input field
+    variables = {
+        "id": variant_id,
+        "attributes": [{"id": attribute_id, "values": ["S"]}],
+    }
+    response = staff_api_client.post_graphql(
+        mutation, variables, permissions=[permission_manage_products]
+    )
+
+    # then mutation passes without validation errors
+    content = get_graphql_content(response)
+    assert not content["data"]["productVariantUpdate"]["errors"]
+
+
+def test_update_product_variant_name(
+    staff_api_client, product, permission_manage_products
+):
+    # given
+    query = """
+        mutation updateVariant (
+            $id: ID!,
+            $name: String
+        ) {
+            productVariantUpdate(
+                id: $id,
+                input: {
+                    name: $name,
+                }
+            ){
+                productVariant {
+                    name
+                }
+                errors {
+                    field
+                    message
+                    code
+                }
+            }
+        }
+    """
+    variant = product.variants.first()
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    new_name = "new-variant-name"
+    variables = {"id": variant_id, "name": new_name}
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    variant.refresh_from_db()
+    content = get_graphql_content(response)
+    data = content["data"]["productVariantUpdate"]
+
+    # then
+    assert not data["errors"]
+    assert data["productVariant"]["name"] == new_name
+
+
+QUERY_UPDATE_VARIANT_PREORDER = """
+    mutation updateVariant (
+        $id: ID!,
+        $sku: String!,
+        $preorder: PreorderSettingsInput) {
+            productVariantUpdate(
+                id: $id,
+                input: {
+                    sku: $sku,
+                    preorder: $preorder,
+                }) {
+                productVariant {
+                    sku
+                    preorder {
+                        globalThreshold
+                        endDate
+                    }
+                }
+            }
+        }
+"""
+
+
+def test_update_product_variant_change_preorder_data(
+    staff_api_client,
+    permission_manage_products,
+    preorder_variant_global_threshold,
+):
+    variant = preorder_variant_global_threshold
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    sku = "test sku"
+
+    new_global_threshold = variant.preorder_global_threshold + 5
+    assert variant.preorder_end_date is None
+    new_preorder_end_date = (
+        (datetime.now() + timedelta(days=3))
+        .astimezone()
+        .replace(microsecond=0)
+        .isoformat()
+    )
+    variables = {
+        "id": variant_id,
+        "sku": sku,
+        "preorder": {
+            "globalThreshold": new_global_threshold,
+            "endDate": new_preorder_end_date,
+        },
+    }
+
+    response = staff_api_client.post_graphql(
+        QUERY_UPDATE_VARIANT_PREORDER,
+        variables,
+        permissions=[permission_manage_products],
+    )
+    variant.refresh_from_db()
+    content = get_graphql_content(response)
+    flush_post_commit_hooks()
+    data = content["data"]["productVariantUpdate"]["productVariant"]
+
+    assert data["sku"] == sku
+    assert data["preorder"]["globalThreshold"] == new_global_threshold
+    assert data["preorder"]["endDate"] == new_preorder_end_date
+
+
+def test_update_product_variant_can_not_turn_off_preorder(
+    staff_api_client,
+    permission_manage_products,
+    preorder_variant_global_threshold,
+):
+    """Passing None with `preorder` field can not turn off preorder,
+    it could be done only with ProductVariantPreorderDeactivate mutation."""
+    variant = preorder_variant_global_threshold
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    sku = "test sku"
+
+    variables = {"id": variant_id, "sku": sku, "preorder": None}
+
+    response = staff_api_client.post_graphql(
+        QUERY_UPDATE_VARIANT_PREORDER,
+        variables,
+        permissions=[permission_manage_products],
+    )
+    variant.refresh_from_db()
+    content = get_graphql_content(response)
+    flush_post_commit_hooks()
+    data = content["data"]["productVariantUpdate"]["productVariant"]
+
+    assert data["sku"] == sku
+    assert data["preorder"]["globalThreshold"] == variant.preorder_global_threshold
+    assert data["preorder"]["endDate"] is None
