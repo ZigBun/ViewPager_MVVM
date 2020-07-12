@@ -55,4 +55,14 @@ def convert_to_shipping_method_data(
 
 
 def initialize_shipping_method_active_status(
-    shipping_methods: List["ShippingMethodData"
+    shipping_methods: List["ShippingMethodData"],
+    excluded_methods: List["ExcludedShippingMethod"],
+):
+    reason_map = {str(method.id): method.reason for method in excluded_methods}
+    for instance in shipping_methods:
+        instance.active = True
+        instance.message = ""
+        reason = reason_map.get(str(instance.id))
+        if reason is not None:
+            instance.active = False
+            instance.message = reason
