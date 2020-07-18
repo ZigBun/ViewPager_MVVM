@@ -15,4 +15,55 @@ class Migration(migrations.Migration):
             name="OrderDiscount",
             fields=[
                 (
- 
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "type",
+                    models.CharField(
+                        choices=[("voucher", "Voucher"), ("manual", "Manual")],
+                        default="manual",
+                        max_length=10,
+                    ),
+                ),
+                (
+                    "value_type",
+                    models.CharField(
+                        choices=[("fixed", "fixed"), ("percentage", "%")],
+                        default="fixed",
+                        max_length=10,
+                    ),
+                ),
+                (
+                    "value",
+                    models.DecimalField(decimal_places=3, max_digits=12, default=0),
+                ),
+                (
+                    "amount_value",
+                    models.DecimalField(decimal_places=3, max_digits=12, default=0),
+                ),
+                ("currency", models.CharField(max_length=3)),
+                ("name", models.CharField(blank=True, max_length=255, null=True)),
+                (
+                    "translated_name",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
+                ("reason", models.TextField(blank=True, null=True)),
+                (
+                    "order",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="discounts",
+                        to="order.order",
+                    ),
+                ),
+            ],
+        ),
+    ]
