@@ -582,4 +582,201 @@ class AdyenGatewayPlugin(BasePlugin):
         # The additional checks are proceed asynchronously so we try to confirm that
         # the payment is already processed
         payment = Payment.objects.filter(id=payment_information.payment_id).first()
-        if not paymen
+        if not payment:
+            raise PaymentError("Unable to find the payment.")
+
+        transaction = (
+            payment.transactions.filter(
+                kind=TransactionKind.ACTION_TO_CONFIRM,
+                is_success=True,
+                action_required=False,
+            )
+            .exclude(token__isnull=False, token__exact="")
+            .last()
+        )
+
+        adyen_auto_capture = self.config.connection_params["adyen_auto_capture"]
+        kind = TransactionKind.AUTH
+        if adyen_auto_capture or config.auto_capture:
+            kind = TransactionKind.CAPTURE
+
+        if not transaction:
+            # We don't have async notification for this payment so we try to proceed
+            # standard flow for confirming an additional action
+            return self._process_additional_action(payment_information, kind)
+
+        result_code = transaction.gateway_response.get("resultCode", "").strip().lower()
+        payment_method = (
+            transaction.gateway_response.get("paymentMethod", "").strip().lower()
+        )
+        if result_code and result_code in PENDING_STATUSES:
+            kind = TransactionKind.PENDING
+        elif result_code == AUTH_STATUS and payment_method == "ideal":
+            kind = TransactionKind.CAPTURE
+
+        # We already have the ACTION_TO_CONFIRM transaction, it means that
+        # payment was processed asynchronous and no additional action is required
+
+        # Check if we didn't process this transaction asynchronously
+        transaction_already_processed = payment.transactions.filter(
+            kind=kind,
+            is_success=True,
+            action_required=False,
+            amount=payment_information.amount,
+            currency=payment_information.currency,
+        ).first()
+        is_success = True
+
+        # confirm that we should proceed the capture action
+        if (
+            not transaction_already_processed
+            and config.auto_capture
+            and kind == TransactionKind.CAPTURE
+        ):
+            response = self.capture_payment(payment_information, None)
+            is_success = response.is_success
+
+        token = transaction.token
+        if transaction_already_processed:
+            token = transaction_already_processed.token
+
+        return GatewayResponse(
+            is_success=is_success,
+            action_required=False,
+            kind=kind,
+            amount=payment_information.amount,
+            currency=payment_information.currency,
+            transaction_id=token,
+            error=None,
+            raw_response={},
+            transaction_already_processed=bool(transaction_already_processed),
+            psp_reference=token,
+        )
+
+    def refund_payment(
+        self, payment_information: "PaymentData", previous_value
+    ) -> "GatewayResponse":
+        if not self.active:
+            return previous_value
+        # we take Auth kind because it contains the transaction id that we need
+        transaction = (
+            Transaction.objects.filter(
+                payment__id=payment_information.payment_id,
+                kind=TransactionKind.AUTH,
+                is_success=True,
+            )
+            .exclude(token__isnull=False, token__exact="")
+            .last()
+        )
+
+        if not transaction:
+            # If we don't find the Auth kind we will try to get Capture kind
+            transaction = (
+                Transaction.objects.filter(
+                    payment__id=payment_information.payment_id,
+                    kind=TransactionKind.CAPTURE,
+                    is_success=True,
+                )
+                .exclude(token__isnull=False, token__exact="")
+                .last()
+            )
+
+        if not transaction:
+            raise PaymentError("Cannot find a payment reference to refund.")
+
+        amount = payment_information.amount
+        currency = payment_information.currency
+
+        result = call_refund(
+            amount=amount,
+            currency=currency,
+            graphql_payment_id=payment_information.graphql_payment_id,
+            merchant_account=self.config.connection_params["merchant_account"],
+            token=transaction.token,
+            adyen_client=self.adyen,
+        )
+
+        if transaction.payment.order:
+            msg = f"Adyen: Refund for amount {amount}{currency} has been requested."
+            external_notification_event(
+                order=transaction.payment.order,
+                user=None,
+                app=None,
+                message=msg,
+                parameters={
+                    "service": transaction.payment.gateway,
+                    "id": transaction.payment.token,
+                },
+            )
+        return GatewayResponse(
+            is_success=True,
+            action_required=False,
+            kind=TransactionKind.REFUND_ONGOING,
+            amount=amount,
+            currency=currency,
+            transaction_id=result.message.get("pspReference", ""),
+            error="",
+            raw_response=result.message,
+            psp_reference=result.message.get("pspReference", ""),
+        )
+
+    def capture_payment(
+        self, payment_information: "PaymentData", previous_value
+    ) -> "GatewayResponse":
+        if not self.active:
+            return previous_value
+
+        if not payment_information.token:
+            raise PaymentError("Cannot find a payment reference to capture.")
+
+        result = call_capture(
+            payment_information=payment_information,
+            merchant_account=self.config.connection_params["merchant_account"],
+            token=payment_information.token,
+            adyen_client=self.adyen,
+        )
+
+        payment_method_info = get_payment_method_info(payment_information, result)
+
+        return GatewayResponse(
+            is_success=True,
+            action_required=False,
+            kind=TransactionKind.CAPTURE,
+            amount=payment_information.amount,
+            currency=payment_information.currency,
+            transaction_id=result.message.get("pspReference", ""),
+            error="",
+            raw_response=result.message,
+            payment_method_info=payment_method_info,
+            psp_reference=result.message.get("pspReference", ""),
+        )
+
+    def void_payment(
+        self, payment_information: "PaymentData", previous_value
+    ) -> "GatewayResponse":
+        if not self.active:
+            return previous_value
+        request = request_for_payment_cancel(
+            payment_information=payment_information,
+            merchant_account=self.config.connection_params["merchant_account"],
+            token=payment_information.token,  # type: ignore
+        )
+        with opentracing.global_tracer().start_active_span(
+            "adyen.payment.cancel"
+        ) as scope:
+            span = scope.span
+            span.set_tag(opentracing.tags.COMPONENT, "payment")
+            span.set_tag("service.name", "adyen")
+            result = api_call(request, self.adyen.payment.cancel)
+
+        return GatewayResponse(
+            is_success=True,
+            action_required=False,
+            kind=TransactionKind.VOID,
+            amount=payment_information.amount,
+            currency=payment_information.currency,
+            transaction_id=result.message.get("pspReference", ""),
+            error="",
+            raw_response=result.message,
+            psp_reference=result.message.get("pspReference", ""),
+        )
