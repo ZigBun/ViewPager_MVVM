@@ -413,4 +413,173 @@ class AdyenGatewayPlugin(BasePlugin):
             {"payment": payment_information.graphql_payment_id, "checkout": checkout.pk}
         )
         return_url = prepare_url(
-         
+            params,
+            build_absolute_uri(
+                f"/plugins/channel/{self.channel.slug}/"  # type: ignore
+                f"{self.PLUGIN_ID}/additional-actions"
+            ),
+        )
+        request_data = request_data_for_payment(
+            payment_information,
+            return_url=return_url,
+            merchant_account=self.config.connection_params["merchant_account"],
+            native_3d_secure=self.config.connection_params["enable_native_3d_secure"],
+        )
+        with opentracing.global_tracer().start_active_span(
+            "adyen.checkout.payments"
+        ) as scope:
+            span = scope.span
+            span.set_tag(opentracing.tags.COMPONENT, "payment")
+            span.set_tag("service.name", "adyen")
+            result = api_call(request_data, self.adyen.checkout.payments)
+        result_code = result.message["resultCode"].strip().lower()
+        is_success = result_code not in FAILED_STATUSES
+        adyen_auto_capture = self.config.connection_params["adyen_auto_capture"]
+        kind = TransactionKind.AUTH
+        if result_code in PENDING_STATUSES:
+            kind = TransactionKind.PENDING
+        elif adyen_auto_capture:
+            kind = TransactionKind.CAPTURE
+        psp_reference = result.message.get("pspReference", "")
+        action = result.message.get("action")
+        error_message = result.message.get("refusalReason")
+        if action:
+            update_payment_with_action_required_data(
+                payment,
+                action,
+                result.message.get("details", []),
+            )
+        # If auto capture is enabled, let's make a capture the auth payment
+        elif (
+            self.config.auto_capture
+            and result_code == AUTH_STATUS
+            and self.order_auto_confirmation
+        ):
+            kind = TransactionKind.CAPTURE
+            result = call_capture(
+                payment_information=payment_information,
+                merchant_account=self.config.connection_params["merchant_account"],
+                token=result.message.get("pspReference"),
+                adyen_client=self.adyen,
+            )
+        payment_method_info = get_payment_method_info(payment_information, result)
+        return GatewayResponse(
+            is_success=is_success,
+            action_required="action" in result.message,
+            kind=kind,
+            amount=payment_information.amount,
+            currency=payment_information.currency,
+            transaction_id=result.message.get("pspReference", ""),
+            error=error_message,
+            raw_response=result.message,
+            action_required_data=action,
+            payment_method_info=payment_method_info,
+            psp_reference=psp_reference,
+        )
+
+    @classmethod
+    def _update_config_items(
+        cls, configuration_to_update: List[dict], current_config: List[dict]
+    ):
+        for item in configuration_to_update:
+            if item.get("name") == "notification-password" and item["value"]:
+                item["value"] = make_password(item["value"])
+        super()._update_config_items(configuration_to_update, current_config)
+
+    def get_payment_config(self, previous_value):
+        if not self.active:
+            return previous_value
+        return []
+
+    def get_supported_currencies(self, previous_value):
+        if not self.active:
+            return previous_value
+        config = self._get_gateway_config()
+        return get_supported_currencies(config, GATEWAY_NAME)
+
+    def _process_additional_action(self, payment_information: "PaymentData", kind: str):
+        config = self._get_gateway_config()
+        additional_data = payment_information.data
+        if not additional_data:
+            return GatewayResponse(
+                is_success=False,
+                action_required=False,
+                kind=kind,
+                amount=payment_information.amount,
+                currency=payment_information.currency,
+                transaction_id="",
+                error=f"Unable to finish the payment. "
+                f"Payment ({payment_information.graphql_payment_id}) "
+                f"does not have the additional data.",
+            )
+
+        with opentracing.global_tracer().start_active_span(
+            "adyen.checkout.payment_details"
+        ) as scope:
+            span = scope.span
+            span.set_tag(opentracing.tags.COMPONENT, "payment")
+            span.set_tag("service.name", "adyen")
+            result = api_call(additional_data, self.adyen.checkout.payments_details)
+        result_code = result.message["resultCode"].strip().lower()
+        is_success = result_code not in FAILED_STATUSES
+        action_required = "action" in result.message
+        if result_code in PENDING_STATUSES:
+            kind = TransactionKind.PENDING
+        elif (
+            is_success
+            and config.auto_capture
+            and self.order_auto_confirmation
+            and not action_required
+        ):
+            # For enabled auto_capture on Saleor side we need to proceed an additional
+            # action
+            kind = TransactionKind.CAPTURE
+            result = call_capture(
+                payment_information=payment_information,
+                merchant_account=self.config.connection_params["merchant_account"],
+                token=result.message.get("pspReference"),
+                adyen_client=self.adyen,
+            )
+
+        payment_method_info = get_payment_method_info(payment_information, result)
+        action = result.message.get("action")
+        return GatewayResponse(
+            is_success=is_success,
+            action_required=action_required,
+            action_required_data=action,
+            kind=kind,
+            amount=payment_information.amount,
+            currency=payment_information.currency,
+            transaction_id=result.message.get("pspReference", ""),
+            error=result.message.get("refusalReason"),
+            raw_response=result.message,
+            psp_reference=result.message.get("pspReference", ""),
+            payment_method_info=payment_method_info,
+        )
+
+    def confirm_payment(
+        self, payment_information: "PaymentData", previous_value
+    ) -> "GatewayResponse":
+        """Confirm a payment on Adyen side.
+
+        In case when we have a transaction with `ACTION_TO_CONFIRM`, we just need to
+        finalize the payment process on our side. Transaction ACTION_TO_CONFIRM is
+        created only when we receive a webhook with a notification that the payment
+        process has been finished with success.
+        In case when we can't find an ACTION_TO_CONFIRM transaction, we call logic
+        responsible for confirming additional data received as an input. The data
+        comes from the storefront when the customer finishes an additional action,
+        which was requested in process_payment call. We still check the value of the
+        action field in the Adyen's response, as there is a possibility that the given
+        payment method will require more additional actions. In that case, we will
+        return action_required set to True and action_required_data fulfilled with
+        action data received from Adyen and required for the next additional action on
+        the customer side.
+        """
+        if not self.active:
+            return previous_value
+        config = self._get_gateway_config()
+        # The additional checks are proceed asynchronously so we try to confirm that
+        # the payment is already processed
+        payment = Payment.objects.filter(id=payment_information.payment_id).first()
+        if not paymen
