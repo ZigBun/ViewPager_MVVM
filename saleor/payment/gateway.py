@@ -161,4 +161,264 @@ def _request_payment_action(
     channel_slug: str,
 ):
     payment_data = TransactionActionData(
-        transaction=tr
+        transaction=transaction, action_type=action_type, action_value=action_value
+    )
+    event_active = manager.is_event_active_for_any_plugin(
+        "transaction_action_request", channel_slug=channel_slug
+    )
+    if not event_active:
+        raise PaymentError(
+            "No app or plugin is configured to handle payment action requests."
+        )
+    manager.transaction_action_request(payment_data, channel_slug=channel_slug)
+
+
+@raise_payment_error
+@require_active_payment
+@with_locked_payment
+@payment_postprocess
+def process_payment(
+    payment: Payment,
+    token: str,
+    manager: "PluginsManager",
+    channel_slug: str,
+    customer_id: Optional[str] = None,
+    store_source: bool = False,
+    additional_data: Optional[dict] = None,
+) -> Transaction:
+    payment_data = create_payment_information(
+        payment=payment,
+        manager=manager,
+        payment_token=token,
+        customer_id=customer_id,
+        store_source=store_source,
+        additional_data=additional_data,
+    )
+
+    response, error = _fetch_gateway_response(
+        manager.process_payment,
+        payment.gateway,
+        payment_data,
+        channel_slug=channel_slug,
+    )
+    action_required = response is not None and response.action_required
+    if response:
+        update_payment(payment, response)
+    return get_already_processed_transaction_or_create_new_transaction(
+        payment=payment,
+        kind=TransactionKind.CAPTURE,
+        action_required=action_required,
+        payment_information=payment_data,
+        error_msg=error,
+        gateway_response=response,
+    )
+
+
+@raise_payment_error
+@require_active_payment
+@with_locked_payment
+@payment_postprocess
+def authorize(
+    payment: Payment,
+    token: str,
+    manager: "PluginsManager",
+    channel_slug: str,
+    customer_id: Optional[str] = None,
+    store_source: bool = False,
+) -> Transaction:
+    clean_authorize(payment)
+    payment_data = create_payment_information(
+        payment=payment,
+        manager=manager,
+        payment_token=token,
+        customer_id=customer_id,
+        store_source=store_source,
+    )
+    response, error = _fetch_gateway_response(
+        manager.authorize_payment,
+        payment.gateway,
+        payment_data,
+        channel_slug=channel_slug,
+    )
+    if response:
+        update_payment(payment, response)
+    return get_already_processed_transaction_or_create_new_transaction(
+        payment=payment,
+        kind=TransactionKind.AUTH,
+        payment_information=payment_data,
+        error_msg=error,
+        gateway_response=response,
+    )
+
+
+@payment_postprocess
+@raise_payment_error
+@require_active_payment
+@with_locked_payment
+@payment_postprocess
+def capture(
+    payment: Payment,
+    manager: "PluginsManager",
+    channel_slug: str,
+    amount: Optional[Decimal] = None,
+    customer_id: Optional[str] = None,
+    store_source: bool = False,
+) -> Transaction:
+    if amount is None:
+        amount = payment.get_charge_amount()
+    clean_capture(payment, Decimal(amount))
+    token = _get_past_transaction_token(payment, TransactionKind.AUTH)
+    payment_data = create_payment_information(
+        payment=payment,
+        manager=manager,
+        payment_token=token,
+        amount=amount,
+        customer_id=customer_id,
+        store_source=store_source,
+    )
+    response, error = _fetch_gateway_response(
+        manager.capture_payment,
+        payment.gateway,
+        payment_data,
+        channel_slug=channel_slug,
+    )
+    if response:
+        update_payment(payment, response)
+    return get_already_processed_transaction_or_create_new_transaction(
+        payment=payment,
+        kind=TransactionKind.CAPTURE,
+        payment_information=payment_data,
+        error_msg=error,
+        gateway_response=response,
+    )
+
+
+@raise_payment_error
+@with_locked_payment
+@payment_postprocess
+def refund(
+    payment: Payment,
+    manager: "PluginsManager",
+    channel_slug: str,
+    amount: Optional[Decimal] = None,
+    refund_data: Optional["RefundData"] = None,
+) -> Transaction:
+    if amount is None:
+        amount = payment.captured_amount
+    _validate_refund_amount(payment, amount)
+    if not payment.can_refund():
+        raise PaymentError("This payment cannot be refunded.")
+
+    kind = TransactionKind.EXTERNAL if payment.is_manual() else TransactionKind.CAPTURE
+
+    token = _get_past_transaction_token(payment, kind)
+    payment_data = create_payment_information(
+        payment=payment,
+        manager=manager,
+        payment_token=token,
+        amount=amount,
+        refund_data=refund_data,
+    )
+    if payment.is_manual():
+        # for manual payment we just need to mark payment as a refunded
+        return create_transaction(
+            payment,
+            kind=TransactionKind.REFUND,
+            payment_information=payment_data,
+            is_success=True,
+        )
+
+    response, error = _fetch_gateway_response(
+        manager.refund_payment, payment.gateway, payment_data, channel_slug=channel_slug
+    )
+    return get_already_processed_transaction_or_create_new_transaction(
+        payment=payment,
+        kind=TransactionKind.REFUND,
+        payment_information=payment_data,
+        error_msg=error,
+        gateway_response=response,
+    )
+
+
+@raise_payment_error
+@with_locked_payment
+@payment_postprocess
+def void(
+    payment: Payment,
+    manager: "PluginsManager",
+    channel_slug: str,
+) -> Transaction:
+    token = _get_past_transaction_token(payment, TransactionKind.AUTH)
+    payment_data = create_payment_information(
+        payment=payment, manager=manager, payment_token=token
+    )
+    response, error = _fetch_gateway_response(
+        manager.void_payment, payment.gateway, payment_data, channel_slug=channel_slug
+    )
+    return get_already_processed_transaction_or_create_new_transaction(
+        payment=payment,
+        kind=TransactionKind.VOID,
+        payment_information=payment_data,
+        error_msg=error,
+        gateway_response=response,
+    )
+
+
+@raise_payment_error
+@require_active_payment
+@with_locked_payment
+@payment_postprocess
+def confirm(
+    payment: Payment,
+    manager: "PluginsManager",
+    channel_slug: str,
+    additional_data: Optional[dict] = None,
+) -> Transaction:
+    txn = payment.transactions.filter(
+        kind=TransactionKind.ACTION_TO_CONFIRM, is_success=True
+    ).last()
+    token = txn.token if txn else ""
+    payment_data = create_payment_information(
+        payment=payment,
+        manager=manager,
+        payment_token=token,
+        additional_data=additional_data,
+    )
+    response, error = _fetch_gateway_response(
+        manager.confirm_payment,
+        payment.gateway,
+        payment_data,
+        channel_slug=channel_slug,
+    )
+    action_required = response is not None and response.action_required
+    if response:
+        update_payment(payment, response)
+    return get_already_processed_transaction_or_create_new_transaction(
+        payment=payment,
+        kind=TransactionKind.CONFIRM,
+        payment_information=payment_data,
+        action_required=action_required,
+        error_msg=error,
+        gateway_response=response,
+    )
+
+
+def list_payment_sources(
+    gateway: str,
+    customer_id: str,
+    manager: "PluginsManager",
+    channel_slug: str,
+) -> List["CustomerSource"]:
+    return manager.list_payment_sources(gateway, customer_id, channel_slug=channel_slug)
+
+
+def list_gateways(
+    manager: "PluginsManager", channel_slug: Optional[str] = None
+) -> List["PaymentGateway"]:
+    return manager.list_payment_gateways(channel_slug=channel_slug)
+
+
+def _fetch_gateway_response(fn, *args, **kwargs):
+    response, error = None, None
+    try:
+   
