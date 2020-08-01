@@ -780,3 +780,42 @@ class AdyenGatewayPlugin(BasePlugin):
             raw_response=result.message,
             psp_reference=result.message.get("pspReference", ""),
         )
+
+    @classmethod
+    def validate_plugin_configuration(
+        cls, plugin_configuration: "PluginConfiguration", **kwargs
+    ):
+        """Validate if provided configuration is correct."""
+        configuration = plugin_configuration.configuration
+        configuration = {item["name"]: item["value"] for item in configuration}
+        apple_certificate = configuration.get("apple-pay-cert")
+        if plugin_configuration.active and apple_certificate:
+            global_apple_url = (
+                "https://apple-pay-gateway.apple.com/paymentservices/paymentSession"
+            )
+            request_data = {
+                "merchantIdentifier": "",
+                "displayName": "",
+                "initiative": "web",
+                "initiativeContext": "",
+            }
+            # Try to exectue the session request without all required data. If the
+            # apple certificate is correct we will get the error related to the missing
+            # parameters. If certificate is incorrect, the SSL error will be raised.
+            try:
+                make_request_to_initialize_apple_pay(
+                    validation_url=global_apple_url,
+                    request_data=request_data,
+                    certificate=apple_certificate,
+                )
+            except SSLError:
+                raise ValidationError(
+                    {
+                        "apple-pay-cert": ValidationError(
+                            "The provided apple certificate is invalid.",
+                            code=PluginErrorCode.INVALID.value,
+                        )
+                    }
+                )
+            except Exception:
+                pass
