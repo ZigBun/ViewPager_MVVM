@@ -5021,3 +5021,1650 @@ def published_collection_PLN(db, channel_PLN):
     CollectionChannelListing.objects.create(
         channel=channel_PLN,
         collection=collection,
+        is_published=True,
+        published_at=timezone.now(),
+    )
+    return collection
+
+
+@pytest.fixture
+def unpublished_collection(db, channel_USD):
+    collection = Collection.objects.create(
+        name="Unpublished Collection",
+        slug="unpublished-collection",
+        description=dummy_editorjs("Test description."),
+    )
+    CollectionChannelListing.objects.create(
+        channel=channel_USD, collection=collection, is_published=False
+    )
+    return collection
+
+
+@pytest.fixture
+def unpublished_collection_PLN(db, channel_PLN):
+    collection = Collection.objects.create(
+        name="Collection",
+        slug="collection",
+        description=dummy_editorjs("Test description."),
+    )
+    CollectionChannelListing.objects.create(
+        channel=channel_PLN, collection=collection, is_published=False
+    )
+    return collection
+
+
+@pytest.fixture
+def collection_with_products(db, published_collection, product_list_published):
+    published_collection.products.set(list(product_list_published))
+    return product_list_published
+
+
+@pytest.fixture
+def collection_with_image(db, image, media_root, channel_USD):
+    collection = Collection.objects.create(
+        name="Collection",
+        slug="collection",
+        description=dummy_editorjs("Test description."),
+        background_image=image,
+    )
+    CollectionChannelListing.objects.create(
+        channel=channel_USD, collection=collection, is_published=False
+    )
+    return collection
+
+
+@pytest.fixture
+def collection_list(db, channel_USD):
+    collections = Collection.objects.bulk_create(
+        [
+            Collection(name="Collection 1", slug="collection-1"),
+            Collection(name="Collection 2", slug="collection-2"),
+            Collection(name="Collection 3", slug="collection-3"),
+        ]
+    )
+    CollectionChannelListing.objects.bulk_create(
+        [
+            CollectionChannelListing(
+                channel=channel_USD, collection=collection, is_published=True
+            )
+            for collection in collections
+        ]
+    )
+    return collections
+
+
+@pytest.fixture
+def page(db, page_type):
+    data = {
+        "slug": "test-url",
+        "title": "Test page",
+        "content": dummy_editorjs("Test content."),
+        "is_published": True,
+        "page_type": page_type,
+    }
+    page = Page.objects.create(**data)
+
+    # associate attribute value
+    page_attr = page_type.page_attributes.first()
+    page_attr_value = page_attr.values.first()
+
+    associate_attribute_values_to_instance(page, page_attr, page_attr_value)
+
+    return page
+
+
+@pytest.fixture
+def page_with_rich_text_attribute(db, page_type_with_rich_text_attribute):
+    data = {
+        "slug": "test-url",
+        "title": "Test page",
+        "content": dummy_editorjs("Test content."),
+        "is_published": True,
+        "page_type": page_type_with_rich_text_attribute,
+    }
+    page = Page.objects.create(**data)
+
+    # associate attribute value
+    page_attr = page_type_with_rich_text_attribute.page_attributes.first()
+    page_attr_value = page_attr.values.first()
+
+    associate_attribute_values_to_instance(page, page_attr, page_attr_value)
+
+    return page
+
+
+@pytest.fixture
+def page_list(db, page_type):
+    data_1 = {
+        "slug": "test-url-1",
+        "title": "Test page",
+        "content": dummy_editorjs("Test content."),
+        "is_published": True,
+        "page_type": page_type,
+    }
+    data_2 = {
+        "slug": "test-url-2",
+        "title": "Test page",
+        "content": dummy_editorjs("Test content."),
+        "is_published": True,
+        "page_type": page_type,
+    }
+    pages = Page.objects.bulk_create([Page(**data_1), Page(**data_2)])
+    return pages
+
+
+@pytest.fixture
+def page_list_unpublished(db, page_type):
+    pages = Page.objects.bulk_create(
+        [
+            Page(
+                slug="page-1", title="Page 1", is_published=False, page_type=page_type
+            ),
+            Page(
+                slug="page-2", title="Page 2", is_published=False, page_type=page_type
+            ),
+            Page(
+                slug="page-3", title="Page 3", is_published=False, page_type=page_type
+            ),
+        ]
+    )
+    return pages
+
+
+@pytest.fixture
+def page_type(db, size_page_attribute, tag_page_attribute):
+    page_type = PageType.objects.create(name="Test page type", slug="test-page-type")
+    page_type.page_attributes.add(size_page_attribute)
+    page_type.page_attributes.add(tag_page_attribute)
+
+    return page_type
+
+
+@pytest.fixture
+def page_type_with_rich_text_attribute(db, rich_text_attribute_page_type):
+    page_type = PageType.objects.create(name="Test page type", slug="test-page-type")
+    page_type.page_attributes.add(rich_text_attribute_page_type)
+    return page_type
+
+
+@pytest.fixture
+def page_type_list(db, tag_page_attribute):
+    page_types = list(
+        PageType.objects.bulk_create(
+            [
+                PageType(name="Test page type 1", slug="test-page-type-1"),
+                PageType(name="Example page type 2", slug="page-type-2"),
+                PageType(name="Example page type 3", slug="page-type-3"),
+            ]
+        )
+    )
+
+    for i, page_type in enumerate(page_types):
+        page_type.page_attributes.add(tag_page_attribute)
+        Page.objects.create(
+            title=f"Test page {i}",
+            slug=f"test-url-{i}",
+            is_published=True,
+            page_type=page_type,
+        )
+
+    return page_types
+
+
+@pytest.fixture
+def model_form_class():
+    mocked_form_class = MagicMock(name="test", spec=ModelForm)
+    mocked_form_class._meta = Mock(name="_meta")
+    mocked_form_class._meta.model = "test_model"
+    mocked_form_class._meta.fields = "test_field"
+    return mocked_form_class
+
+
+@pytest.fixture
+def menu(db):
+    return Menu.objects.get_or_create(name="test-navbar", slug="test-navbar")[0]
+
+
+@pytest.fixture
+def menu_item(menu):
+    return MenuItem.objects.create(menu=menu, name="Link 1", url="http://example.com/")
+
+
+@pytest.fixture
+def menu_item_list(menu):
+    menu_item_1 = MenuItem.objects.create(menu=menu, name="Link 1")
+    menu_item_2 = MenuItem.objects.create(menu=menu, name="Link 2")
+    menu_item_3 = MenuItem.objects.create(menu=menu, name="Link 3")
+    return menu_item_1, menu_item_2, menu_item_3
+
+
+@pytest.fixture
+def menu_with_items(menu, category, published_collection):
+    menu.items.create(name="Link 1", url="http://example.com/")
+    menu_item = menu.items.create(name="Link 2", url="http://example.com/")
+    menu.items.create(name=category.name, category=category, parent=menu_item)
+    menu.items.create(
+        name=published_collection.name,
+        collection=published_collection,
+        parent=menu_item,
+    )
+    return menu
+
+
+@pytest.fixture
+def translated_variant_fr(product):
+    attribute = product.product_type.variant_attributes.first()
+    return AttributeTranslation.objects.create(
+        language_code="fr", attribute=attribute, name="Name tranlsated to french"
+    )
+
+
+@pytest.fixture
+def translated_attribute(product):
+    attribute = product.product_type.product_attributes.first()
+    return AttributeTranslation.objects.create(
+        language_code="fr", attribute=attribute, name="French attribute name"
+    )
+
+
+@pytest.fixture
+def translated_attribute_value(pink_attribute_value):
+    return AttributeValueTranslation.objects.create(
+        language_code="fr",
+        attribute_value=pink_attribute_value,
+        name="French attribute value name",
+    )
+
+
+@pytest.fixture
+def translated_page_unique_attribute_value(page, rich_text_attribute_page_type):
+    page_type = page.page_type
+    page_type.page_attributes.add(rich_text_attribute_page_type)
+    attribute_value = rich_text_attribute_page_type.values.first()
+    associate_attribute_values_to_instance(
+        page, rich_text_attribute_page_type, attribute_value
+    )
+    return AttributeValueTranslation.objects.create(
+        language_code="fr",
+        attribute_value=attribute_value,
+        rich_text=dummy_editorjs("French description."),
+    )
+
+
+@pytest.fixture
+def translated_product_unique_attribute_value(product, rich_text_attribute):
+    product_type = product.product_type
+    product_type.product_attributes.add(rich_text_attribute)
+    attribute_value = rich_text_attribute.values.first()
+    associate_attribute_values_to_instance(
+        product, rich_text_attribute, attribute_value
+    )
+    return AttributeValueTranslation.objects.create(
+        language_code="fr",
+        attribute_value=attribute_value,
+        rich_text=dummy_editorjs("French description."),
+    )
+
+
+@pytest.fixture
+def translated_variant_unique_attribute_value(variant, rich_text_attribute):
+    product_type = variant.product.product_type
+    product_type.variant_attributes.add(rich_text_attribute)
+    attribute_value = rich_text_attribute.values.first()
+    associate_attribute_values_to_instance(
+        variant, rich_text_attribute, attribute_value
+    )
+    return AttributeValueTranslation.objects.create(
+        language_code="fr",
+        attribute_value=attribute_value,
+        rich_text=dummy_editorjs("French description."),
+    )
+
+
+@pytest.fixture
+def voucher_translation_fr(voucher):
+    return VoucherTranslation.objects.create(
+        language_code="fr", voucher=voucher, name="French name"
+    )
+
+
+@pytest.fixture
+def product_translation_fr(product):
+    return ProductTranslation.objects.create(
+        language_code="fr",
+        product=product,
+        name="French name",
+        description=dummy_editorjs("French description."),
+    )
+
+
+@pytest.fixture
+def variant_translation_fr(variant):
+    return ProductVariantTranslation.objects.create(
+        language_code="fr", product_variant=variant, name="French product variant name"
+    )
+
+
+@pytest.fixture
+def collection_translation_fr(published_collection):
+    return CollectionTranslation.objects.create(
+        language_code="fr",
+        collection=published_collection,
+        name="French collection name",
+        description=dummy_editorjs("French description."),
+    )
+
+
+@pytest.fixture
+def category_translation_fr(category):
+    return CategoryTranslation.objects.create(
+        language_code="fr",
+        category=category,
+        name="French category name",
+        description=dummy_editorjs("French category description."),
+    )
+
+
+@pytest.fixture
+def page_translation_fr(page):
+    return PageTranslation.objects.create(
+        language_code="fr",
+        page=page,
+        title="French page title",
+        content=dummy_editorjs("French page content."),
+    )
+
+
+@pytest.fixture
+def shipping_method_translation_fr(shipping_method):
+    return ShippingMethodTranslation.objects.create(
+        language_code="fr",
+        shipping_method=shipping_method,
+        name="French shipping method name",
+    )
+
+
+@pytest.fixture
+def sale_translation_fr(sale):
+    return SaleTranslation.objects.create(
+        language_code="fr", sale=sale, name="French sale name"
+    )
+
+
+@pytest.fixture
+def menu_item_translation_fr(menu_item):
+    return MenuItemTranslation.objects.create(
+        language_code="fr", menu_item=menu_item, name="French manu item name"
+    )
+
+
+@pytest.fixture
+def payment_dummy(db, order_with_lines):
+    return Payment.objects.create(
+        gateway="mirumee.payments.dummy",
+        order=order_with_lines,
+        is_active=True,
+        cc_first_digits="4111",
+        cc_last_digits="1111",
+        cc_brand="visa",
+        cc_exp_month=12,
+        cc_exp_year=2027,
+        total=order_with_lines.total.gross.amount,
+        currency=order_with_lines.currency,
+        billing_first_name=order_with_lines.billing_address.first_name,
+        billing_last_name=order_with_lines.billing_address.last_name,
+        billing_company_name=order_with_lines.billing_address.company_name,
+        billing_address_1=order_with_lines.billing_address.street_address_1,
+        billing_address_2=order_with_lines.billing_address.street_address_2,
+        billing_city=order_with_lines.billing_address.city,
+        billing_postal_code=order_with_lines.billing_address.postal_code,
+        billing_country_code=order_with_lines.billing_address.country.code,
+        billing_country_area=order_with_lines.billing_address.country_area,
+        billing_email=order_with_lines.user_email,
+    )
+
+
+@pytest.fixture
+def payments_dummy(order_with_lines):
+    return Payment.objects.bulk_create(
+        [
+            Payment(
+                gateway="mirumee.payments.dummy",
+                order=order_with_lines,
+                is_active=True,
+                cc_first_digits="4111",
+                cc_last_digits="1111",
+                cc_brand="visa",
+                cc_exp_month=12,
+                cc_exp_year=2027,
+                total=order_with_lines.total.gross.amount,
+                currency=order_with_lines.currency,
+                billing_first_name=order_with_lines.billing_address.first_name,
+                billing_last_name=order_with_lines.billing_address.last_name,
+                billing_company_name=order_with_lines.billing_address.company_name,
+                billing_address_1=order_with_lines.billing_address.street_address_1,
+                billing_address_2=order_with_lines.billing_address.street_address_2,
+                billing_city=order_with_lines.billing_address.city,
+                billing_postal_code=order_with_lines.billing_address.postal_code,
+                billing_country_code=order_with_lines.billing_address.country.code,
+                billing_country_area=order_with_lines.billing_address.country_area,
+                billing_email=order_with_lines.user_email,
+            )
+            for _ in range(3)
+        ]
+    )
+
+
+@pytest.fixture
+def payment(payment_dummy, payment_app):
+    gateway_id = "credit-card"
+    gateway = to_payment_app_id(payment_app, gateway_id)
+    payment_dummy.gateway = gateway
+    payment_dummy.save()
+    return payment_dummy
+
+
+@pytest.fixture
+def payment_cancelled(payment_dummy):
+    payment_dummy.charge_status = ChargeStatus.CANCELLED
+    payment_dummy.save()
+    return payment_dummy
+
+
+@pytest.fixture
+def payment_dummy_fully_charged(payment_dummy):
+    payment_dummy.captured_amount = payment_dummy.total
+    payment_dummy.charge_status = ChargeStatus.FULLY_CHARGED
+    payment_dummy.save()
+    return payment_dummy
+
+
+@pytest.fixture
+def payment_dummy_credit_card(db, order_with_lines):
+    return Payment.objects.create(
+        gateway="mirumee.payments.dummy_credit_card",
+        order=order_with_lines,
+        is_active=True,
+        cc_first_digits="4111",
+        cc_last_digits="1111",
+        cc_brand="visa",
+        cc_exp_month=12,
+        cc_exp_year=2027,
+        total=order_with_lines.total.gross.amount,
+        currency=order_with_lines.total.gross.currency,
+        billing_first_name=order_with_lines.billing_address.first_name,
+        billing_last_name=order_with_lines.billing_address.last_name,
+        billing_company_name=order_with_lines.billing_address.company_name,
+        billing_address_1=order_with_lines.billing_address.street_address_1,
+        billing_address_2=order_with_lines.billing_address.street_address_2,
+        billing_city=order_with_lines.billing_address.city,
+        billing_postal_code=order_with_lines.billing_address.postal_code,
+        billing_country_code=order_with_lines.billing_address.country.code,
+        billing_country_area=order_with_lines.billing_address.country_area,
+        billing_email=order_with_lines.user_email,
+    )
+
+
+@pytest.fixture
+def transaction_item(order):
+    return TransactionItem.objects.create(
+        status="Captured",
+        type="Credit card",
+        reference="PSP ref",
+        available_actions=["refund"],
+        currency="USD",
+        order_id=order.pk,
+        charged_value=Decimal("10"),
+    )
+
+
+@pytest.fixture
+def digital_content(category, media_root, warehouse, channel_USD) -> DigitalContent:
+    product_type = ProductType.objects.create(
+        name="Digital Type",
+        slug="digital-type",
+        kind=ProductTypeKind.NORMAL,
+        has_variants=True,
+        is_shipping_required=False,
+        is_digital=True,
+    )
+    product = Product.objects.create(
+        name="Test digital product",
+        slug="test-digital-product",
+        product_type=product_type,
+        category=category,
+    )
+    ProductChannelListing.objects.create(
+        product=product,
+        channel=channel_USD,
+        is_published=True,
+        visible_in_listings=True,
+        available_for_purchase_at=datetime.datetime(1999, 1, 1, tzinfo=pytz.UTC),
+    )
+    product_variant = ProductVariant.objects.create(product=product, sku="SKU_554")
+    ProductVariantChannelListing.objects.create(
+        variant=product_variant,
+        channel=channel_USD,
+        price_amount=Decimal(10),
+        cost_price_amount=Decimal(1),
+        currency=channel_USD.currency_code,
+    )
+    Stock.objects.create(
+        product_variant=product_variant,
+        warehouse=warehouse,
+        quantity=5,
+    )
+
+    assert product_variant.is_digital()
+
+    image_file, image_name = create_image()
+    d_content = DigitalContent.objects.create(
+        content_file=image_file,
+        product_variant=product_variant,
+        use_default_settings=True,
+    )
+    return d_content
+
+
+@pytest.fixture
+def digital_content_url(digital_content, order_line):
+    return DigitalContentUrl.objects.create(content=digital_content, line=order_line)
+
+
+@pytest.fixture
+def media_root(tmpdir, settings):
+    settings.MEDIA_ROOT = str(tmpdir.mkdir("media"))
+
+
+@pytest.fixture
+def description_json():
+    return {
+        "blocks": [
+            {
+                "key": "",
+                "data": {
+                    "text": "E-commerce for the PWA era",
+                },
+                "text": "E-commerce for the PWA era",
+                "type": "header-two",
+                "depth": 0,
+                "entityRanges": [],
+                "inlineStyleRanges": [],
+            },
+            {
+                "key": "",
+                "data": {
+                    "text": (
+                        "A modular, high performance e-commerce storefront "
+                        "built with GraphQL, Django, and ReactJS."
+                    )
+                },
+                "type": "paragraph",
+                "depth": 0,
+                "entityRanges": [],
+                "inlineStyleRanges": [],
+            },
+            {
+                "key": "",
+                "data": {},
+                "text": "",
+                "type": "paragraph",
+                "depth": 0,
+                "entityRanges": [],
+                "inlineStyleRanges": [],
+            },
+            {
+                "key": "",
+                "data": {
+                    "text": (
+                        "Saleor is a rapidly-growing open source e-commerce platform "
+                        "that has served high-volume companies from branches "
+                        "like publishing and apparel since 2012. Based on Python "
+                        "and Django, the latest major update introduces a modular "
+                        "front end with a GraphQL API and storefront and dashboard "
+                        "written in React to make Saleor a full-functionality "
+                        "open source e-commerce."
+                    ),
+                },
+                "type": "paragraph",
+                "depth": 0,
+                "entityRanges": [],
+                "inlineStyleRanges": [],
+            },
+            {
+                "key": "",
+                "data": {"text": ""},
+                "type": "paragraph",
+                "depth": 0,
+                "entityRanges": [],
+                "inlineStyleRanges": [],
+            },
+            {
+                "key": "",
+                "data": {
+                    "text": "Get Saleor today!",
+                },
+                "type": "paragraph",
+                "depth": 0,
+                "entityRanges": [{"key": 0, "length": 17, "offset": 0}],
+                "inlineStyleRanges": [],
+            },
+        ],
+        "entityMap": {
+            "0": {
+                "data": {"href": "https://github.com/mirumee/saleor"},
+                "type": "LINK",
+                "mutability": "MUTABLE",
+            }
+        },
+    }
+
+
+@pytest.fixture
+def other_description_json():
+    return {
+        "blocks": [
+            {
+                "key": "",
+                "data": {
+                    "text": (
+                        "A GRAPHQL-FIRST <b>ECOMMERCE</b> PLATFORM FOR PERFECTIONISTS"
+                    ),
+                },
+                "text": "A GRAPHQL-FIRST ECOMMERCE PLATFORM FOR PERFECTIONISTS",
+                "type": "header-two",
+                "depth": 0,
+                "entityRanges": [],
+                "inlineStyleRanges": [],
+            },
+            {
+                "key": "",
+                "data": {
+                    "text": (
+                        "Saleor is powered by a GraphQL server running on "
+                        "top of Python 3 and a Django 2 framework."
+                    ),
+                },
+                "type": "paragraph",
+                "depth": 0,
+                "entityRanges": [],
+                "inlineStyleRanges": [],
+            },
+        ],
+        "entityMap": {},
+    }
+
+
+@pytest.fixture
+def app(db):
+    app = App.objects.create(
+        name="Sample app objects",
+        is_active=True,
+        identifier="saleor.app.test",
+    )
+    return app
+
+
+@pytest.fixture
+def webhook_app(
+    db,
+    permission_manage_shipping,
+    permission_manage_gift_card,
+    permission_manage_discounts,
+    permission_manage_menus,
+    permission_manage_products,
+    permission_manage_staff,
+    permission_manage_orders,
+):
+    app = App.objects.create(name="Webhook app", is_active=True)
+    app.permissions.add(permission_manage_shipping)
+    app.permissions.add(permission_manage_gift_card)
+    app.permissions.add(permission_manage_discounts)
+    app.permissions.add(permission_manage_menus)
+    app.permissions.add(permission_manage_products)
+    app.permissions.add(permission_manage_staff)
+    app.permissions.add(permission_manage_orders)
+    return app
+
+
+@pytest.fixture
+def app_with_token(db):
+    app = App.objects.create(name="Sample app objects", is_active=True)
+    app.tokens.create(name="Test")
+    return app
+
+
+@pytest.fixture
+def app_with_extensions(app_with_token, permission_manage_products):
+    first_app_extension = AppExtension(
+        app=app_with_token,
+        label="Create product with App",
+        url="www.example.com/app-product",
+        mount=AppExtensionMount.PRODUCT_OVERVIEW_MORE_ACTIONS,
+    )
+    extensions = AppExtension.objects.bulk_create(
+        [
+            first_app_extension,
+            AppExtension(
+                app=app_with_token,
+                label="Update product with App",
+                url="www.example.com/app-product-update",
+                mount=AppExtensionMount.PRODUCT_DETAILS_MORE_ACTIONS,
+            ),
+        ]
+    )
+    first_app_extension.permissions.add(permission_manage_products)
+    return app_with_token, extensions
+
+
+@pytest.fixture
+def payment_app(db, permission_manage_payments):
+    app = App.objects.create(
+        name="Payment App", is_active=True, identifier="saleor.payment.test.app"
+    )
+    app.tokens.create(name="Default")
+    app.permissions.add(permission_manage_payments)
+
+    webhook = Webhook.objects.create(
+        name="payment-webhook-1",
+        app=app,
+        target_url="https://payment-gateway.com/api/",
+    )
+    webhook.events.bulk_create(
+        [
+            WebhookEvent(event_type=event_type, webhook=webhook)
+            for event_type in WebhookEventSyncType.PAYMENT_EVENTS
+        ]
+    )
+    return app
+
+
+@pytest.fixture
+def payment_app_with_subscription_webhooks(db, permission_manage_payments):
+    app = App.objects.create(
+        name="Payment App", is_active=True, identifier="saleor.payment.test.app"
+    )
+    app.tokens.create(name="Default")
+    app.permissions.add(permission_manage_payments)
+
+    webhook = Webhook.objects.create(
+        name="payment-subscription-webhook-1",
+        app=app,
+        target_url="https://payment-gateway.com/api/",
+        subscription_query=subscription_queries.PAYMENT_AUTHORIZE,
+    )
+    webhook.events.bulk_create(
+        [
+            WebhookEvent(event_type=event_type, webhook=webhook)
+            for event_type in WebhookEventSyncType.PAYMENT_EVENTS
+        ]
+    )
+    return app
+
+
+@pytest.fixture
+def shipping_app(db, permission_manage_shipping):
+    app = App.objects.create(name="Shipping App", is_active=True)
+    app.tokens.create(name="Default")
+    app.permissions.add(permission_manage_shipping)
+
+    webhook = Webhook.objects.create(
+        name="shipping-webhook-1",
+        app=app,
+        target_url="https://shipping-app.com/api/",
+    )
+    webhook.events.bulk_create(
+        [
+            WebhookEvent(event_type=event_type, webhook=webhook)
+            for event_type in [
+                WebhookEventSyncType.SHIPPING_LIST_METHODS_FOR_CHECKOUT,
+                WebhookEventAsyncType.FULFILLMENT_CREATED,
+            ]
+        ]
+    )
+    return app
+
+
+@pytest.fixture
+def tax_app(db, permission_handle_taxes):
+    app = App.objects.create(name="Tax App", is_active=True)
+    app.permissions.add(permission_handle_taxes)
+
+    webhook = Webhook.objects.create(
+        name="tax-webhook-1",
+        app=app,
+        target_url="https://tax-app.com/api/",
+    )
+    webhook.events.bulk_create(
+        [
+            WebhookEvent(event_type=event_type, webhook=webhook)
+            for event_type in [
+                WebhookEventSyncType.ORDER_CALCULATE_TAXES,
+                WebhookEventSyncType.CHECKOUT_CALCULATE_TAXES,
+            ]
+        ]
+    )
+    return app
+
+
+@pytest.fixture
+def observability_webhook(db, permission_manage_observability):
+    app = App.objects.create(name="Observability App", is_active=True)
+    app.tokens.create(name="Default")
+    app.permissions.add(permission_manage_observability)
+
+    webhook = Webhook.objects.create(
+        name="observability-webhook-1",
+        app=app,
+        target_url="https://observability-app.com/api/",
+    )
+    webhook.events.create(event_type=WebhookEventAsyncType.OBSERVABILITY)
+    return webhook
+
+
+@pytest.fixture
+def observability_webhook_data(observability_webhook):
+    return WebhookData(
+        id=observability_webhook.id,
+        saleor_domain="mirumee.com",
+        target_url=observability_webhook.target_url,
+        secret_key=observability_webhook.secret_key,
+    )
+
+
+@pytest.fixture
+def external_app(db):
+    app = App.objects.create(
+        name="External App",
+        is_active=True,
+        type=AppType.THIRDPARTY,
+        identifier="mirumee.app.sample",
+        about_app="About app text.",
+        data_privacy="Data privacy text.",
+        data_privacy_url="http://www.example.com/privacy/",
+        homepage_url="http://www.example.com/homepage/",
+        support_url="http://www.example.com/support/contact/",
+        configuration_url="http://www.example.com/app-configuration/",
+        app_url="http://www.example.com/app/",
+    )
+    app.tokens.create(name="Default")
+    return app
+
+
+@pytest.fixture
+def webhook(app):
+    webhook = Webhook.objects.create(
+        name="Simple webhook", app=app, target_url="http://www.example.com/test"
+    )
+    webhook.events.create(event_type=WebhookEventAsyncType.ORDER_CREATED)
+    return webhook
+
+
+@pytest.fixture
+def any_webhook(app):
+    webhook = Webhook.objects.create(
+        name="Any webhook", app=app, target_url="http://www.example.com/any"
+    )
+    webhook.events.create(event_type=WebhookEventAsyncType.ANY)
+    return webhook
+
+
+@pytest.fixture
+def fake_payment_interface(mocker):
+    return mocker.Mock(spec=PaymentInterface)
+
+
+@pytest.fixture
+def staff_notification_recipient(db, staff_user):
+    return StaffNotificationRecipient.objects.create(active=True, user=staff_user)
+
+
+@pytest.fixture
+def warehouse(address, shipping_zone, channel_USD):
+    warehouse = Warehouse.objects.create(
+        address=address,
+        name="Example Warehouse",
+        slug="example-warehouse",
+        email="test@example.com",
+    )
+    warehouse.shipping_zones.add(shipping_zone)
+    warehouse.channels.add(channel_USD)
+    warehouse.save()
+    return warehouse
+
+
+@pytest.fixture
+def warehouse_with_external_ref(address, shipping_zone, channel_USD):
+    warehouse = Warehouse.objects.create(
+        address=address,
+        name="Example Warehouse With Ref",
+        slug="example-warehouse-with-ref",
+        email="test@example.com",
+        external_reference="example-warehouse-with-ref",
+    )
+    warehouse.shipping_zones.add(shipping_zone)
+    warehouse.channels.add(channel_USD)
+    warehouse.save()
+    return warehouse
+
+
+@pytest.fixture
+def warehouse_JPY(address, shipping_zone_JPY, channel_JPY):
+    warehouse = Warehouse.objects.create(
+        address=address,
+        name="Example Warehouse JPY",
+        slug="example-warehouse-jpy",
+        email="test-jpy@example.com",
+    )
+    warehouse.shipping_zones.add(shipping_zone_JPY)
+    warehouse.channels.add(channel_JPY)
+    warehouse.save()
+    return warehouse
+
+
+@pytest.fixture
+def warehouses(address, address_usa, channel_USD):
+    warehouses = Warehouse.objects.bulk_create(
+        [
+            Warehouse(
+                address=address.get_copy(),
+                name="Warehouse PL",
+                slug="warehouse1",
+                email="warehouse1@example.com",
+                external_reference="warehouse1",
+            ),
+            Warehouse(
+                address=address_usa.get_copy(),
+                name="Warehouse USA",
+                slug="warehouse2",
+                email="warehouse2@example.com",
+                external_reference="warehouse2",
+            ),
+        ]
+    )
+    for warehouse in warehouses:
+        warehouse.channels.add(channel_USD)
+    return warehouses
+
+
+@pytest.fixture()
+def warehouses_for_cc(address, shipping_zones, channel_USD):
+    warehouses = Warehouse.objects.bulk_create(
+        [
+            Warehouse(
+                address=address.get_copy(),
+                name="Warehouse1",
+                slug="warehouse1",
+                email="warehouse1@example.com",
+            ),
+            Warehouse(
+                address=address.get_copy(),
+                name="Warehouse2",
+                slug="warehouse2",
+                email="warehouse2@example.com",
+                click_and_collect_option=WarehouseClickAndCollectOption.ALL_WAREHOUSES,
+            ),
+            Warehouse(
+                address=address.get_copy(),
+                name="Warehouse3",
+                slug="warehouse3",
+                email="warehouse3@example.com",
+                click_and_collect_option=WarehouseClickAndCollectOption.LOCAL_STOCK,
+                is_private=False,
+            ),
+            Warehouse(
+                address=address.get_copy(),
+                name="Warehouse4",
+                slug="warehouse4",
+                email="warehouse4@example.com",
+                click_and_collect_option=WarehouseClickAndCollectOption.LOCAL_STOCK,
+                is_private=False,
+            ),
+        ]
+    )
+    # add to shipping zones only not click and collect warehouses
+    warehouses[0].shipping_zones.add(*shipping_zones)
+    channel_USD.warehouses.add(*warehouses)
+    return warehouses
+
+
+@pytest.fixture
+def warehouse_for_cc(address, product_variant_list, channel_USD):
+    warehouse = Warehouse.objects.create(
+        address=address.get_copy(),
+        name="Local Warehouse",
+        slug="local-warehouse",
+        email="local@example.com",
+        is_private=False,
+        click_and_collect_option=WarehouseClickAndCollectOption.LOCAL_STOCK,
+    )
+    warehouse.channels.add(channel_USD)
+
+    Stock.objects.bulk_create(
+        [
+            Stock(
+                warehouse=warehouse, product_variant=product_variant_list[0], quantity=1
+            ),
+            Stock(
+                warehouse=warehouse, product_variant=product_variant_list[1], quantity=2
+            ),
+            Stock(
+                warehouse=warehouse, product_variant=product_variant_list[2], quantity=2
+            ),
+        ]
+    )
+    return warehouse
+
+
+@pytest.fixture(params=["warehouse_for_cc", "shipping_method"])
+def delivery_method(request, warehouse_for_cc, shipping_method):
+    if request.param == "warehouse":
+        return warehouse_for_cc
+    if request.param == "shipping_method":
+        return shipping_method
+
+
+@pytest.fixture
+def stocks_for_cc(warehouses_for_cc, product_variant_list, product_with_two_variants):
+    return Stock.objects.bulk_create(
+        [
+            Stock(
+                warehouse=warehouses_for_cc[0],
+                product_variant=product_variant_list[0],
+                quantity=5,
+            ),
+            Stock(
+                warehouse=warehouses_for_cc[1],
+                product_variant=product_variant_list[0],
+                quantity=3,
+            ),
+            Stock(
+                warehouse=warehouses_for_cc[1],
+                product_variant=product_variant_list[1],
+                quantity=10,
+            ),
+            Stock(
+                warehouse=warehouses_for_cc[1],
+                product_variant=product_variant_list[2],
+                quantity=10,
+            ),
+            Stock(
+                warehouse=warehouses_for_cc[2],
+                product_variant=product_variant_list[0],
+                quantity=3,
+            ),
+            Stock(
+                warehouse=warehouses_for_cc[3],
+                product_variant=product_variant_list[0],
+                quantity=3,
+            ),
+            Stock(
+                warehouse=warehouses_for_cc[3],
+                product_variant=product_variant_list[1],
+                quantity=3,
+            ),
+            Stock(
+                warehouse=warehouses_for_cc[3],
+                product_variant=product_with_two_variants.variants.last(),
+                quantity=7,
+            ),
+            Stock(
+                warehouse=warehouses_for_cc[3],
+                product_variant=product_variant_list[2],
+                quantity=3,
+            ),
+        ]
+    )
+
+
+@pytest.fixture
+def checkout_for_cc(channel_USD, customer_user):
+    checkout = Checkout.objects.create(
+        channel=channel_USD,
+        billing_address=customer_user.default_billing_address,
+        shipping_address=customer_user.default_shipping_address,
+        note="Test notes",
+        currency="USD",
+        email=customer_user.email,
+    )
+    CheckoutMetadata.objects.create(checkout=checkout)
+    return checkout
+
+
+@pytest.fixture
+def checkout_with_items_for_cc(checkout_for_cc, product_variant_list):
+    CheckoutLine.objects.bulk_create(
+        [
+            CheckoutLine(
+                checkout=checkout_for_cc,
+                variant=product_variant_list[0],
+                quantity=1,
+                currency=checkout_for_cc.currency,
+            ),
+            CheckoutLine(
+                checkout=checkout_for_cc,
+                variant=product_variant_list[1],
+                quantity=1,
+                currency=checkout_for_cc.currency,
+            ),
+            CheckoutLine(
+                checkout=checkout_for_cc,
+                variant=product_variant_list[2],
+                quantity=1,
+                currency=checkout_for_cc.currency,
+            ),
+        ]
+    )
+    checkout_for_cc.set_country("US", commit=True)
+
+    return checkout_for_cc
+
+
+@pytest.fixture
+def checkout_with_item_for_cc(checkout_for_cc, product_variant_list):
+    CheckoutLine.objects.create(
+        checkout=checkout_for_cc,
+        variant=product_variant_list[0],
+        quantity=1,
+        currency=checkout_for_cc.currency,
+    )
+    return checkout_for_cc
+
+
+@pytest.fixture
+def warehouses_with_shipping_zone(warehouses, shipping_zone):
+    warehouses[0].shipping_zones.add(shipping_zone)
+    warehouses[1].shipping_zones.add(shipping_zone)
+    return warehouses
+
+
+@pytest.fixture
+def warehouses_with_different_shipping_zone(warehouses, shipping_zones):
+    warehouses[0].shipping_zones.add(shipping_zones[0])
+    warehouses[1].shipping_zones.add(shipping_zones[1])
+    return warehouses
+
+
+@pytest.fixture
+def warehouse_no_shipping_zone(address, channel_USD):
+    warehouse = Warehouse.objects.create(
+        address=address,
+        name="Warehouse without shipping zone",
+        slug="warehouse-no-shipping-zone",
+        email="test2@example.com",
+    )
+    warehouse.channels.add(channel_USD)
+    return warehouse
+
+
+@pytest.fixture
+def stock(variant, warehouse):
+    return Stock.objects.create(
+        product_variant=variant, warehouse=warehouse, quantity=15
+    )
+
+
+@pytest.fixture
+def allocation(order_line, stock):
+    return Allocation.objects.create(
+        order_line=order_line, stock=stock, quantity_allocated=order_line.quantity
+    )
+
+
+@pytest.fixture
+def allocations(order_list, stock, channel_USD):
+    variant = stock.product_variant
+    product = variant.product
+    channel_listing = variant.channel_listings.get(channel=channel_USD)
+    net = variant.get_price(product, [], channel_USD, channel_listing)
+    gross = Money(amount=net.amount * Decimal(1.23), currency=net.currency)
+    price = TaxedMoney(net=net, gross=gross)
+    lines = OrderLine.objects.bulk_create(
+        [
+            OrderLine(
+                order=order_list[0],
+                variant=variant,
+                quantity=1,
+                product_name=str(variant.product),
+                variant_name=str(variant),
+                product_sku=variant.sku,
+                product_variant_id=variant.get_global_id(),
+                is_shipping_required=variant.is_shipping_required(),
+                is_gift_card=variant.is_gift_card(),
+                unit_price=price,
+                total_price=price,
+                tax_rate=Decimal("0.23"),
+                **get_tax_class_kwargs_for_order_line(product.product_type.tax_class),
+            ),
+            OrderLine(
+                order=order_list[1],
+                variant=variant,
+                quantity=2,
+                product_name=str(variant.product),
+                variant_name=str(variant),
+                product_sku=variant.sku,
+                product_variant_id=variant.get_global_id(),
+                is_shipping_required=variant.is_shipping_required(),
+                is_gift_card=variant.is_gift_card(),
+                unit_price=price,
+                total_price=price,
+                tax_rate=Decimal("0.23"),
+                **get_tax_class_kwargs_for_order_line(product.product_type.tax_class),
+            ),
+            OrderLine(
+                order=order_list[2],
+                variant=variant,
+                quantity=4,
+                product_name=str(variant.product),
+                variant_name=str(variant),
+                product_sku=variant.sku,
+                product_variant_id=variant.get_global_id(),
+                is_shipping_required=variant.is_shipping_required(),
+                is_gift_card=variant.is_gift_card(),
+                unit_price=price,
+                total_price=price,
+                tax_rate=Decimal("0.23"),
+                **get_tax_class_kwargs_for_order_line(product.product_type.tax_class),
+            ),
+        ]
+    )
+
+    for order in order_list:
+        order.search_vector = FlatConcatSearchVector(
+            *prepare_order_search_vector_value(order)
+        )
+    Order.objects.bulk_update(order_list, ["search_vector"])
+
+    return Allocation.objects.bulk_create(
+        [
+            Allocation(
+                order_line=lines[0], stock=stock, quantity_allocated=lines[0].quantity
+            ),
+            Allocation(
+                order_line=lines[1], stock=stock, quantity_allocated=lines[1].quantity
+            ),
+            Allocation(
+                order_line=lines[2], stock=stock, quantity_allocated=lines[2].quantity
+            ),
+        ]
+    )
+
+
+@pytest.fixture
+def preorder_allocation(
+    order_line, preorder_variant_global_and_channel_threshold, channel_PLN
+):
+    variant = preorder_variant_global_and_channel_threshold
+    product_variant_channel_listing = variant.channel_listings.get(channel=channel_PLN)
+    return PreorderAllocation.objects.create(
+        order_line=order_line,
+        product_variant_channel_listing=product_variant_channel_listing,
+        quantity=order_line.quantity,
+    )
+
+
+@pytest.fixture
+def app_installation():
+    app_installation = AppInstallation.objects.create(
+        app_name="External App",
+        manifest_url="http://localhost:3000/manifest",
+    )
+    return app_installation
+
+
+@pytest.fixture
+def user_export_file(staff_user):
+    job = ExportFile.objects.create(user=staff_user)
+    return job
+
+
+@pytest.fixture
+def app_export_file(app):
+    job = ExportFile.objects.create(app=app)
+    return job
+
+
+@pytest.fixture
+def export_file_list(staff_user):
+    export_file_list = list(
+        ExportFile.objects.bulk_create(
+            [
+                ExportFile(user=staff_user),
+                ExportFile(
+                    user=staff_user,
+                ),
+                ExportFile(
+                    user=staff_user,
+                    status=JobStatus.SUCCESS,
+                ),
+                ExportFile(user=staff_user, status=JobStatus.SUCCESS),
+                ExportFile(
+                    user=staff_user,
+                    status=JobStatus.FAILED,
+                ),
+            ]
+        )
+    )
+
+    updated_date = datetime.datetime(
+        2019, 4, 18, tzinfo=timezone.get_current_timezone()
+    )
+    created_date = datetime.datetime(
+        2019, 4, 10, tzinfo=timezone.get_current_timezone()
+    )
+    new_created_and_updated_dates = [
+        (created_date, updated_date),
+        (created_date, updated_date + datetime.timedelta(hours=2)),
+        (
+            created_date + datetime.timedelta(hours=2),
+            updated_date - datetime.timedelta(days=2),
+        ),
+        (created_date - datetime.timedelta(days=2), updated_date),
+        (
+            created_date - datetime.timedelta(days=5),
+            updated_date - datetime.timedelta(days=5),
+        ),
+    ]
+    for counter, export_file in enumerate(export_file_list):
+        created, updated = new_created_and_updated_dates[counter]
+        export_file.created_at = created
+        export_file.updated_at = updated
+
+    ExportFile.objects.bulk_update(export_file_list, ["created_at", "updated_at"])
+
+    return export_file_list
+
+
+@pytest.fixture
+def user_export_event(user_export_file):
+    return ExportEvent.objects.create(
+        type=ExportEvents.EXPORT_FAILED,
+        export_file=user_export_file,
+        user=user_export_file.user,
+        parameters={"message": "Example error message"},
+    )
+
+
+@pytest.fixture
+def app_export_event(app_export_file):
+    return ExportEvent.objects.create(
+        type=ExportEvents.EXPORT_FAILED,
+        export_file=app_export_file,
+        app=app_export_file.app,
+        parameters={"message": "Example error message"},
+    )
+
+
+@pytest.fixture
+def app_manifest():
+    return {
+        "name": "Sample Saleor App",
+        "version": "0.1",
+        "about": "Sample Saleor App serving as an example.",
+        "dataPrivacy": "",
+        "dataPrivacyUrl": "",
+        "homepageUrl": "http://172.17.0.1:5000/homepageUrl",
+        "supportUrl": "http://172.17.0.1:5000/supportUrl",
+        "id": "saleor-complex-sample",
+        "permissions": ["MANAGE_PRODUCTS", "MANAGE_USERS"],
+        "appUrl": "",
+        "configurationUrl": "http://127.0.0.1:5000/configuration/",
+        "tokenTargetUrl": "http://127.0.0.1:5000/configuration/install",
+    }
+
+
+@pytest.fixture
+def app_manifest_webhook():
+    return {
+        "name": "webhook",
+        "asyncEvents": [
+            "ORDER_CREATED",
+            "ORDER_FULLY_PAID",
+            "CUSTOMER_CREATED",
+            "FULFILLMENT_CREATED",
+        ],
+        "query": """
+            subscription {
+                event {
+                    ... on OrderCreated {
+                        order {
+                            id
+                        }
+                    }
+                    ... on OrderFullyPaid {
+                        order {
+                            id
+                        }
+                    }
+                    ... on CustomerCreated {
+                        user {
+                            id
+                        }
+                    }
+                    ... on FulfillmentCreated {
+                        fulfillment {
+                            id
+                        }
+                    }
+                }
+            }
+        """,
+        "targetUrl": "https://app.example/api/webhook",
+    }
+
+
+@pytest.fixture
+def event_payload():
+    """Return event payload."""
+    return EventPayload.objects.create(payload='{"payload_key": "payload_value"}')
+
+
+@pytest.fixture
+def event_delivery(event_payload, webhook, app):
+    """Return event delivery object"""
+    return EventDelivery.objects.create(
+        event_type=WebhookEventAsyncType.ANY,
+        payload=event_payload,
+        webhook=webhook,
+    )
+
+
+@pytest.fixture
+def event_attempt(event_delivery):
+    """Return event delivery attempt object"""
+    return EventDeliveryAttempt.objects.create(
+        delivery=event_delivery,
+        task_id="example_task_id",
+        duration=None,
+        response="example_response",
+        response_headers=None,
+        request_headers=None,
+    )
+
+
+@pytest.fixture
+def webhook_response():
+    return WebhookResponse(
+        content="test_content",
+        request_headers={"headers": "test_request"},
+        response_headers={"headers": "test_response"},
+        response_status_code=200,
+        duration=2.0,
+        status=EventDeliveryStatus.SUCCESS,
+    )
+
+
+@pytest.fixture
+def webhook_response_failed():
+    return WebhookResponse(
+        content="example_content_response",
+        request_headers={"headers": "test_request"},
+        response_headers={"headers": "test_response"},
+        response_status_code=500,
+        duration=2.0,
+        status=EventDeliveryStatus.FAILED,
+    )
+
+
+@pytest.fixture
+def check_payment_balance_input():
+    return {
+        "gatewayId": "mirumee.payments.gateway",
+        "channel": "channel_default",
+        "method": "givex",
+        "card": {
+            "cvc": "9891",
+            "code": "12345678910",
+            "money": {"currency": "GBP", "amount": 100.0},
+        },
+    }
+
+
+@pytest.fixture
+def delivery_attempts(event_delivery):
+    """Return consecutive deliveries attempts ids"""
+    with freeze_time("2020-03-18 12:00:00"):
+        attempt_1 = EventDeliveryAttempt.objects.create(
+            delivery=event_delivery,
+            task_id="example_task_id_1",
+            duration=None,
+            response="example_response",
+            response_headers=None,
+            request_headers=None,
+        )
+
+    with freeze_time("2020-03-18 13:00:00"):
+        attempt_2 = EventDeliveryAttempt.objects.create(
+            delivery=event_delivery,
+            task_id="example_task_id_2",
+            duration=None,
+            response="example_response",
+            response_headers=None,
+            request_headers=None,
+        )
+
+    with freeze_time("2020-03-18 14:00:00"):
+        attempt_3 = EventDeliveryAttempt.objects.create(
+            delivery=event_delivery,
+            task_id="example_task_id_3",
+            duration=None,
+            response="example_response",
+            response_headers=None,
+            request_headers=None,
+        )
+
+    attempt_1 = graphene.Node.to_global_id("EventDeliveryAttempt", attempt_1.pk)
+    attempt_2 = graphene.Node.to_global_id("EventDeliveryAttempt", attempt_2.pk)
+    attempt_3 = graphene.Node.to_global_id("EventDeliveryAttempt", attempt_3.pk)
+    webhook_id = graphene.Node.to_global_id("Webhook", event_delivery.webhook.pk)
+
+    return {
+        "webhook_id": webhook_id,
+        "attempt_1_id": attempt_1,
+        "attempt_2_id": attempt_2,
+        "attempt_3_id": attempt_3,
+    }
+
+
+@pytest.fixture
+def event_deliveries(event_payload, webhook, app):
+    """Return consecutive event deliveries ids"""
+    delivery_1 = EventDelivery.objects.create(
+        event_type=WebhookEventAsyncType.ANY,
+        payload=event_payload,
+        webhook=webhook,
+    )
+    delivery_2 = EventDelivery.objects.create(
+        event_type=WebhookEventAsyncType.ANY,
+        payload=event_payload,
+        webhook=webhook,
+    )
+    delivery_3 = EventDelivery.objects.create(
+        event_type=WebhookEventAsyncType.ANY,
+        payload=event_payload,
+        webhook=webhook,
+    )
+    webhook_id = graphene.Node.to_global_id("Webhook", webhook.pk)
+    delivery_1 = graphene.Node.to_global_id("EventDelivery", delivery_1.pk)
+    delivery_2 = graphene.Node.to_global_id("EventDelivery", delivery_2.pk)
+    delivery_3 = graphene.Node.to_global_id("EventDelivery", delivery_3.pk)
+
+    return {
+        "webhook_id": webhook_id,
+        "delivery_1_id": delivery_1,
+        "delivery_2_id": delivery_2,
+        "delivery_3_id": delivery_3,
+    }
+
+
+@pytest.fixture
+def action_required_gateway_response():
+    return GatewayResponse(
+        is_success=True,
+        action_required=True,
+        action_required_data={
+            "paymentData": "test",
+            "paymentMethodType": "scheme",
+            "url": "https://test.adyen.com/hpp/3d/validate.shtml",
+            "data": {
+                "MD": "md-test-data",
+                "PaReq": "PaReq-test-data",
+                "TermUrl": "http://127.0.0.1:3000/",
+            },
+            "method": "POST",
+            "type": "redirect",
+        },
+        kind=TransactionKind.CAPTURE,
+        amount=Decimal(3.0),
+        currency="usd",
+        transaction_id="1234",
+        error=None,
+    )
+
+
+@pytest.fixture
+def product_media_image(product, image, media_root):
+    return ProductMedia.objects.create(
+        product=product,
+        image=image,
+        alt="image",
+        type=ProductMediaTypes.IMAGE,
+        oembed_data="{}",
+    )
+
+
+@pytest.fixture
+def thumbnail_product_media(product_media_image, image_list, media_root):
+    return Thumbnail.objects.create(
+        product_media=product_media_image,
+        size=128,
+        image=image_list[1],
+    )
+
+
+@pytest.fixture
+def thumbnail_category(category_with_image, image_list, media_root):
+    return Thumbnail.objects.create(
+        category=category_with_image,
+        size=128,
+        image=image_list[1],
+    )
+
+
+@pytest.fixture
+def thumbnail_collection(collection_with_image, image_list, media_root):
+    return Thumbnail.objects.create(
+        collection=collection_with_image,
+        size=128,
+        image=image_list[1],
+    )
+
+
+@pytest.fixture
+def thumbnail_user(customer_user, image_list, media_root):
+    customer_user.avatar = image_list[0]
+    return Thumbnail.objects.create(
+        user=customer_user,
+        size=128,
+        image=image_list[1],
+    )
