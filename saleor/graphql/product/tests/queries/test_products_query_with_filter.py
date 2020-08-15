@@ -963,4 +963,223 @@ def test_products_query_with_price_filter_as_staff(
         "channel": channel_USD.slug,
     }
     staff_api_client.user.user_permissions.add(permission_manage_products)
-    response = staff_api_client.post_graphql(query_
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 3
+
+
+def test_products_query_with_price_filter_as_user(
+    query_products_with_filter,
+    user_api_client,
+    product_list,
+    permission_manage_products,
+    channel_USD,
+):
+    product = product_list[0]
+    product.variants.first().channel_listings.filter().update(price_amount=None)
+    second_product_id = graphene.Node.to_global_id("Product", product_list[1].id)
+    third_product_id = graphene.Node.to_global_id("Product", product_list[2].id)
+    variables = {
+        "filter": {"price": {"gte": 9, "lte": 31}},
+        "channel": channel_USD.slug,
+    }
+    response = user_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 2
+    assert products[0]["node"]["id"] == second_product_id
+    assert products[1]["node"]["id"] == third_product_id
+
+
+@pytest.mark.parametrize("is_published", [(True), (False)])
+def test_products_query_with_filter_search_by_sku(
+    is_published,
+    query_products_with_filter,
+    staff_api_client,
+    product_with_two_variants,
+    product_with_default_variant,
+    permission_manage_products,
+    channel_USD,
+):
+    ProductChannelListing.objects.filter(
+        product=product_with_default_variant, channel=channel_USD
+    ).update(is_published=is_published)
+    variables = {"filter": {"search": "1234"}}
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    product_id = graphene.Node.to_global_id("Product", product_with_default_variant.id)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == product_id
+    assert products[0]["node"]["name"] == product_with_default_variant.name
+
+
+@pytest.mark.parametrize("search_value", ["new", "NEW color", "Color"])
+def test_products_query_with_filter_search_by_dropdown_attribute_value(
+    search_value,
+    query_products_with_filter,
+    staff_api_client,
+    product_list,
+    permission_manage_products,
+    channel_USD,
+    color_attribute,
+):
+    # given
+    product_with_dropdown_attr = product_list[1]
+
+    product_type = product_with_dropdown_attr.product_type
+    product_type.product_attributes.add(color_attribute)
+
+    dropdown_attr_value = color_attribute.values.first()
+    dropdown_attr_value.name = "New color"
+    dropdown_attr_value.save(update_fields=["name"])
+
+    associate_attribute_values_to_instance(
+        product_with_dropdown_attr, color_attribute, dropdown_attr_value
+    )
+
+    product_with_dropdown_attr.refresh_from_db()
+
+    product_with_dropdown_attr.search_vector = FlatConcatSearchVector(
+        *prepare_product_search_vector_value(product_with_dropdown_attr)
+    )
+    product_with_dropdown_attr.save(update_fields=["search_document", "search_vector"])
+
+    variables = {"filter": {"search": search_value}, "channel": channel_USD.slug}
+
+    # when
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+
+    # then
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == graphene.Node.to_global_id(
+        "Product", product_with_dropdown_attr.id
+    )
+    assert products[0]["node"]["name"] == product_with_dropdown_attr.name
+
+
+@pytest.mark.parametrize(
+    "search_value",
+    ["eco mode", "ECO Performance", "performance", "eco performance mode"],
+)
+def test_products_query_with_filter_search_by_multiselect_attribute_value(
+    search_value,
+    query_products_with_filter,
+    staff_api_client,
+    product_list,
+    permission_manage_products,
+    channel_USD,
+):
+    # given
+    product_with_multiselect_attr = product_list[2]
+
+    multiselect_attribute = Attribute.objects.create(
+        slug="modes",
+        name="Available Modes",
+        input_type=AttributeInputType.MULTISELECT,
+        type=AttributeType.PRODUCT_TYPE,
+    )
+
+    multiselect_attr_val_1 = AttributeValue.objects.create(
+        attribute=multiselect_attribute, name="Eco Mode", slug="eco"
+    )
+    multiselect_attr_val_2 = AttributeValue.objects.create(
+        attribute=multiselect_attribute, name="Performance Mode", slug="power"
+    )
+
+    product_type = product_with_multiselect_attr.product_type
+    product_type.product_attributes.add(multiselect_attribute)
+
+    associate_attribute_values_to_instance(
+        product_with_multiselect_attr,
+        multiselect_attribute,
+        multiselect_attr_val_1,
+        multiselect_attr_val_2,
+    )
+
+    product_with_multiselect_attr.refresh_from_db()
+
+    product_with_multiselect_attr.search_vector = FlatConcatSearchVector(
+        *prepare_product_search_vector_value(product_with_multiselect_attr)
+    )
+    product_with_multiselect_attr.save(update_fields=["search_vector"])
+
+    variables = {"filter": {"search": search_value}, "channel": channel_USD.slug}
+
+    # when
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+
+    # then
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == graphene.Node.to_global_id(
+        "Product", product_with_multiselect_attr.id
+    )
+    assert products[0]["node"]["name"] == product_with_multiselect_attr.name
+
+
+@pytest.mark.parametrize("search_value", ["rich", "test rich", "RICH text"])
+def test_products_query_with_filter_search_by_rich_text_attribute(
+    search_value,
+    query_products_with_filter,
+    staff_api_client,
+    product_list,
+    permission_manage_products,
+    channel_USD,
+    rich_text_attribute,
+):
+    # given
+    product_with_rich_text_attr = product_list[1]
+
+    product_type = product_with_rich_text_attr.product_type
+    product_type.product_attributes.add(rich_text_attribute)
+
+    rich_text_value = rich_text_attribute.values.first()
+    rich_text_value.rich_text = dummy_editorjs("Test rich text.")
+    rich_text_value.save(update_fields=["rich_text"])
+
+    associate_attribute_values_to_instance(
+        product_with_rich_text_attr, rich_text_attribute, rich_text_value
+    )
+
+    product_with_rich_text_attr.refresh_from_db()
+
+    product_with_rich_text_attr.search_vector = FlatConcatSearchVector(
+        *prepare_product_search_vector_value(product_with_rich_text_attr)
+    )
+    product_with_rich_text_attr.save(update_fields=["search_vector"])
+
+    variables = {"filter": {"search": search_value}, "channel": channel_USD.slug}
+
+    # when
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+
+    # then
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == graphene.Node.to_global_id(
+        "Product", product_with_rich_text_attr.id
+    )
+    assert products[0]["node"]["name"] == product_with_rich_text_attr.name
+
+
+@pytest.mark.parametrize("search_value", ["plain", "test plain", "PLAIN text"])
+def test_products_query_with_filter_search_by_plain_text_attribute(
+    search_value,
+    query_products_with_filter,
+    staff_api_client
