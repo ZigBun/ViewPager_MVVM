@@ -741,4 +741,226 @@ def test_products_query_with_filter_category(
 def test_products_query_with_filter_has_category_false(
     query_products_with_filter, staff_api_client, product, permission_manage_products
 ):
-    second_product 
+    second_product = product
+    second_product.category = None
+    second_product.id = None
+    second_product.slug = "second-product"
+    second_product.save()
+
+    variables = {"filter": {"hasCategory": False}}
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    second_product_id = graphene.Node.to_global_id("Product", second_product.id)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == second_product_id
+    assert products[0]["node"]["name"] == second_product.name
+
+
+def test_products_query_with_filter_has_category_true(
+    query_products_with_filter,
+    staff_api_client,
+    product_without_category,
+    permission_manage_products,
+):
+    category = Category.objects.create(name="Custom", slug="custom")
+    second_product = product_without_category
+    second_product.category = category
+    second_product.id = None
+    second_product.slug = "second-product"
+    second_product.save()
+
+    variables = {"filter": {"hasCategory": True}}
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    second_product_id = graphene.Node.to_global_id("Product", second_product.id)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == second_product_id
+    assert products[0]["node"]["name"] == second_product.name
+
+
+def test_products_query_with_filter_collection(
+    query_products_with_filter,
+    staff_api_client,
+    product,
+    collection,
+    permission_manage_products,
+):
+    second_product = product
+    second_product.id = None
+    second_product.slug = "second-product"
+    second_product.save()
+    second_product.collections.add(collection)
+
+    collection_id = graphene.Node.to_global_id("Collection", collection.id)
+    variables = {"filter": {"collections": [collection_id]}}
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    second_product_id = graphene.Node.to_global_id("Product", second_product.id)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == second_product_id
+    assert products[0]["node"]["name"] == second_product.name
+
+
+def test_products_query_with_filter_category_and_search(
+    query_products_with_filter,
+    staff_api_client,
+    product,
+    permission_manage_products,
+):
+    category = Category.objects.create(name="Custom", slug="custom")
+    second_product = product
+    second_product.id = None
+    second_product.slug = "second-product"
+    second_product.category = category
+    product.category = category
+    second_product.save()
+    product.save()
+
+    for pr in [product, second_product]:
+        pr.search_vector = FlatConcatSearchVector(
+            *prepare_product_search_vector_value(pr)
+        )
+    Product.objects.bulk_update([product, second_product], ["search_vector"])
+
+    category_id = graphene.Node.to_global_id("Category", category.id)
+    variables = {"filter": {"categories": [category_id], "search": product.name}}
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    product_id = graphene.Node.to_global_id("Product", product.id)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == product_id
+    assert products[0]["node"]["name"] == product.name
+
+
+def test_products_query_with_filter_gift_card_false(
+    query_products_with_filter,
+    staff_api_client,
+    product,
+    shippable_gift_card_product,
+    permission_manage_products,
+):
+    # given
+    variables = {"filter": {"giftCard": False}}
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+
+    # when
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+
+    # then
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == graphene.Node.to_global_id(
+        "Product", product.pk
+    )
+
+
+def test_products_query_with_filter_gift_card_true(
+    query_products_with_filter,
+    staff_api_client,
+    product,
+    shippable_gift_card_product,
+    permission_manage_products,
+):
+    # given
+    variables = {"filter": {"giftCard": True}}
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+
+    # when
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+
+    # then
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == graphene.Node.to_global_id(
+        "Product", shippable_gift_card_product.pk
+    )
+
+
+@pytest.mark.parametrize(
+    "products_filter",
+    [
+        {"minimalPrice": {"gte": 1.0, "lte": 2.0}},
+        {"isPublished": False},
+        {"search": "Juice1"},
+    ],
+)
+def test_products_query_with_filter(
+    products_filter,
+    query_products_with_filter,
+    staff_api_client,
+    product,
+    permission_manage_products,
+    channel_USD,
+):
+    assert "Juice1" not in product.name
+
+    second_product = product
+    second_product.id = None
+    second_product.name = "Apple Juice1"
+    second_product.slug = "apple-juice1"
+    second_product.save()
+    variant_second_product = second_product.variants.create(
+        product=second_product,
+        sku=second_product.slug,
+    )
+    ProductVariantChannelListing.objects.create(
+        variant=variant_second_product,
+        channel=channel_USD,
+        price_amount=Decimal(1.99),
+        cost_price_amount=Decimal(1),
+        currency=channel_USD.currency_code,
+    )
+    ProductChannelListing.objects.create(
+        product=second_product,
+        discounted_price_amount=Decimal(1.99),
+        channel=channel_USD,
+        is_published=False,
+    )
+    second_product.search_vector = FlatConcatSearchVector(
+        *prepare_product_search_vector_value(second_product)
+    )
+    second_product.save(update_fields=["search_vector"])
+    variables = {"filter": products_filter, "channel": channel_USD.slug}
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    second_product_id = graphene.Node.to_global_id("Product", second_product.id)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == second_product_id
+    assert products[0]["node"]["name"] == second_product.name
+
+
+def test_products_query_with_price_filter_as_staff(
+    query_products_with_filter,
+    staff_api_client,
+    product_list,
+    permission_manage_products,
+    channel_USD,
+):
+    product = product_list[0]
+    product.variants.first().channel_listings.filter().update(price_amount=None)
+
+    variables = {
+        "filter": {"price": {"gte": 9, "lte": 31}},
+        "channel": channel_USD.slug,
+    }
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query_
