@@ -1182,4 +1182,231 @@ def test_products_query_with_filter_search_by_rich_text_attribute(
 def test_products_query_with_filter_search_by_plain_text_attribute(
     search_value,
     query_products_with_filter,
-    staff_api_client
+    staff_api_client,
+    product_list,
+    permission_manage_products,
+    channel_USD,
+    plain_text_attribute,
+):
+    # given
+    product_with_plain_text_attr = product_list[1]
+
+    product_type = product_with_plain_text_attr.product_type
+    product_type.product_attributes.add(plain_text_attribute)
+
+    plain_text_value = plain_text_attribute.values.first()
+    plain_text_value.plain_text = "Test plain text."
+    plain_text_value.save(update_fields=["plain_text"])
+
+    associate_attribute_values_to_instance(
+        product_with_plain_text_attr, plain_text_attribute, plain_text_value
+    )
+
+    product_with_plain_text_attr.refresh_from_db()
+
+    product_with_plain_text_attr.search_vector = FlatConcatSearchVector(
+        *prepare_product_search_vector_value(product_with_plain_text_attr)
+    )
+    product_with_plain_text_attr.save(update_fields=["search_vector"])
+
+    variables = {"filter": {"search": search_value}, "channel": channel_USD.slug}
+
+    # when
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+
+    # then
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == graphene.Node.to_global_id(
+        "Product", product_with_plain_text_attr.id
+    )
+    assert products[0]["node"]["name"] == product_with_plain_text_attr.name
+
+
+@pytest.mark.parametrize("search_value", ["13456", "13456 cm"])
+def test_products_query_with_filter_search_by_numeric_attribute_value(
+    search_value,
+    query_products_with_filter,
+    staff_api_client,
+    product_list,
+    permission_manage_products,
+    channel_USD,
+    numeric_attribute,
+):
+    # given
+    product_with_numeric_attr = product_list[1]
+
+    product_type = product_with_numeric_attr.product_type
+    product_type.product_attributes.add(numeric_attribute)
+
+    numeric_attribute.unit = MeasurementUnits.CM
+    numeric_attribute.save(update_fields=["unit"])
+
+    numeric_attr_value = numeric_attribute.values.first()
+    numeric_attr_value.name = "13456"
+    numeric_attr_value.save(update_fields=["name"])
+
+    associate_attribute_values_to_instance(
+        product_with_numeric_attr, numeric_attribute, numeric_attr_value
+    )
+
+    product_with_numeric_attr.refresh_from_db()
+
+    product_with_numeric_attr.search_vector = FlatConcatSearchVector(
+        *prepare_product_search_vector_value(product_with_numeric_attr)
+    )
+    product_with_numeric_attr.save(update_fields=["search_vector"])
+
+    variables = {"filter": {"search": search_value}, "channel": channel_USD.slug}
+
+    # when
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+
+    # then
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == graphene.Node.to_global_id(
+        "Product", product_with_numeric_attr.id
+    )
+    assert products[0]["node"]["name"] == product_with_numeric_attr.name
+
+
+def test_products_query_with_filter_search_by_numeric_attribute_value_without_unit(
+    query_products_with_filter,
+    staff_api_client,
+    product_list,
+    permission_manage_products,
+    channel_USD,
+    numeric_attribute_without_unit,
+):
+    # given
+    numeric_attribute = numeric_attribute_without_unit
+    product_with_numeric_attr = product_list[1]
+
+    product_type = product_with_numeric_attr.product_type
+    product_type.product_attributes.add(numeric_attribute)
+
+    numeric_attr_value = numeric_attribute.values.first()
+    numeric_attr_value.name = "13456"
+    numeric_attr_value.save(update_fields=["name"])
+
+    associate_attribute_values_to_instance(
+        product_with_numeric_attr, numeric_attribute, numeric_attr_value
+    )
+
+    product_with_numeric_attr.refresh_from_db()
+
+    product_with_numeric_attr.search_vector = FlatConcatSearchVector(
+        *prepare_product_search_vector_value(product_with_numeric_attr)
+    )
+    product_with_numeric_attr.save(update_fields=["search_vector"])
+
+    variables = {"filter": {"search": "13456"}, "channel": channel_USD.slug}
+
+    # when
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+
+    # then
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == graphene.Node.to_global_id(
+        "Product", product_with_numeric_attr.id
+    )
+    assert products[0]["node"]["name"] == product_with_numeric_attr.name
+
+
+@pytest.mark.parametrize("search_value", ["2020", "2020-10-10"])
+def test_products_query_with_filter_search_by_date_attribute_value(
+    search_value,
+    query_products_with_filter,
+    staff_api_client,
+    product_list,
+    permission_manage_products,
+    channel_USD,
+    date_attribute,
+):
+    # given
+    product_with_date_attr = product_list[2]
+
+    product_type = product_with_date_attr.product_type
+    product_type.product_attributes.add(date_attribute)
+
+    date_attr_value = date_attribute.values.first()
+    date_attr_value.date_time = datetime(2020, 10, 10, tzinfo=pytz.utc)
+    date_attr_value.save(update_fields=["date_time"])
+
+    associate_attribute_values_to_instance(
+        product_with_date_attr, date_attribute, date_attr_value
+    )
+
+    product_with_date_attr.refresh_from_db()
+
+    product_with_date_attr.search_vector = FlatConcatSearchVector(
+        *prepare_product_search_vector_value(product_with_date_attr)
+    )
+    product_with_date_attr.save(update_fields=["search_vector"])
+
+    variables = {"filter": {"search": search_value}, "channel": channel_USD.slug}
+
+    # when
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+
+    # then
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == graphene.Node.to_global_id(
+        "Product", product_with_date_attr.id
+    )
+    assert products[0]["node"]["name"] == product_with_date_attr.name
+
+
+@pytest.mark.parametrize("search_value", ["2020", "2020-10-10", "22:20"])
+def test_products_query_with_filter_search_by_date_time_attribute_value(
+    search_value,
+    query_products_with_filter,
+    staff_api_client,
+    product_list,
+    permission_manage_products,
+    channel_USD,
+    date_time_attribute,
+):
+    # given
+    product_with_date_time_attr = product_list[0]
+
+    product_type = product_with_date_time_attr.product_type
+    product_type.product_attributes.add(date_time_attribute)
+
+    date_time_attr_value = date_time_attribute.values.first()
+    date_time_attr_value.date_time = datetime(2020, 10, 10, 22, 20, tzinfo=pytz.utc)
+    date_time_attr_value.save(update_fields=["date_time"])
+
+    associate_attribute_values_to_instance(
+        product_with_date_time_attr, date_time_attribute, date_time_attr_value
+    )
+
+    product_with_date_time_attr.refresh_from_db()
+
+    product_with_date_time_attr.search_vector = FlatConcatSearchVector(
+        *prepare_product_search_vector_value(product_with_date_time_attr)
+    )
+    product_with_date_time_attr.save(update_fields=["search_vector"])
+
+    variables = {"filter": {"search": search_value}, "channel": channel_USD.slug}
+
+    # when
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+
+    # then
+    response = staff_api_client.post_graphql(query_products_wi
