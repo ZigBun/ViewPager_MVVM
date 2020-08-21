@@ -1409,4 +1409,247 @@ def test_products_query_with_filter_search_by_date_time_attribute_value(
     staff_api_client.user.user_permissions.add(permission_manage_products)
 
     # then
-    response = staff_api_client.post_graphql(query_products_wi
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == graphene.Node.to_global_id(
+        "Product", product_with_date_time_attr.id
+    )
+    assert products[0]["node"]["name"] == product_with_date_time_attr.name
+
+
+def test_products_query_with_is_published_filter_variants_without_prices(
+    query_products_with_filter,
+    staff_api_client,
+    variant,
+    permission_manage_products,
+    channel_USD,
+):
+    ProductVariantChannelListing.objects.filter(
+        variant__product=variant.product
+    ).update(price_amount=None)
+
+    variables = {"channel": channel_USD.slug, "filter": {"isPublished": True}}
+    response = staff_api_client.post_graphql(
+        query_products_with_filter,
+        variables,
+        permissions=[permission_manage_products],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 0
+
+
+def test_products_query_with_is_published_filter_one_variant_without_price(
+    query_products_with_filter,
+    staff_api_client,
+    variant,
+    permission_manage_products,
+    channel_USD,
+):
+    variant.channel_listings.update(price_amount=None)
+
+    variables = {"channel": channel_USD.slug, "filter": {"isPublished": True}}
+    response = staff_api_client.post_graphql(
+        query_products_with_filter,
+        variables,
+        permissions=[permission_manage_products],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+
+
+def test_products_query_with_filter_stock_availability_as_staff(
+    query_products_with_filter,
+    staff_api_client,
+    product_list,
+    order_line,
+    permission_manage_products,
+    channel_USD,
+):
+    for product in product_list:
+        stock = product.variants.first().stocks.first()
+        Allocation.objects.create(
+            order_line=order_line, stock=stock, quantity_allocated=stock.quantity
+        )
+    product = product_list[0]
+    product.variants.first().channel_listings.filter(channel=channel_USD).update(
+        price_amount=None
+    )
+    variables = {
+        "filter": {"stockAvailability": "OUT_OF_STOCK"},
+        "channel": channel_USD.slug,
+    }
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 3
+
+
+def test_products_query_with_filter_stock_availability_including_reservations(
+    query_products_with_filter,
+    staff_api_client,
+    product_list,
+    order_line,
+    checkout_line,
+    permission_manage_products,
+    channel_USD,
+    warehouse_JPY,
+    stock,
+):
+    # given
+    stocks = [product.variants.first().stocks.first() for product in product_list]
+    stock.quantity = 50
+    stock.product_variant = stocks[2].product_variant
+    stock.warehouse_id = warehouse_JPY.id
+    stocks[2].quantity = 50
+
+    Allocation.objects.create(
+        order_line=order_line, stock=stocks[0], quantity_allocated=50
+    )
+    Reservation.objects.bulk_create(
+        [
+            Reservation(
+                checkout_line=checkout_line,
+                stock=stocks[0],
+                quantity_reserved=50,
+                reserved_until=timezone.now() + timedelta(minutes=5),
+            ),
+            Reservation(
+                checkout_line=checkout_line,
+                stock=stocks[1],
+                quantity_reserved=100,
+                reserved_until=timezone.now() - timedelta(minutes=5),
+            ),
+            Reservation(
+                checkout_line=checkout_line,
+                stock=stocks[2],
+                quantity_reserved=50,
+                reserved_until=timezone.now() + timedelta(minutes=5),
+            ),
+        ]
+    )
+    variables = {
+        "filter": {"stockAvailability": "OUT_OF_STOCK"},
+        "channel": channel_USD.slug,
+    }
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+
+    # when
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+
+    # then
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == graphene.Node.to_global_id(
+        "Product", product_list[0].id
+    )
+
+
+def test_products_query_with_filter_stock_availability_as_user(
+    query_products_with_filter,
+    user_api_client,
+    product_list,
+    order_line,
+    permission_manage_products,
+    channel_USD,
+):
+    for product in product_list:
+        stock = product.variants.first().stocks.first()
+        Allocation.objects.create(
+            order_line=order_line, stock=stock, quantity_allocated=stock.quantity
+        )
+    product = product_list[0]
+    product.variants.first().channel_listings.filter(channel=channel_USD).update(
+        price_amount=None
+    )
+    variables = {
+        "filter": {"stockAvailability": "OUT_OF_STOCK"},
+        "channel": channel_USD.slug,
+    }
+    response = user_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    product_id = graphene.Node.to_global_id("Product", product_list[1].id)
+    second_product_id = graphene.Node.to_global_id("Product", product_list[2].id)
+
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 2
+    assert products[0]["node"]["id"] == product_id
+    assert products[0]["node"]["name"] == product_list[1].name
+    assert products[1]["node"]["id"] == second_product_id
+    assert products[1]["node"]["name"] == product_list[2].name
+
+
+def test_products_query_with_filter_stock_availability_channel_without_shipping_zones(
+    query_products_with_filter,
+    staff_api_client,
+    product,
+    permission_manage_products,
+    channel_USD,
+):
+    channel_USD.shipping_zones.clear()
+    variables = {
+        "filter": {"stockAvailability": "OUT_OF_STOCK"},
+        "channel": channel_USD.slug,
+    }
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+    product_id = graphene.Node.to_global_id("Product", product.id)
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == product_id
+
+
+def test_products_query_with_filter_stock_availability_only_stock_in_cc_warehouse(
+    query_products_with_filter,
+    user_api_client,
+    product,
+    order_line,
+    channel_USD,
+    warehouse_for_cc,
+):
+    # given
+    variant = product.variants.first()
+    variant.stocks.all().delete()
+
+    Stock.objects.create(
+        warehouse=warehouse_for_cc, product_variant=variant, quantity=10
+    )
+
+    variables = {
+        "filter": {"stockAvailability": "IN_STOCK"},
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = user_api_client.post_graphql(query_products_with_filter, variables)
+
+    # then
+    content = get_graphql_content(response)
+
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == graphene.Node.to_global_id(
+        "Product", product.id
+    )
+
+
+@pytest.mark.parametrize(
+    "quantity_input, warehouse_indexes, count, indexes_of_products_in_result",
+    [
+        ({"lte": "80", "gte": "20"}, [1, 2], 1, [1]),
+        ({
