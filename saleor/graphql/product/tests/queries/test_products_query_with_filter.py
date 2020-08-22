@@ -1652,4 +1652,194 @@ def test_products_query_with_filter_stock_availability_only_stock_in_cc_warehous
     "quantity_input, warehouse_indexes, count, indexes_of_products_in_result",
     [
         ({"lte": "80", "gte": "20"}, [1, 2], 1, [1]),
-        ({
+        ({"lte": "120", "gte": "40"}, [1, 2], 1, [0]),
+        ({"gte": "10"}, [1], 1, [1]),
+        ({"gte": "110"}, [2], 0, []),
+        (None, [1], 1, [1]),
+        (None, [2], 2, [0, 1]),
+        ({"lte": "210", "gte": "70"}, [], 1, [0]),
+        ({"lte": "90"}, [], 1, [1]),
+        ({"lte": "90", "gte": "75"}, [], 0, []),
+    ],
+)
+def test_products_query_with_filter_stocks(
+    quantity_input,
+    warehouse_indexes,
+    count,
+    indexes_of_products_in_result,
+    query_products_with_filter,
+    staff_api_client,
+    product_with_single_variant,
+    product_with_two_variants,
+    warehouse,
+    channel_USD,
+):
+    product1 = product_with_single_variant
+    product2 = product_with_two_variants
+    products = [product1, product2]
+
+    second_warehouse = Warehouse.objects.get(pk=warehouse.pk)
+    second_warehouse.slug = "second warehouse"
+    second_warehouse.pk = None
+    second_warehouse.save()
+
+    third_warehouse = Warehouse.objects.get(pk=warehouse.pk)
+    third_warehouse.slug = "third warehouse"
+    third_warehouse.pk = None
+    third_warehouse.save()
+
+    warehouses = [warehouse, second_warehouse, third_warehouse]
+    warehouse_pks = [
+        graphene.Node.to_global_id("Warehouse", warehouses[index].pk)
+        for index in warehouse_indexes
+    ]
+
+    Stock.objects.bulk_create(
+        [
+            Stock(
+                warehouse=third_warehouse,
+                product_variant=product1.variants.first(),
+                quantity=100,
+            ),
+            Stock(
+                warehouse=second_warehouse,
+                product_variant=product2.variants.first(),
+                quantity=10,
+            ),
+            Stock(
+                warehouse=third_warehouse,
+                product_variant=product2.variants.first(),
+                quantity=25,
+            ),
+            Stock(
+                warehouse=third_warehouse,
+                product_variant=product2.variants.last(),
+                quantity=30,
+            ),
+        ]
+    )
+
+    variables = {
+        "filter": {
+            "stocks": {"quantity": quantity_input, "warehouseIds": warehouse_pks}
+        },
+        "channel": channel_USD.slug,
+    }
+    response = staff_api_client.post_graphql(
+        query_products_with_filter, variables, check_no_permissions=False
+    )
+    content = get_graphql_content(response)
+    products_data = content["data"]["products"]["edges"]
+
+    product_ids = {
+        graphene.Node.to_global_id("Product", products[index].pk)
+        for index in indexes_of_products_in_result
+    }
+
+    assert len(products_data) == count
+    assert {node["node"]["id"] for node in products_data} == product_ids
+
+
+def test_query_products_with_filter_ids(
+    api_client, product_list, query_products_with_filter, channel_USD
+):
+    # given
+    product_ids = [
+        graphene.Node.to_global_id("Product", product.id) for product in product_list
+    ][:2]
+    variables = {
+        "filter": {"ids": product_ids},
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = api_client.post_graphql(query_products_with_filter, variables)
+
+    # then
+    content = get_graphql_content(response)
+    products_data = content["data"]["products"]["edges"]
+
+    assert len(products_data) == 2
+    assert [node["node"]["id"] for node in products_data] == product_ids
+
+
+def test_products_query_with_filter_has_preordered_variants_false(
+    query_products_with_filter,
+    staff_api_client,
+    preorder_variant_global_threshold,
+    product_without_shipping,
+    permission_manage_products,
+):
+    product = product_without_shipping
+    variables = {"filter": {"hasPreorderedVariants": False}}
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    product_id = graphene.Node.to_global_id("Product", product.id)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == product_id
+    assert products[0]["node"]["name"] == product.name
+
+
+def test_products_query_with_filter_has_preordered_variants_true(
+    query_products_with_filter,
+    staff_api_client,
+    preorder_variant_global_threshold,
+    product_without_shipping,
+    permission_manage_products,
+):
+    product = preorder_variant_global_threshold.product
+    variables = {"filter": {"hasPreorderedVariants": True}}
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    product_id = graphene.Node.to_global_id("Product", product.id)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == product_id
+    assert products[0]["node"]["name"] == product.name
+
+
+def test_products_query_with_filter_has_preordered_variants_before_end_date(
+    query_products_with_filter,
+    staff_api_client,
+    preorder_variant_global_threshold,
+    permission_manage_products,
+):
+    variant = preorder_variant_global_threshold
+    variant.preorder_end_date = timezone.now() + timedelta(days=3)
+    variant.save(update_fields=["preorder_end_date"])
+
+    product = preorder_variant_global_threshold.product
+    variables = {"filter": {"hasPreorderedVariants": True}}
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    product_id = graphene.Node.to_global_id("Product", product.id)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 1
+    assert products[0]["node"]["id"] == product_id
+    assert products[0]["node"]["name"] == product.name
+
+
+def test_products_query_with_filter_has_preordered_variants_after_end_date(
+    query_products_with_filter,
+    staff_api_client,
+    preorder_variant_global_threshold,
+    permission_manage_products,
+):
+    variant = preorder_variant_global_threshold
+    variant.preorder_end_date = timezone.now() - timedelta(days=3)
+    variant.save(update_fields=["preorder_end_date"])
+
+    variables = {"filter": {"hasPreorderedVariants": True}}
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query_products_with_filter, variables)
+    content = get_graphql_content(response)
+    products = content["data"]["products"]["edges"]
+
+    assert len(products) == 0
