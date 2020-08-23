@@ -228,3 +228,224 @@ def test_partial_refund_payment(fake_payment_interface, payment_txn_captured):
         USED_GATEWAY, PAYMENT_DATA, channel_slug=payment_txn_captured.order.channel.slug
     )
 
+    payment_txn_captured.refresh_from_db()
+    assert payment_txn_captured.charge_status == ChargeStatus.PARTIALLY_REFUNDED
+    assert transaction.amount == PARTIAL_REFUND_AMOUNT
+    assert transaction.kind == TransactionKind.REFUND
+    assert transaction.currency == "usd"
+    assert transaction.gateway_response == RAW_RESPONSE
+
+
+def test_full_refund_payment(fake_payment_interface, payment_txn_captured):
+    capture_transaction = payment_txn_captured.transactions.get()
+    PAYMENT_DATA = create_payment_information(
+        payment=payment_txn_captured,
+        amount=FULL_REFUND_AMOUNT,
+        payment_token=capture_transaction.token,
+    )
+    fake_payment_interface.refund_payment.return_value = FULL_REFUND_RESPONSE
+    transaction = gateway.refund(
+        payment=payment_txn_captured,
+        manager=fake_payment_interface,
+        channel_slug=payment_txn_captured.order.channel.slug,
+    )
+    fake_payment_interface.refund_payment.assert_called_once_with(
+        USED_GATEWAY, PAYMENT_DATA, channel_slug=payment_txn_captured.order.channel.slug
+    )
+
+    payment_txn_captured.refresh_from_db()
+    assert payment_txn_captured.charge_status == ChargeStatus.FULLY_REFUNDED
+    assert transaction.amount == FULL_REFUND_AMOUNT
+    assert transaction.kind == TransactionKind.REFUND
+    assert transaction.currency == "usd"
+    assert transaction.gateway_response == RAW_RESPONSE
+
+
+def test_void_payment(fake_payment_interface, payment_txn_preauth):
+    auth_transaction = payment_txn_preauth.transactions.get()
+    PAYMENT_DATA = create_payment_information(
+        payment=payment_txn_preauth,
+        payment_token=auth_transaction.token,
+        amount=VOID_AMOUNT,
+    )
+    fake_payment_interface.void_payment.return_value = VOID_RESPONSE
+
+    transaction = gateway.void(
+        payment=payment_txn_preauth,
+        manager=fake_payment_interface,
+        channel_slug=payment_txn_preauth.order.channel.slug,
+    )
+
+    fake_payment_interface.void_payment.assert_called_once_with(
+        USED_GATEWAY, PAYMENT_DATA, channel_slug=payment_txn_preauth.order.channel.slug
+    )
+    payment_txn_preauth.refresh_from_db()
+    assert not payment_txn_preauth.is_active
+    assert transaction.amount == VOID_RESPONSE.amount
+    assert transaction.kind == TransactionKind.VOID
+    assert transaction.currency == "usd"
+    assert transaction.gateway_response == RAW_RESPONSE
+
+
+@patch("saleor.payment.gateway.update_payment")
+def test_confirm_payment(
+    update_payment_mock, fake_payment_interface, payment_txn_to_confirm
+):
+    auth_transaction = payment_txn_to_confirm.transactions.get()
+    PAYMENT_DATA = create_payment_information(
+        payment=payment_txn_to_confirm,
+        payment_token=auth_transaction.token,
+        amount=CONFIRM_AMOUNT,
+    )
+    fake_payment_interface.confirm_payment.return_value = CONFIRM_RESPONSE
+
+    transaction = gateway.confirm(
+        payment=payment_txn_to_confirm,
+        manager=fake_payment_interface,
+        channel_slug=payment_txn_to_confirm.order.channel.slug,
+    )
+
+    fake_payment_interface.confirm_payment.assert_called_once_with(
+        USED_GATEWAY,
+        PAYMENT_DATA,
+        channel_slug=payment_txn_to_confirm.order.channel.slug,
+    )
+    assert transaction.amount == CONFIRM_RESPONSE.amount
+    assert transaction.kind == TransactionKind.CONFIRM
+    assert transaction.currency == "usd"
+    assert transaction.gateway_response == RAW_RESPONSE
+    update_payment_mock.assert_called_once_with(
+        payment_txn_to_confirm, CONFIRM_RESPONSE
+    )
+
+
+def test_list_gateways(fake_payment_interface):
+    gateways = [{"name": "Stripe"}, {"name": "Braintree"}]
+    fake_payment_interface.list_payment_gateways.return_value = gateways
+    lst = gateway.list_gateways(fake_payment_interface)
+    fake_payment_interface.list_payment_gateways.assert_called_once()
+    assert lst == gateways
+
+
+@patch("saleor.plugins.manager.PluginsManager.is_event_active_for_any_plugin")
+def test_request_capture_action_missing_active_event(
+    mocked_is_active, order, staff_user
+):
+    # given
+    transaction = TransactionItem.objects.create(
+        status="Authorized",
+        type="Credit card",
+        reference="PSP ref",
+        available_actions=["capture", "void"],
+        currency="USD",
+        order_id=order.pk,
+        authorized_value=Decimal("10"),
+    )
+    mocked_is_active.return_value = False
+    action_value = Decimal("5.00")
+
+    # when & then
+    with pytest.raises(PaymentError):
+        request_charge_action(
+            transaction=transaction,
+            manager=get_plugins_manager(),
+            charge_value=action_value,
+            channel_slug=order.channel.slug,
+            user=staff_user,
+            app=None,
+        )
+
+
+@patch("saleor.plugins.manager.PluginsManager.is_event_active_for_any_plugin")
+@patch("saleor.plugins.manager.PluginsManager.transaction_action_request")
+def test_request_capture_action_on_order(
+    mocked_transaction_action_request, mocked_is_active, order, staff_user
+):
+    # given
+    transaction = TransactionItem.objects.create(
+        status="Authorized",
+        type="Credit card",
+        reference="PSP ref",
+        available_actions=["capture", "void"],
+        currency="USD",
+        order_id=order.pk,
+        authorized_value=Decimal("10"),
+    )
+    mocked_is_active.return_value = True
+    action_value = Decimal("5.00")
+
+    # when
+    request_charge_action(
+        transaction=transaction,
+        manager=get_plugins_manager(),
+        charge_value=action_value,
+        channel_slug=order.channel.slug,
+        user=staff_user,
+        app=None,
+    )
+
+    # then
+    assert mocked_is_active.called
+    mocked_transaction_action_request.assert_called_once_with(
+        TransactionActionData(
+            transaction=transaction,
+            action_type=TransactionAction.CHARGE,
+            action_value=action_value,
+        ),
+        channel_slug=order.channel.slug,
+    )
+
+    event = order.events.first()
+    assert event.type == OrderEvents.TRANSACTION_CAPTURE_REQUESTED
+    assert Decimal(event.parameters["amount"]) == action_value
+    assert event.parameters["reference"] == transaction.reference
+    assert event.user == staff_user
+
+
+@patch("saleor.plugins.manager.PluginsManager.is_event_active_for_any_plugin")
+@patch("saleor.plugins.manager.PluginsManager.transaction_action_request")
+def test_request_capture_action_by_app(
+    mocked_transaction_action_request, mocked_is_active, order, app
+):
+    # given
+    transaction = TransactionItem.objects.create(
+        status="Authorized",
+        type="Credit card",
+        reference="PSP ref",
+        available_actions=["capture", "void"],
+        currency="USD",
+        order_id=order.pk,
+        authorized_value=Decimal("10"),
+    )
+    mocked_is_active.return_value = True
+    action_value = Decimal("5.00")
+
+    # when
+    request_charge_action(
+        transaction=transaction,
+        manager=get_plugins_manager(),
+        charge_value=action_value,
+        channel_slug=order.channel.slug,
+        user=None,
+        app=app,
+    )
+
+    # then
+    assert mocked_is_active.called
+    mocked_transaction_action_request.assert_called_once_with(
+        TransactionActionData(
+            transaction=transaction,
+            action_type=TransactionAction.CHARGE,
+            action_value=action_value,
+        ),
+        channel_slug=order.channel.slug,
+    )
+
+    event = order.events.first()
+    assert event.type == OrderEvents.TRANSACTION_CAPTURE_REQUESTED
+    assert Decimal(event.parameters["amount"]) == action_value
+    assert event.parameters["reference"] == transaction.reference
+    assert event.app == app
+
+
+@patch("saleor.plugins
