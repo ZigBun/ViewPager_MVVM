@@ -936,4 +936,28 @@ def test_payment_refund_or_void_void_called(void_mock, payment):
 
 
 @patch("saleor.payment.gateway.void")
-def test_payment_refund_or_void_void_not_called_txn_exist(void_mock, 
+def test_payment_refund_or_void_void_not_called_txn_exist(void_mock, payment):
+    """Ensure that void method is not called when VOID transaction already exists with
+    given transaction_id."""
+    # given
+    payment.can_void = Mock(return_value=True)
+    assert payment.can_refund() is False
+    assert payment.can_void() is True
+
+    txn = payment.transactions.create(
+        is_success=True,
+        action_required=False,
+        kind=TransactionKind.VOID,
+        amount=payment.total,
+        currency=payment.currency,
+        token="test",
+        gateway_response={},
+    )
+
+    # when
+    gateway.payment_refund_or_void(
+        payment, get_plugins_manager(), None, transaction_id=txn.token
+    )
+
+    # then
+    void_mock.assert_not_called()
