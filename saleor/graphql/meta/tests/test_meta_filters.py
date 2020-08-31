@@ -115,4 +115,45 @@ def test_filter_by_meta_total_returned_objects(
 
 def test_filter_by_meta_expected_product_for_key_and_value(
     api_client, product_list, channel_USD
-)
+):
+    product = product_list[0]
+    variables = {
+        "channel": channel_USD.slug,
+        "filter": {
+            "metadata": [{"key": "A", "value": "1"}],
+        },
+    }
+    product.store_value_in_metadata({"A": "1", "B": "2", "C": "3"})
+    product.save()
+
+    # when
+    response = api_client.post_graphql(FILTER_BY_META_QUERY, variables)
+    content = get_graphql_content(response)
+
+    # then
+    product_data = content["data"]["products"]["edges"][0]["node"]
+
+    assert product_data["slug"] == product.slug
+
+
+def test_filter_by_meta_expected_product_for_only_key(
+    api_client, product_list, channel_USD
+):
+    product = product_list[0]
+    variables = {
+        "channel": channel_USD.slug,
+        "filter": {
+            "metadata": [{"key": "A"}],
+        },
+    }
+    product.store_value_in_metadata({"A": "1", "B": "2", "C": "3"})
+    product.save(update_fields=["metadata"])
+
+    # when
+    response = api_client.post_graphql(FILTER_BY_META_QUERY, variables)
+    content = get_graphql_content(response)
+
+    # then
+    product_data = content["data"]["products"]["edges"][0]["node"]
+
+    assert product_data["slug"] == product.slug
