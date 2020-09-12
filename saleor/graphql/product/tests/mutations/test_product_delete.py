@@ -236,4 +236,241 @@ def test_delete_product_variant_in_draft_order(
         quantity = 3
         total_price = unit_price * quantity
 
-        order_line = OrderLine.objects.create
+        order_line = OrderLine.objects.create(
+            variant=variant,
+            order=draft_order,
+            product_name=str(variant.product),
+            variant_name=str(variant),
+            product_sku=variant.sku,
+            product_variant_id=variant.get_global_id(),
+            is_shipping_required=variant.is_shipping_required(),
+            is_gift_card=variant.is_gift_card(),
+            unit_price=TaxedMoney(net=net, gross=gross),
+            total_price=total_price,
+            quantity=quantity,
+        )
+        draft_order_lines_pks.append(order_line.pk)
+
+        order_line_not_draft = OrderLine.objects.create(
+            variant=variant,
+            order=not_draft_order,
+            product_name=str(variant.product),
+            variant_name=str(variant),
+            product_sku=variant.sku,
+            product_variant_id=variant.get_global_id(),
+            is_shipping_required=variant.is_shipping_required(),
+            is_gift_card=variant.is_gift_card(),
+            unit_price=TaxedMoney(net=net, gross=gross),
+            total_price=total_price,
+            quantity=quantity,
+        )
+        not_draft_order_lines_pks.append(order_line_not_draft.pk)
+
+    node_id = graphene.Node.to_global_id("Product", product.id)
+    variables = {"id": node_id}
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["productDelete"]
+    assert data["product"]["name"] == product.name
+    with pytest.raises(product._meta.model.DoesNotExist):
+        product.refresh_from_db()
+    assert node_id == data["product"]["id"]
+
+    assert not OrderLine.objects.filter(pk__in=draft_order_lines_pks).exists()
+
+    assert OrderLine.objects.filter(pk__in=not_draft_order_lines_pks).exists()
+    mocked_recalculate_orders_task.assert_called_once_with([draft_order.id])
+
+    event = OrderEvent.objects.filter(
+        type=OrderEvents.ORDER_LINE_PRODUCT_DELETED
+    ).last()
+    assert event
+    assert event.order == draft_order
+    assert event.user == staff_api_client.user
+    expected_params = [
+        {
+            "item": str(line),
+            "line_pk": line.pk,
+            "quantity": line.quantity,
+        }
+        for line in draft_order.lines.all()
+    ]
+    for param in expected_params:
+        assert param in event.parameters
+
+
+def test_product_delete_removes_reference_to_product(
+    staff_api_client,
+    product_type_product_reference_attribute,
+    product_list,
+    product_type,
+    permission_manage_products,
+):
+    # given
+    query = DELETE_PRODUCT_MUTATION
+
+    product = product_list[0]
+    product_ref = product_list[1]
+
+    product_type.product_attributes.add(product_type_product_reference_attribute)
+    attr_value = AttributeValue.objects.create(
+        attribute=product_type_product_reference_attribute,
+        name=product_ref.name,
+        slug=f"{product.pk}_{product_ref.pk}",
+        reference_product=product_ref,
+    )
+    associate_attribute_values_to_instance(
+        product, product_type_product_reference_attribute, attr_value
+    )
+
+    reference_id = graphene.Node.to_global_id("Product", product_ref.pk)
+
+    variables = {"id": reference_id}
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["productDelete"]
+
+    with pytest.raises(attr_value._meta.model.DoesNotExist):
+        attr_value.refresh_from_db()
+    with pytest.raises(product_ref._meta.model.DoesNotExist):
+        product_ref.refresh_from_db()
+
+    assert not data["errors"]
+
+
+def test_product_delete_removes_reference_to_product_variant(
+    staff_api_client,
+    variant,
+    product_type_product_reference_attribute,
+    permission_manage_products,
+    product_list,
+):
+    query = DELETE_PRODUCT_MUTATION
+    product_type = variant.product.product_type
+    product_type.variant_attributes.set([product_type_product_reference_attribute])
+
+    attr_value = AttributeValue.objects.create(
+        attribute=product_type_product_reference_attribute,
+        name=product_list[0].name,
+        slug=f"{variant.pk}_{product_list[0].pk}",
+        reference_product=product_list[0],
+    )
+
+    associate_attribute_values_to_instance(
+        variant,
+        product_type_product_reference_attribute,
+        attr_value,
+    )
+    reference_id = graphene.Node.to_global_id("Product", product_list[0].pk)
+
+    variables = {"id": reference_id}
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["productDelete"]
+
+    with pytest.raises(attr_value._meta.model.DoesNotExist):
+        attr_value.refresh_from_db()
+    with pytest.raises(product_list[0]._meta.model.DoesNotExist):
+        product_list[0].refresh_from_db()
+
+    assert not data["errors"]
+
+
+def test_product_delete_removes_reference_to_page(
+    staff_api_client,
+    permission_manage_products,
+    page,
+    page_type_product_reference_attribute,
+    product,
+):
+    query = DELETE_PRODUCT_MUTATION
+
+    page_type = page.page_type
+    page_type.page_attributes.add(page_type_product_reference_attribute)
+
+    attr_value = AttributeValue.objects.create(
+        attribute=page_type_product_reference_attribute,
+        name=page.title,
+        slug=f"{page.pk}_{product.pk}",
+        reference_product=product,
+    )
+    associate_attribute_values_to_instance(
+        page, page_type_product_reference_attribute, attr_value
+    )
+
+    reference_id = graphene.Node.to_global_id("Product", product.pk)
+
+    variables = {"id": reference_id}
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["productDelete"]
+
+    with pytest.raises(attr_value._meta.model.DoesNotExist):
+        attr_value.refresh_from_db()
+    with pytest.raises(product._meta.model.DoesNotExist):
+        product.refresh_from_db()
+
+    assert not data["errors"]
+
+
+DELETE_PRODUCT_BY_EXTERNAL_REFERENCE = """
+    mutation DeleteProduct($id: ID, $externalReference: String) {
+        productDelete(id: $id, externalReference: $externalReference) {
+            product {
+                id
+                externalReference
+            }
+            errors {
+                field
+                message
+            }
+        }
+    }
+"""
+
+
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_product_by_external_reference(
+    mocked_recalculate_orders_task,
+    staff_api_client,
+    product,
+    permission_manage_products,
+):
+    # given
+    query = DELETE_PRODUCT_BY_EXTERNAL_REFERENCE
+    product.external_reference = "test-ext-id"
+    product.save(update_fields=["external_reference"])
+    variables = {"externalReference": product.external_reference}
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["productDelete"]
+
+    # then
+    with pytest.raises(product._meta.model.DoesNotExist):
+        product.refresh_from_db()
+    assert (
+        graphene.Node.to_global_id(product._meta.model.__name__, product.id)
+        == data["product"]["id"]
+    )
+    assert data["product"]["externalReference"] == product.external_reference
+    mocked_recalculate_orders_task.assert_not_called()
+
+
+def test_delete_product_by_both_id_and_external_reference(
+    staff_api_client, permission_manage_products
+):
