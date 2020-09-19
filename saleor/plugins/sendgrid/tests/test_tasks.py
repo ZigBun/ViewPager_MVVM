@@ -829,4 +829,122 @@ def test_send_gift_card_email_task_by_app(
     payload = {
         "user": None,
         "requester_user_id": None,
-        "request
+        "requester_app_id": to_global_id_or_none(app),
+        "recipient_email": recipient_email,
+        "resending": False,
+        "gift_card": {
+            "id": to_global_id_or_none(gift_card),
+            "code": gift_card.code,
+            "balance": gift_card.current_balance_amount,
+            "currency": gift_card.currency,
+        },
+    }
+
+    plugin = sendgrid_email_plugin(
+        api_key="A12",
+        send_gift_card_template_id=template_id,
+        sender_name="Sender Name",
+        sender_address="sender@example.com",
+    )
+
+    send_gift_card_email_task(payload, asdict(plugin.config))
+
+    mocked_send_email.assert_called_with(
+        configuration=plugin.config,
+        template_id=template_id,
+        payload=payload,
+    )
+
+    gift_card_event = GiftCardEvent.objects.get()
+    assert gift_card_event.type == GiftCardEvents.SENT_TO_CUSTOMER
+    assert gift_card_event.parameters == {
+        "email": recipient_email,
+    }
+    assert not gift_card_event.user
+    assert gift_card_event.app == app
+
+
+@patch("saleor.plugins.sendgrid.tasks.send_email")
+def test_send_order_confirmed_email_task_by_user(
+    mocked_send_email, staff_user, order, sendgrid_email_plugin
+):
+    template_id = "ABC1"
+
+    recipient_email = "user@example.com"
+    payload = {
+        "order": get_default_order_payload(order, "http://localhost:8000/redirect"),
+        "recipient_email": recipient_email,
+        "amount": order.total_gross_amount,
+        "currency": order.currency,
+        "site_name": "Saleor",
+        "domain": "localhost:8000",
+        "requester_user_id": to_global_id_or_none(staff_user),
+        "requester_app_id": None,
+    }
+
+    plugin = sendgrid_email_plugin(
+        api_key="A12",
+        order_confirmed_template_id=template_id,
+        sender_name="Sender Name",
+        sender_address="sender@example.com",
+    )
+
+    send_order_confirmed_email_task(payload, asdict(plugin.config))
+
+    mocked_send_email.assert_called_with(
+        configuration=plugin.config,
+        template_id=template_id,
+        payload=payload,
+    )
+
+    order_event = OrderEvent.objects.get()
+    assert order_event.type == OrderEvents.EMAIL_SENT
+    assert order_event.parameters == {
+        "email": recipient_email,
+        "email_type": OrderEventsEmails.CONFIRMED,
+    }
+    assert order_event.user == staff_user
+    assert not order_event.app
+
+
+@patch("saleor.plugins.sendgrid.tasks.send_email")
+def test_send_order_confirmed_email_task_by_app(
+    mocked_send_email, app, order, sendgrid_email_plugin
+):
+    template_id = "ABC1"
+
+    recipient_email = "user@example.com"
+    payload = {
+        "order": get_default_order_payload(order, "http://localhost:8000/redirect"),
+        "recipient_email": recipient_email,
+        "amount": order.total_gross_amount,
+        "currency": order.currency,
+        "site_name": "Saleor",
+        "domain": "localhost:8000",
+        "requester_user_id": None,
+        "requester_app_id": to_global_id_or_none(app),
+    }
+
+    plugin = sendgrid_email_plugin(
+        api_key="A12",
+        order_confirmed_template_id=template_id,
+        sender_name="Sender Name",
+        sender_address="sender@example.com",
+    )
+
+    send_order_confirmed_email_task(payload, asdict(plugin.config))
+
+    mocked_send_email.assert_called_with(
+        configuration=plugin.config,
+        template_id=template_id,
+        payload=payload,
+    )
+
+    order_event = OrderEvent.objects.get()
+    assert order_event.type == OrderEvents.EMAIL_SENT
+    assert order_event.parameters == {
+        "email": recipient_email,
+        "email_type": OrderEventsEmails.CONFIRMED,
+    }
+    assert not order_event.user
+    assert order_event.app == app
