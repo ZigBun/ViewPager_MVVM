@@ -107,4 +107,36 @@ class AttributeValueBulkDelete(ModelBulkDeleteMutation):
 
     @classmethod
     def bulk_action(cls, info: ResolveInfo, queryset, /):
-        attributes = {value.attribute for value in querys
+        attributes = {value.attribute for value in queryset}
+        values = list(queryset)
+        queryset.delete()
+        manager = get_plugin_manager_promise(info.context).get()
+        for value in values:
+            manager.attribute_value_deleted(value)
+        for attribute in attributes:
+            manager.attribute_updated(attribute)
+
+    @classmethod
+    def get_product_ids_to_update(cls, value_pks):
+        assigned_product_values = models.AssignedProductAttributeValue.objects.filter(
+            value_id__in=value_pks
+        )
+        assigned_product_attrs = models.AssignedProductAttribute.objects.filter(
+            Exists(assigned_product_values.filter(assignment_id=OuterRef("id")))
+        )
+
+        assigned_variant_values = models.AssignedVariantAttributeValue.objects.filter(
+            value_id__in=value_pks
+        )
+        assigned_variant_attrs = models.AssignedVariantAttribute.objects.filter(
+            Exists(assigned_variant_values.filter(assignment_id=OuterRef("id")))
+        )
+        variants = product_models.ProductVariant.objects.filter(
+            Exists(assigned_variant_attrs.filter(variant_id=OuterRef("id")))
+        )
+
+        product_ids = product_models.Product.objects.filter(
+            Exists(assigned_product_attrs.filter(product_id=OuterRef("id")))
+            | Q(Exists(variants.filter(product_id=OuterRef("id"))))
+        ).values_list("id", flat=True)
+        return list(product_ids)
