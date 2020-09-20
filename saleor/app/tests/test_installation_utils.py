@@ -358,4 +358,104 @@ def test_install_app_with_webhook(
     assert webhook.custom_headers == {"x-key": "Value"}
 
 
-def test_install_app_webhook_inco
+def test_install_app_webhook_incorrect_url(
+    app_manifest, app_manifest_webhook, app_installation, monkeypatch
+):
+    # given
+    app_manifest_webhook["targetUrl"] = "ftp://user:pass@app.example/deep/cover"
+    app_manifest["webhooks"] = [app_manifest_webhook]
+
+    mocked_get_response = Mock()
+    mocked_get_response.json.return_value = app_manifest
+    monkeypatch.setattr(requests, "get", Mock(return_value=mocked_get_response))
+
+    # when & then
+    with pytest.raises(ValidationError) as excinfo:
+        install_app(app_installation, activate=True)
+
+    error_dict = excinfo.value.error_dict
+    assert "webhooks" in error_dict
+    assert error_dict["webhooks"][0].message == "Invalid target url."
+
+
+def test_install_app_webhook_incorrect_query(
+    app_manifest, app_manifest_webhook, app_installation, monkeypatch
+):
+    # given
+    app_manifest_webhook[
+        "query"
+    ] = """
+        no {
+            that's {
+                not {
+                    ... on a {
+                        valid graphql {
+                            query
+                        }
+                    }
+                }
+            }
+        }
+    """
+    app_manifest["webhooks"] = [app_manifest_webhook]
+
+    mocked_get_response = Mock()
+    mocked_get_response.json.return_value = app_manifest
+    monkeypatch.setattr(requests, "get", Mock(return_value=mocked_get_response))
+
+    # when & then
+    with pytest.raises(ValidationError) as excinfo:
+        install_app(app_installation, activate=True)
+
+    error_dict = excinfo.value.error_dict
+    assert "webhooks" in error_dict
+    assert "Subscription query is not valid:" in error_dict["webhooks"][0].message
+
+
+def test_install_app_webhook_incorrect_custom_headers(
+    app_manifest, app_manifest_webhook, app_installation, monkeypatch
+):
+    # given
+    custom_headers = {"InvalidKey": "Value"}
+    app_manifest_webhook["customHeaders"] = custom_headers
+    app_manifest["webhooks"] = [app_manifest_webhook]
+
+    mocked_get_response = Mock()
+    mocked_get_response.json.return_value = app_manifest
+    monkeypatch.setattr(requests, "get", Mock(return_value=mocked_get_response))
+
+    # when & then
+    with pytest.raises(ValidationError) as excinfo:
+        install_app(app_installation, activate=True)
+
+    error_dict = excinfo.value.error_dict
+    assert "webhooks" in error_dict
+    assert error_dict["webhooks"][0].message == (
+        'Invalid custom headers: "InvalidKey" '
+        'does not match allowed key pattern: "X-*" or "Authorization*".'
+    )
+
+
+def test_install_app_lack_of_token_target_url_in_manifest_data(
+    app_manifest, app_installation, monkeypatch, permission_manage_products
+):
+    # given
+    app_manifest.pop("tokenTargetUrl")
+
+    app_manifest["permissions"] = ["MANAGE_PRODUCTS"]
+    mocked_get_response = Mock()
+    mocked_get_response.json.return_value = app_manifest
+
+    monkeypatch.setattr(requests, "get", Mock(return_value=mocked_get_response))
+    mocked_post = Mock()
+    monkeypatch.setattr(requests, "post", mocked_post)
+
+    app_installation.permissions.set([permission_manage_products])
+
+    # when & then
+    with pytest.raises(ValidationError) as excinfo:
+        install_app(app_installation, activate=True)
+
+    error_dict = excinfo.value.error_dict
+    assert "tokenTargetUrl" in error_dict
+    assert error_dict["tokenTargetUrl"][0].message == "Field required."
