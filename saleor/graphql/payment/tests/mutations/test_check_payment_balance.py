@@ -106,4 +106,86 @@ def test_payment_check_balance_validate_channel_inactive(
     channel_USD.save(update_fields=["is_active"])
     check_payment_balance_input["channel"] = "main"
 
-    response = staff_api_
+    response = staff_api_client.post_graphql(
+        MUTATION_CHECK_PAYMENT_BALANCE, {"input": check_payment_balance_input}
+    )
+
+    content = get_graphql_content(response)
+    errors = content["data"]["paymentCheckBalance"]["errors"]
+
+    assert len(errors) == 1
+    assert errors[0]["code"] == PaymentErrorCode.CHANNEL_INACTIVE.value.upper()
+    assert errors[0]["field"] == "channel"
+    assert errors[0]["message"] == "Channel with 'main' is inactive."
+    assert check_payment_balance_mock.call_count == 0
+
+
+@patch.object(PluginsManager, "check_payment_balance")
+@patch.object(PaymentCheckBalance, "validate_gateway")
+@patch.object(PaymentCheckBalance, "validate_currency")
+@patch("saleor.graphql.payment.mutations.validate_channel")
+def test_payment_check_balance_payment(
+    _,
+    __,
+    ___,
+    check_payment_balance_mock,
+    staff_api_client,
+    check_payment_balance_input,
+):
+    staff_api_client.post_graphql(
+        MUTATION_CHECK_PAYMENT_BALANCE, {"input": check_payment_balance_input}
+    )
+
+    check_payment_balance_mock.assert_called_once_with(
+        {
+            "gateway_id": "mirumee.payments.gateway",
+            "method": "givex",
+            "card": {
+                "cvc": "9891",
+                "code": "12345678910",
+                "money": {"currency": "GBP", "amount": 100.0},
+            },
+        },
+        "channel_default",
+    )
+
+
+@patch.object(PluginsManager, "check_payment_balance")
+@patch.object(PaymentCheckBalance, "validate_gateway")
+@patch.object(PaymentCheckBalance, "validate_currency")
+@patch("saleor.graphql.payment.mutations.validate_channel")
+def test_payment_check_balance_balance_raises_error(
+    _,
+    __,
+    ___,
+    check_payment_balance_mock,
+    staff_api_client,
+    check_payment_balance_input,
+):
+    check_payment_balance_mock.side_effect = Mock(
+        side_effect=PaymentError("Test payment error")
+    )
+
+    response = staff_api_client.post_graphql(
+        MUTATION_CHECK_PAYMENT_BALANCE, {"input": check_payment_balance_input}
+    )
+
+    content = get_graphql_content(response)
+    errors = content["data"]["paymentCheckBalance"]["errors"]
+
+    assert len(errors) == 1
+    assert errors[0]["code"] == PaymentErrorCode.BALANCE_CHECK_ERROR.value.upper()
+    assert errors[0]["message"] == "Test payment error"
+
+    check_payment_balance_mock.assert_called_once_with(
+        {
+            "gateway_id": "mirumee.payments.gateway",
+            "method": "givex",
+            "card": {
+                "cvc": "9891",
+                "code": "12345678910",
+                "money": {"currency": "GBP", "amount": 100.0},
+            },
+        },
+        "channel_default",
+    )
