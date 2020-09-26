@@ -321,3 +321,34 @@ COST_MAP = {
     },
     "TaxClassCountryRate": {
         "taxClass": {"complexity": 1},
+    },
+    "TaxCountryConfiguration": {
+        "taxClassCountryRates": {"complexity": 1},
+    },
+    "TaxConfiguration": {
+        "channel": {"complexity": 1},
+        "countries": {"complexity": 1},
+    },
+    "User": {
+        "avatar": {"complexity": 1},
+        "checkout": {"complexity": 1},
+        "editableGroups": {"complexity": 1},
+        "events": {"complexity": 1},
+        "giftCards": {"complexity": 1, "multipliers": ["first", "last"]},
+        "orders": {"complexity": 1, "multipliers": ["first", "last"]},
+        "permissionGroups": {"complexity": 1},
+        "storedPaymentSources": {"complexity": 1},
+        "userPermissions": {"complexity": 1},
+    },
+    "Voucher": {
+        "categories": {"complexity": 1, "multipliers": ["first", "last"]},
+        "channelListings": {"complexity": 1},
+        "collections": {"complexity": 1, "multipliers": ["first", "last"]},
+        "countries": {"complexity": 1},
+        "products": {"complexity": 1, "multipliers": ["first", "last"]},
+        "variants": {"complexity": 1, "multipliers": ["first", "last"]},
+    },
+    "VoucherChannelListing": {
+        "channel": {"complexity": 1},
+    },
+}
