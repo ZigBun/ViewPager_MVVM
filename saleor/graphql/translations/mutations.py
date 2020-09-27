@@ -300,4 +300,214 @@ class ProductVariantTranslate(BaseTranslateMutation):
         else:
             cls.call_event(manager.translation_updated, translation)
 
-        return cls(**{cls._meta.
+        return cls(**{cls._meta.return_field_name: variant})
+
+
+class AttributeTranslate(BaseTranslateMutation):
+    class Arguments:
+        id = graphene.ID(
+            required=True,
+            description="Attribute ID or AttributeTranslatableContent ID.",
+        )
+        language_code = graphene.Argument(
+            LanguageCodeEnum, required=True, description="Translation language code."
+        )
+        input = NameTranslationInput(required=True)
+
+    class Meta:
+        description = "Creates/updates translations for an attribute."
+        model = attribute_models.Attribute
+        object_type = Attribute
+        error_type_class = TranslationError
+        error_type_field = "translation_errors"
+        permissions = (SitePermissions.MANAGE_TRANSLATIONS,)
+
+
+class AttributeValueTranslate(BaseTranslateMutation):
+    class Arguments:
+        id = graphene.ID(
+            required=True,
+            description="AttributeValue ID or AttributeValueTranslatableContent ID.",
+        )
+        language_code = graphene.Argument(
+            LanguageCodeEnum, required=True, description="Translation language code."
+        )
+        input = AttributeValueTranslationInput(required=True)
+
+    class Meta:
+        description = "Creates/updates translations for an attribute value."
+        model = attribute_models.AttributeValue
+        object_type = AttributeValue
+        error_type_class = TranslationError
+        error_type_field = "translation_errors"
+        permissions = (SitePermissions.MANAGE_TRANSLATIONS,)
+
+    @classmethod
+    def pre_update_or_create(cls, instance, input_data):
+        if "name" not in input_data.keys() or input_data["name"] is None:
+            if instance.attribute.input_type == AttributeInputType.RICH_TEXT:
+                input_data["name"] = truncatechars(
+                    clean_editor_js(input_data["rich_text"], to_string=True), 100
+                )
+            elif instance.attribute.input_type == AttributeInputType.PLAIN_TEXT:
+                input_data["name"] = truncatechars(input_data["plain_text"], 100)
+        return input_data
+
+
+class SaleTranslate(BaseTranslateMutation):
+    class Arguments:
+        id = graphene.ID(
+            required=True, description="Sale ID or SaleTranslatableContent ID."
+        )
+        language_code = graphene.Argument(
+            LanguageCodeEnum, required=True, description="Translation language code."
+        )
+        input = NameTranslationInput(required=True)
+
+    class Meta:
+        description = "Creates/updates translations for a sale."
+        model = discount_models.Sale
+        object_type = Sale
+        error_type_class = TranslationError
+        error_type_field = "translation_errors"
+        permissions = (SitePermissions.MANAGE_TRANSLATIONS,)
+
+    @classmethod
+    def perform_mutation(  # type: ignore[override]
+        cls, root, info: ResolveInfo, /, *, id, input, language_code
+    ):
+        response = super().perform_mutation(
+            root, info, id=id, input=input, language_code=language_code
+        )
+        instance = ChannelContext(node=response.sale, channel_slug=None)
+        return cls(**{cls._meta.return_field_name: instance})
+
+
+class VoucherTranslate(BaseTranslateMutation):
+    class Arguments:
+        id = graphene.ID(
+            required=True, description="Voucher ID or VoucherTranslatableContent ID."
+        )
+        language_code = graphene.Argument(
+            LanguageCodeEnum, required=True, description="Translation language code."
+        )
+        input = NameTranslationInput(required=True)
+
+    class Meta:
+        description = "Creates/updates translations for a voucher."
+        model = discount_models.Voucher
+        object_type = Voucher
+        error_type_class = TranslationError
+        error_type_field = "translation_errors"
+        permissions = (SitePermissions.MANAGE_TRANSLATIONS,)
+
+    @classmethod
+    def perform_mutation(  # type: ignore[override]
+        cls, root, info: ResolveInfo, /, *, id, input, language_code
+    ):
+        response = super().perform_mutation(
+            root, info, id=id, input=input, language_code=language_code
+        )
+        instance = ChannelContext(node=response.voucher, channel_slug=None)
+        return cls(**{cls._meta.return_field_name: instance})
+
+
+class ShippingPriceTranslate(BaseTranslateMutation):
+    class Arguments:
+        id = graphene.ID(
+            required=True,
+            description=(
+                "ShippingMethodType ID or ShippingMethodTranslatableContent ID."
+            ),
+        )
+        language_code = graphene.Argument(
+            LanguageCodeEnum, required=True, description="Translation language code."
+        )
+        input = ShippingPriceTranslationInput(required=True)
+
+    class Meta:
+        description = "Creates/updates translations for a shipping method."
+        model = shipping_models.ShippingMethod
+        object_type = ShippingMethodType
+        error_type_class = TranslationError
+        error_type_field = "translation_errors"
+        permissions = (SitePermissions.MANAGE_TRANSLATIONS,)
+
+    @classmethod
+    def perform_mutation(  # type: ignore[override]
+        cls, root, info: ResolveInfo, /, *, id, input, language_code
+    ):
+        response = super().perform_mutation(
+            root, info, id=id, input=input, language_code=language_code
+        )
+        instance = ChannelContext(node=response.shippingMethod, channel_slug=None)
+        return cls(**{cls._meta.return_field_name: instance})
+
+    @classmethod
+    def get_node_or_error(  # type: ignore[override]
+        cls,
+        info: ResolveInfo,
+        node_id,
+        *,
+        field="id",
+        only_type=None,
+        code="not_found",
+    ):
+        if only_type is ShippingMethodType:
+            only_type = None
+        return super().get_node_or_error(
+            info,
+            node_id,
+            field=field,
+            only_type=only_type,
+            qs=shipping_models.ShippingMethod.objects,
+            code=code,
+        )
+
+
+class MenuItemTranslate(BaseTranslateMutation):
+    class Arguments:
+        id = graphene.ID(
+            required=True, description="MenuItem ID or MenuItemTranslatableContent ID."
+        )
+        language_code = graphene.Argument(
+            LanguageCodeEnum, required=True, description="Translation language code."
+        )
+        input = NameTranslationInput(required=True)
+
+    class Meta:
+        description = "Creates/updates translations for a menu item."
+        model = menu_models.MenuItem
+        object_type = MenuItem
+        error_type_class = TranslationError
+        error_type_field = "translation_errors"
+        permissions = (SitePermissions.MANAGE_TRANSLATIONS,)
+
+    @classmethod
+    def perform_mutation(  # type: ignore[override]
+        cls, root, info: ResolveInfo, /, *, id, input, language_code
+    ):
+        response = super().perform_mutation(
+            root, info, id=id, input=input, language_code=language_code
+        )
+        instance = ChannelContext(node=response.menuItem, channel_slug=None)
+        return cls(**{cls._meta.return_field_name: instance})
+
+
+class PageTranslationInput(SeoTranslationInput):
+    title = graphene.String()
+    content = JSONString(description="Translated page content." + RICH_CONTENT)
+
+
+class PageTranslate(BaseTranslateMutation):
+    class Arguments:
+        id = graphene.ID(
+            required=True, description="Page ID or PageTranslatableContent ID."
+        )
+        language_code = graphene.Argument(
+            LanguageCodeEnum, required=True, description="Translation language code."
+        )
+        input = PageTranslationInput(required=True)
+
+    class Meta:
+      
