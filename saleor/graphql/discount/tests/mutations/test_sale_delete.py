@@ -26,4 +26,19 @@ SALE_DELETE_MUTATION = """
 
 @patch("saleor.plugins.manager.PluginsManager.sale_deleted")
 def test_sale_delete_mutation(
-    delete
+    deleted_webhook_mock, staff_api_client, sale, permission_manage_discounts
+):
+    query = SALE_DELETE_MUTATION
+    variables = {"id": graphene.Node.to_global_id("Sale", sale.id)}
+    previous_catalogue = convert_catalogue_info_to_global_ids(
+        fetch_catalogue_info(sale)
+    )
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_discounts]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["saleDelete"]
+    assert data["sale"]["name"] == sale.name
+    deleted_webhook_mock.assert_called_once_with(sale, previous_catalogue)
+    with pytest.raises(sale._meta.model.DoesNotExist):
+        sale.refresh_from_db()
