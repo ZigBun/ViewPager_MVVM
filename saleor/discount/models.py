@@ -390,3 +390,17 @@ class OrderDiscount(models.Model):
         max_digits=settings.DEFAULT_MAX_DIGITS,
         decimal_places=settings.DEFAULT_DECIMAL_PLACES,
         default=Decimal("0.0"),
+    )
+    amount = MoneyField(amount_field="amount_value", currency_field="currency")
+    currency = models.CharField(
+        max_length=settings.DEFAULT_CURRENCY_CODE_LENGTH,
+    )
+
+    name = models.CharField(max_length=255, null=True, blank=True)
+    translated_name = models.CharField(max_length=255, null=True, blank=True)
+    reason = models.TextField(blank=True, null=True)
+
+    class Meta:
+        # Orders searching index
+        indexes = [GinIndex(fields=["name", "translated_name"])]
+        ordering = ("created_at", "id")
