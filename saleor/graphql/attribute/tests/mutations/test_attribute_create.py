@@ -1037,4 +1037,264 @@ def test_create_attribute_with_reference_input_type_invalid_one_settings_value(
     value,
     staff_api_client,
     permission_manage_product_types_and_attributes,
-    permission_mana
+    permission_manage_products,
+):
+    # given
+    query = CREATE_ATTRIBUTE_MUTATION
+
+    attribute_name = "Example name"
+    variables = {
+        "input": {
+            "name": attribute_name,
+            "type": AttributeTypeEnum.PRODUCT_TYPE.name,
+            "inputType": AttributeInputTypeEnum.REFERENCE.name,
+            "entityType": AttributeEntityTypeEnum.PAGE.name,
+            field: value,
+        }
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query,
+        variables,
+        permissions=[
+            permission_manage_product_types_and_attributes,
+            permission_manage_products,
+        ],
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["attributeCreate"]
+    errors = data["errors"]
+
+    assert not data["attribute"]
+    assert len(errors) == 1
+    assert errors[0]["field"] == field
+    assert errors[0]["code"] == AttributeErrorCode.INVALID.name
+
+
+@pytest.mark.parametrize(
+    "entity_type",
+    [AttributeEntityTypeEnum.PAGE.name, AttributeEntityTypeEnum.PRODUCT.name],
+)
+def test_create_attribute_with_reference_input_type_values_given(
+    entity_type,
+    staff_api_client,
+    permission_manage_product_types_and_attributes,
+    permission_manage_products,
+):
+    # given
+    query = CREATE_ATTRIBUTE_MUTATION
+
+    attribute_name = "Example name"
+    variables = {
+        "input": {
+            "name": attribute_name,
+            "type": AttributeTypeEnum.PRODUCT_TYPE.name,
+            "inputType": AttributeInputTypeEnum.REFERENCE.name,
+            "entityType": entity_type,
+            "values": [{"name": "test-value"}],
+        }
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query,
+        variables,
+        permissions=[
+            permission_manage_product_types_and_attributes,
+            permission_manage_products,
+        ],
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["attributeCreate"]
+    errors = data["errors"]
+
+    assert not data["attribute"]
+    assert len(errors) == 1
+    assert errors[0]["field"] == "values"
+    assert errors[0]["code"] == AttributeErrorCode.INVALID.name
+
+
+@pytest.mark.parametrize(
+    "input_slug, expected_slug",
+    (
+        ("my-slug", "my-slug"),
+        (None, "my-name"),
+        ("", "my-name"),
+        ("わたし-わ-にっぽん-です", "わたし-わ-にっぽん-です"),
+    ),
+)
+def test_create_attribute_with_given_slug(
+    staff_api_client,
+    permission_manage_product_types_and_attributes,
+    permission_manage_products,
+    input_slug,
+    expected_slug,
+):
+    # given
+    staff_api_client.user.user_permissions.add(
+        permission_manage_product_types_and_attributes
+    )
+    query = """
+        mutation createAttribute(
+            $name: String!, $slug: String, $type: AttributeTypeEnum!) {
+        attributeCreate(input: {name: $name, slug: $slug, type: $type}) {
+            errors {
+                field
+                message
+                code
+            }
+            attribute {
+                slug
+            }
+        }
+    }
+    """
+
+    attribute_name = "My Name"
+    variables = {
+        "name": attribute_name,
+        "slug": input_slug,
+        "type": AttributeTypeEnum.PRODUCT_TYPE.name,
+    }
+
+    # when
+    content = get_graphql_content(staff_api_client.post_graphql(query, variables))
+
+    # then
+    assert not content["data"]["attributeCreate"]["errors"]
+    assert content["data"]["attributeCreate"]["attribute"]["slug"] == expected_slug
+
+
+def test_create_attribute_value_name_and_slug_with_unicode(
+    staff_api_client,
+    permission_manage_product_types_and_attributes,
+    permission_manage_products,
+):
+    # given
+    query = CREATE_ATTRIBUTE_MUTATION
+    name = "わたし わ にっぽん です"
+    slug = "わたし-わ-にっぽん-で"
+    variables = {
+        "input": {
+            "name": name,
+            "slug": slug,
+            "type": AttributeTypeEnum.PRODUCT_TYPE.name,
+        }
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query,
+        variables,
+        permissions=[
+            permission_manage_product_types_and_attributes,
+            permission_manage_products,
+        ],
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["attributeCreate"]
+    assert not data["errors"]
+    assert data["attribute"]["name"] == name
+    assert data["attribute"]["slug"] == slug
+
+
+@pytest.mark.parametrize(
+    "name_1, name_2, error_msg, error_code",
+    (
+        (
+            "Red color",
+            "Red color",
+            "Provided values are not unique.",
+            AttributeErrorCode.UNIQUE,
+        ),
+        (
+            "Red color",
+            "red color",
+            "Provided values are not unique.",
+            AttributeErrorCode.UNIQUE,
+        ),
+    ),
+)
+def test_create_attribute_and_attribute_values_errors(
+    staff_api_client,
+    name_1,
+    name_2,
+    error_msg,
+    error_code,
+    permission_manage_product_types_and_attributes,
+    permission_manage_products,
+    product_type,
+):
+    # given
+    query = CREATE_ATTRIBUTE_MUTATION
+    variables = {
+        "input": {
+            "name": "Example name",
+            "type": AttributeTypeEnum.PRODUCT_TYPE.name,
+            "values": [{"name": name_1}, {"name": name_2}],
+        }
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query,
+        variables,
+        permissions=[
+            permission_manage_product_types_and_attributes,
+            permission_manage_products,
+        ],
+    )
+
+    # then
+    content = get_graphql_content(response)
+    errors = content["data"]["attributeCreate"]["errors"]
+    assert errors
+    assert errors[0]["field"] == "values"
+    assert errors[0]["message"] == error_msg
+    assert errors[0]["code"] == error_code.name
+
+
+def test_create_attribute_with_non_unique_external_reference(
+    staff_api_client,
+    permission_manage_product_types_and_attributes,
+    permission_manage_products,
+    color_attribute,
+):
+    # given
+    query = CREATE_ATTRIBUTE_MUTATION
+
+    ext_ref = "test-ext-ref"
+    color_attribute.external_reference = ext_ref
+    color_attribute.save(update_fields=["external_reference"])
+
+    variables = {
+        "input": {
+            "name": "some test name",
+            "type": AttributeTypeEnum.PRODUCT_TYPE.name,
+            "externalReference": ext_ref,
+        }
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query,
+        variables,
+        permissions=[
+            permission_manage_product_types_and_attributes,
+            permission_manage_products,
+        ],
+    )
+    content = get_graphql_content(response)
+
+    # then
+    error = content["data"]["attributeCreate"]["errors"][0]
+    assert error["field"] == "externalReference"
+    assert error["code"] == AttributeErrorCode.UNIQUE.name
+    assert error["message"] == "Attribute with this External reference already exists."
