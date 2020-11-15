@@ -176,4 +176,233 @@ def test_order_query_pagination_with_filter_created(
     total_count = content["data"]["orders"]["totalCount"]
 
     for i in range(total_count if total_count < page_size else page_size):
-    
+        assert orders[i]["node"]["total"]["gross"]["amount"] == orders_order[i]
+
+    assert expected_total_count == total_count
+
+
+@pytest.mark.parametrize(
+    "orders_filter, expected_total_count, payment_status, orders_order",
+    [
+        ({"paymentStatus": "FULLY_CHARGED"}, 1, ChargeStatus.FULLY_CHARGED, [98.4]),
+        ({"paymentStatus": "NOT_CHARGED"}, 4, ChargeStatus.NOT_CHARGED, [3.0, 2.0]),
+        (
+            {"paymentStatus": "PARTIALLY_CHARGED"},
+            1,
+            ChargeStatus.PARTIALLY_CHARGED,
+            [98.4],
+        ),
+        (
+            {"paymentStatus": "PARTIALLY_REFUNDED"},
+            1,
+            ChargeStatus.PARTIALLY_REFUNDED,
+            [98.4],
+        ),
+        ({"paymentStatus": "FULLY_REFUNDED"}, 1, ChargeStatus.FULLY_REFUNDED, [98.4]),
+        ({"paymentStatus": "FULLY_CHARGED"}, 0, ChargeStatus.FULLY_REFUNDED, []),
+        ({"paymentStatus": "NOT_CHARGED"}, 3, ChargeStatus.FULLY_REFUNDED, [3.0, 2.0]),
+    ],
+)
+def test_order_query_pagination_with_filter_payment_status(
+    orders_filter,
+    expected_total_count,
+    payment_status,
+    orders_order,
+    staff_api_client,
+    payment_dummy,
+    permission_manage_orders,
+    orders_for_pagination,
+):
+    payment_dummy.charge_status = payment_status
+    payment_dummy.save()
+
+    for order in orders_for_pagination:
+        payment_dummy.id = None
+        payment_dummy.order = order
+        payment_dummy.charge_status = ChargeStatus.NOT_CHARGED
+        payment_dummy.save()
+
+    page_size = 2
+    variables = {"first": page_size, "after": None, "filter": orders_filter}
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(QUERY_ORDERS_WITH_PAGINATION, variables)
+    content = get_graphql_content(response)
+
+    orders = content["data"]["orders"]["edges"]
+    total_count = content["data"]["orders"]["totalCount"]
+    assert total_count == expected_total_count
+
+    for i in range(total_count if total_count < page_size else page_size):
+        assert orders[i]["node"]["total"]["gross"]["amount"] == orders_order[i]
+
+
+@pytest.mark.parametrize(
+    "orders_filter, expected_total_count, status, orders_order",
+    [
+        ({"status": "UNFULFILLED"}, 4, OrderStatus.UNFULFILLED, [3.0, 2.0]),
+        ({"status": "PARTIALLY_FULFILLED"}, 1, OrderStatus.PARTIALLY_FULFILLED, [0.0]),
+        ({"status": "FULFILLED"}, 1, OrderStatus.FULFILLED, [0.0]),
+        ({"status": "CANCELED"}, 1, OrderStatus.CANCELED, [0.0]),
+    ],
+)
+def test_order_query_pagination_with_filter_status(
+    orders_filter,
+    expected_total_count,
+    status,
+    orders_order,
+    staff_api_client,
+    permission_manage_orders,
+    order,
+    orders_for_pagination,
+):
+    order.status = status
+    order.save()
+
+    page_size = 2
+    variables = {"first": page_size, "after": None, "filter": orders_filter}
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(QUERY_ORDERS_WITH_PAGINATION, variables)
+    content = get_graphql_content(response)
+
+    orders = content["data"]["orders"]["edges"]
+    total_count = content["data"]["orders"]["totalCount"]
+    assert total_count == expected_total_count
+
+    for i in range(total_count if total_count < page_size else page_size):
+        assert orders[i]["node"]["total"]["gross"]["amount"] == orders_order[i]
+
+
+@pytest.mark.parametrize(
+    "orders_filter, user_field, user_value",
+    [
+        ({"customer": "admin"}, "email", "admin@example.com"),
+        ({"customer": "John"}, "first_name", "johnny"),
+        ({"customer": "Snow"}, "last_name", "snow"),
+    ],
+)
+def test_order_query_pagination_with_filter_customer_fields(
+    orders_filter,
+    user_field,
+    user_value,
+    staff_api_client,
+    permission_manage_orders,
+    customer_user,
+    orders_for_pagination,
+    channel_USD,
+):
+    setattr(customer_user, user_field, user_value)
+    customer_user.save()
+    customer_user.refresh_from_db()
+
+    order = Order.objects.create(user=customer_user, channel=channel_USD)
+
+    page_size = 2
+    variables = {"first": page_size, "after": None, "filter": orders_filter}
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(QUERY_ORDERS_WITH_PAGINATION, variables)
+    content = get_graphql_content(response)
+    orders = content["data"]["orders"]["edges"]
+    order_id = graphene.Node.to_global_id("Order", order.pk)
+
+    assert len(orders) == 1
+    assert orders[0]["node"]["id"] == order_id
+
+
+@pytest.mark.parametrize(
+    "orders_filter, user_field, user_value",
+    [
+        ({"customer": "admin"}, "email", "admin@example.com"),
+        ({"customer": "John"}, "first_name", "johnny"),
+        ({"customer": "Snow"}, "last_name", "snow"),
+    ],
+)
+def test_draft_order_query_pagination_with_filter_customer_fields(
+    orders_filter,
+    user_field,
+    user_value,
+    staff_api_client,
+    permission_manage_orders,
+    customer_user,
+    draft_orders_for_pagination,
+    channel_USD,
+):
+    setattr(customer_user, user_field, user_value)
+    customer_user.save()
+    customer_user.refresh_from_db()
+
+    order = Order.objects.create(
+        status=OrderStatus.DRAFT,
+        user=customer_user,
+        channel=channel_USD,
+    )
+
+    page_size = 2
+    variables = {"first": page_size, "after": None, "filter": orders_filter}
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(
+        QUERY_DRAFT_ORDERS_WITH_PAGINATION, variables
+    )
+    content = get_graphql_content(response)
+    orders = content["data"]["draftOrders"]["edges"]
+    order_id = graphene.Node.to_global_id("Order", order.pk)
+
+    assert len(orders) == 1
+    assert orders[0]["node"]["id"] == order_id
+
+
+@pytest.mark.parametrize(
+    "orders_filter, expected_total_count, orders_order",
+    [
+        (
+            {
+                "created": {
+                    "gte": str(date.today() - timedelta(days=3)),
+                    "lte": str(date.today()),
+                }
+            },
+            3,
+            [3.0, 2.0],
+        ),
+        ({"created": {"gte": str(date.today() - timedelta(days=3))}}, 3, [3.0, 2.0]),
+        ({"created": {"lte": str(date.today())}}, 4, [0.0, 3.0]),
+        ({"created": {"lte": str(date.today() - timedelta(days=3))}}, 1, [0.0]),
+        ({"created": {"gte": str(date.today() + timedelta(days=1))}}, 0, []),
+    ],
+)
+def test_draft_order_query_pagination_with_filter_created(
+    orders_filter,
+    expected_total_count,
+    orders_order,
+    staff_api_client,
+    permission_manage_orders,
+    draft_orders_for_pagination,
+    channel_USD,
+):
+    with freeze_time("2012-01-14"):
+        Order.objects.create(
+            status=OrderStatus.DRAFT,
+            channel=channel_USD,
+            should_refresh_prices=False,
+        )
+    page_size = 2
+    variables = {"first": page_size, "after": None, "filter": orders_filter}
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(
+        QUERY_DRAFT_ORDERS_WITH_PAGINATION, variables
+    )
+    content = get_graphql_content(response)
+
+    orders = content["data"]["draftOrders"]["edges"]
+    total_count = content["data"]["draftOrders"]["totalCount"]
+
+    for i in range(total_count if total_count < page_size else page_size):
+        assert orders[i]["node"]["total"]["gross"]["amount"] == orders_order[i]
+
+    assert expected_total_count == total_count
+
+
+@pytest.mark.parametrize(
+    "orders_filter, expected_total_count",
+    [
+        ({"search": "discount name"}, 2),
+        ({"search": "Some
