@@ -1,0 +1,3 @@
+interactions:
+- request:
+    body: <?xml version="1.0" encoding="utf-8"?><createTransactionRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd"><merchantAuthentication><name>public</name><transactionKey>secret</transactionKey></merchantAuthentication><clientId>sdk-python-1.1.3</clientId><refId>40</refId><transactionRequest><transactionType>authCaptureTransaction</transactionType><amount>10.0</amount><payment><opaqueData><dataDescriptor>COMMON.ACCEPT.INAPP.PAYMENT</dataDescriptor><dataValue>Y29kZTo1MF8yXzA2MDAwIHRva2VuOjEgdjox

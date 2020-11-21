@@ -636,4 +636,36 @@ def test_query_orders_pagination_with_sort(
         address2.save()
         created_orders.append(
             Order.objects.create(
-                billing_address=addre
+                billing_address=address2,
+                status=OrderStatus.FULFILLED,
+                total=TaxedMoney(net=Money(100, "USD"), gross=Money(130, "USD")),
+                channel=channel_USD,
+            )
+        )
+    address3 = address.get_copy()
+    address3.last_name = "Alice"
+    address3.save()
+    created_orders.append(
+        Order.objects.create(
+            billing_address=address3,
+            status=OrderStatus.CANCELED,
+            total=TaxedMoney(net=Money(20, "USD"), gross=Money(26, "USD")),
+            channel=channel_USD,
+        )
+    )
+
+    created_orders[2].save()
+    created_orders[0].save()
+    created_orders[1].save()
+
+    page_size = 2
+    variables = {"first": page_size, "after": None, "sortBy": order_sort}
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(QUERY_ORDERS_WITH_PAGINATION, variables)
+    content = get_graphql_content(response)
+    orders = content["data"]["orders"]["edges"]
+
+    for order, order_number in enumerate(result_order):
+        assert orders[order]["node"]["number"] == str(
+            created_orders[order_number].number
+        )
