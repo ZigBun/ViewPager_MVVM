@@ -405,4 +405,235 @@ def test_draft_order_query_pagination_with_filter_created(
     "orders_filter, expected_total_count",
     [
         ({"search": "discount name"}, 2),
-        ({"search": "Some
+        ({"search": "Some other"}, 1),
+        ({"search": "test@mirumee.com"}, 1),
+        ({"search": "Leslie"}, 1),
+        ({"search": "Wade"}, 1),
+        ({"search": ""}, 6),
+    ],
+)
+def test_orders_query_pagination_with_filter_search(
+    orders_filter,
+    expected_total_count,
+    staff_api_client,
+    permission_manage_orders,
+    customer_user,
+    orders_for_pagination,
+    channel_USD,
+):
+    orders = Order.objects.bulk_create(
+        [
+            Order(
+                user=customer_user,
+                user_email="test@mirumee.com",
+                channel=channel_USD,
+            ),
+            Order(
+                user_email="user_email1@example.com",
+                channel=channel_USD,
+            ),
+            Order(
+                user_email="user_email2@example.com",
+                channel=channel_USD,
+            ),
+        ]
+    )
+    OrderDiscount.objects.bulk_create(
+        [
+            OrderDiscount(
+                order=orders[0],
+                name="Some discount name",
+                value=Decimal("1"),
+                amount_value=Decimal("1"),
+                translated_name="translated",
+            ),
+            OrderDiscount(
+                order=orders[2],
+                name="Some other discount name",
+                value=Decimal("10"),
+                amount_value=Decimal("10"),
+                translated_name="PL_name",
+            ),
+        ]
+    )
+
+    for order in orders:
+        order.search_vector = FlatConcatSearchVector(
+            *prepare_order_search_vector_value(order)
+        )
+    Order.objects.bulk_update(orders, ["search_vector"])
+
+    after = None
+    orders_seen = 0
+    while True:
+        variables = {"first": 1, "after": after, "filter": orders_filter}
+        staff_api_client.user.user_permissions.add(permission_manage_orders)
+        response = staff_api_client.post_graphql(
+            QUERY_ORDERS_WITH_PAGINATION, variables
+        )
+        content = get_graphql_content(response)
+        orders_seen += len(content["data"]["orders"]["edges"])
+        total_count = content["data"]["orders"]["totalCount"]
+        if not content["data"]["orders"]["pageInfo"]["hasNextPage"]:
+            break
+        after = content["data"]["orders"]["pageInfo"]["endCursor"]
+
+    assert orders_seen == total_count
+    assert total_count == expected_total_count
+
+
+@pytest.mark.parametrize(
+    "draft_orders_filter, expected_total_count",
+    [
+        ({"search": "discount name"}, 2),
+        ({"search": "Some other"}, 1),
+        ({"search": "test@mirumee.com"}, 1),
+        ({"search": "Leslie"}, 1),
+        ({"search": "Wade"}, 1),
+        ({"search": ""}, 6),
+    ],
+)
+def test_draft_orders_query_pagination_with_filter_search(
+    draft_orders_filter,
+    expected_total_count,
+    staff_api_client,
+    permission_manage_orders,
+    customer_user,
+    draft_orders_for_pagination,
+    channel_USD,
+):
+    orders = Order.objects.bulk_create(
+        [
+            Order(
+                user=customer_user,
+                user_email="test@mirumee.com",
+                status=OrderStatus.DRAFT,
+                channel=channel_USD,
+                should_refresh_prices=False,
+            ),
+            Order(
+                user_email="user_email1@example.com",
+                status=OrderStatus.DRAFT,
+                channel=channel_USD,
+                should_refresh_prices=False,
+            ),
+            Order(
+                user_email="user_email2@example.com",
+                status=OrderStatus.DRAFT,
+                channel=channel_USD,
+                should_refresh_prices=False,
+            ),
+        ]
+    )
+    OrderDiscount.objects.bulk_create(
+        [
+            OrderDiscount(
+                order=orders[0],
+                name="Some discount name",
+                value=Decimal("1"),
+                amount_value=Decimal("1"),
+                translated_name="translated",
+            ),
+            OrderDiscount(
+                order=orders[2],
+                name="Some other discount name",
+                value=Decimal("10"),
+                amount_value=Decimal("10"),
+                translated_name="PL_name",
+            ),
+        ]
+    )
+
+    for order in orders:
+        order.search_vector = FlatConcatSearchVector(
+            *prepare_order_search_vector_value(order)
+        )
+    Order.objects.bulk_update(orders, ["search_vector"])
+
+    page_size = 2
+    variables = {"first": page_size, "after": None, "filter": draft_orders_filter}
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(
+        QUERY_DRAFT_ORDERS_WITH_PAGINATION, variables
+    )
+    content = get_graphql_content(response)
+    orders = content["data"]["draftOrders"]["edges"]
+    total_count = content["data"]["draftOrders"]["totalCount"]
+
+    assert expected_total_count == total_count
+
+
+def test_orders_query_pagination_with_filter_search_by_number(
+    order_with_search_vector_value, staff_api_client, permission_manage_orders
+):
+    order = order_with_search_vector_value
+    page_size = 2
+    variables = {"first": page_size, "after": None, "filter": {"search": order.number}}
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(QUERY_ORDERS_WITH_PAGINATION, variables)
+    content = get_graphql_content(response)
+    assert content["data"]["orders"]["totalCount"] == 1
+
+
+def test_draft_orders_query_pagination_with_filter_search_by_number(
+    draft_order,
+    staff_api_client,
+    permission_manage_orders,
+):
+    update_order_search_vector(draft_order)
+    page_size = 2
+    variables = {
+        "first": page_size,
+        "after": None,
+        "filter": {"search": draft_order.number},
+    }
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(
+        QUERY_DRAFT_ORDERS_WITH_PAGINATION, variables
+    )
+    content = get_graphql_content(response)
+    assert content["data"]["draftOrders"]["totalCount"] == 1
+
+
+@pytest.mark.parametrize(
+    "order_sort, result_order",
+    [
+        ({"field": "NUMBER", "direction": "ASC"}, [0, 1]),
+        ({"field": "NUMBER", "direction": "DESC"}, [2, 1]),
+        ({"field": "CREATION_DATE", "direction": "ASC"}, [1, 0]),
+        ({"field": "CREATION_DATE", "direction": "DESC"}, [2, 0]),
+        ({"field": "CUSTOMER", "direction": "ASC"}, [2, 0]),
+        ({"field": "CUSTOMER", "direction": "DESC"}, [1, 0]),
+        ({"field": "FULFILLMENT_STATUS", "direction": "ASC"}, [2, 1]),
+        ({"field": "FULFILLMENT_STATUS", "direction": "DESC"}, [0, 1]),
+        ({"field": "CREATED_AT", "direction": "ASC"}, [1, 0]),
+        ({"field": "CREATED_AT", "direction": "DESC"}, [2, 0]),
+        ({"field": "LAST_MODIFIED_AT", "direction": "ASC"}, [2, 0]),
+        ({"field": "LAST_MODIFIED_AT", "direction": "DESC"}, [1, 0]),
+    ],
+)
+def test_query_orders_pagination_with_sort(
+    order_sort,
+    result_order,
+    staff_api_client,
+    permission_manage_orders,
+    address,
+    channel_USD,
+):
+    created_orders = []
+    with freeze_time("2017-01-14"):
+        created_orders.append(
+            Order.objects.create(
+                billing_address=address,
+                status=OrderStatus.PARTIALLY_FULFILLED,
+                total=TaxedMoney(net=Money(10, "USD"), gross=Money(13, "USD")),
+                channel=channel_USD,
+            )
+        )
+    with freeze_time("2012-01-14"):
+        address2 = address.get_copy()
+        address2.first_name = "Walter"
+        address2.save()
+        created_orders.append(
+            Order.objects.create(
+                billing_address=addre
