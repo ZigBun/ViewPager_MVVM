@@ -126,4 +126,43 @@ def test_payment_capture_gateway_error(
     "DummyCreditCardGatewayPlugin.DEFAULT_ACTIVE",
     True,
 )
-def test_payment_capture_gatew
+def test_payment_capture_gateway_dummy_credit_card_error(
+    staff_api_client, permission_manage_orders, payment_txn_preauth, monkeypatch
+):
+    # given
+    token = TOKEN_EXPIRED
+    error = TOKEN_VALIDATION_MAPPING[token]
+
+    payment = payment_txn_preauth
+    payment.gateway = "mirumee.payments.dummy_credit_card"
+    payment.save()
+
+    transaction = payment.transactions.last()
+    transaction.token = token
+    transaction.save()
+
+    assert payment.charge_status == ChargeStatus.NOT_CHARGED
+    payment_id = graphene.Node.to_global_id("Payment", payment.pk)
+    variables = {"paymentId": payment_id, "amount": str(payment_txn_preauth.total)}
+    monkeypatch.setattr(
+        "saleor.payment.gateways.dummy_credit_card.dummy_success", lambda: False
+    )
+
+    # when
+    response = staff_api_client.post_graphql(
+        CAPTURE_QUERY, variables, permissions=[permission_manage_orders]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["paymentCapture"]
+    assert data["errors"] == [
+        {"field": None, "message": error, "code": "PAYMENT_ERROR"}
+    ]
+
+    payment_txn_preauth.refresh_from_db()
+    assert payment.charge_status == ChargeStatus.NOT_CHARGED
+    assert payment.transactions.count() == 2
+    txn = payment.transactions.last()
+    assert txn.kind == TransactionKind.CAPTURE
+    assert not txn.is_success
