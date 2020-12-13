@@ -9,4 +9,15 @@ class Migration(migrations.Migration):
         ("giftcard", "0016_alter_giftcard_created_at"),
     ]
 
-    oper
+    operations = [
+        migrations.AlterField(
+            model_name="giftcard",
+            name="code",
+            field=models.CharField(
+                db_index=True,
+                max_length=16,
+                unique=True,
+                validators=[django.core.validators.MinLengthValidator(8)],
+            ),
+        ),
+    ]
