@@ -135,4 +135,42 @@ class AppToken(models.Model):
     objects = AppTokenManager()
 
     def set_auth_token(self, raw_token=None):
-        s
+        self.auth_token = make_password(raw_token)
+        self.token_last_4 = raw_token[-4:]
+
+
+class AppExtension(models.Model):
+    app = models.ForeignKey(App, on_delete=models.CASCADE, related_name="extensions")
+    label = models.CharField(max_length=256)
+    url = models.URLField()
+    mount = models.CharField(choices=AppExtensionMount.CHOICES, max_length=256)
+    target = models.CharField(
+        choices=AppExtensionTarget.CHOICES,
+        max_length=128,
+        default=AppExtensionTarget.POPUP,
+    )
+    permissions = models.ManyToManyField(
+        Permission,
+        blank=True,
+        help_text="Specific permissions for this app extension.",
+    )
+
+
+class AppInstallation(Job):
+    app_name = models.CharField(max_length=60)
+    manifest_url = models.URLField()
+    permissions = models.ManyToManyField(
+        Permission,
+        blank=True,
+        help_text="Specific permissions which will be assigned to app.",
+        related_name="app_installation_set",
+        related_query_name="app_installation",
+    )
+
+    def set_message(self, message: str, truncate=True):
+        if truncate:
+            max_length = self._meta.get_field("message").max_length
+            if max_length is None:
+                raise ValueError("Cannot truncate message without max_length")
+            message = Truncator(message).chars(max_length)
+        self.message = message
