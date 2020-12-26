@@ -1,0 +1,47 @@
+interactions:
+- request:
+    body: payment_method=pm_card_pl&amount=4242&currency=usd&confirmation_method=manual&confirm=True&capture_method=manual
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '112'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      Idempotency-Key:
+      - 9776ddc6-aff7-4265-aa0b-d1836d01f8d1
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.33.0
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_KxLRnayybvlIeS", "request_duration_ms":
+        627}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.33.0", "lang": "python", "publisher": "stripe", "httplib":
+        "requests", "lang_version": "3.7.4", "platform": "Darwin-18.7.0-x86_64-i386-64bit",
+        "uname": "Darwin mbp-jakub.lan 18.7.0 Darwin Kernel Version 18.7.0: Thu Jun
+        20 18:42:21 PDT 2019; root:xnu-4903.270.47~4/RELEASE_X86_64 x86_64 i386"}'
+    method: POST
+    uri: https://api.stripe.com/v1/payment_intents
+  response:
+    body:
+      string: "{\n  \"id\": \"pi_1F5BsRIUmJaD6Oqvz2XMKZCD\",\n  \"object\": \"payment_intent\"\
+        ,\n  \"amount\": 4242,\n  \"amount_capturable\": 4242,\n  \"amount_received\"\
+        : 0,\n  \"application\": null,\n  \"application_fee_amount\": null,\n  \"\
+        canceled_at\": null,\n  \"cancellation_reason\": null,\n  \"capture_method\"\
+        : \"manual\",\n  \"charges\": {\n    \"object\": \"list\",\n    \"data\":\
+        \ [\n      {\n        \"id\": \"ch_1F5BsRIUmJaD6Oqvl2WF1xdU\",\n        \"\
+        object\": \"charge\",\n        \"amount\": 4242,\n        \"amount_refunded\"\
+        : 0,\n        \"application\": null,\n        \"application_fee\": null,\n\
+        \        \"application_fee_amount\": null,\n        \"balance_transaction\"\
+        : null,\n        \"billing_details\": {\n          \"address\": {\n      \
+        \      \"city\": null,\n            \"country\": null,\n            \"line1\"\
+        : null,\n            \"line2\": null,\n            \"postal_code\": null,\n\
+        \            \"state\": null\n          },\n          \"email\": null,\n \
+        \         \"name\": null,\n          \"phone\": null\n        },\n       \
+        \ \"captured\": false,\n        \"created\": 1565271719,\n        \"currency\"\
+        : \"usd\",\n        \"customer\": null,\n        \"description\": null,\n\
+        \        \"destination\": null,\n        \"dispute\": null,\n        \"failu

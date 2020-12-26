@@ -180,4 +180,40 @@ def test_user_doesnt_have_permissions_from_token(prefix, staff_user, app, rf):
         ([], ["manage_checkouts"], []),
         ([], [], []),
         (["manage_apps"], ["manage_checkouts"], []),
-        (["manage_checkouts"], [
+        (["manage_checkouts"], [], []),
+        (
+            ["manage_orders", "manage_checkouts", "manage_apps"],
+            ["manage_checkouts", "manage_apps"],
+            ["MANAGE_CHECKOUTS", "MANAGE_APPS"],
+        ),
+    ],
+)
+def test_user_with_limited_permissions(
+    user_permissions, app_permissions, expected_limited_permissions, rf, staff_user, app
+):
+    staff_user.user_permissions.set(
+        Permission.objects.filter(codename__in=user_permissions)
+    )
+    app.permissions.set(Permission.objects.filter(codename__in=app_permissions))
+    access_token_for_app = create_access_token_for_app(app, staff_user)
+    request = rf.request(HTTP_AUTHORIZATION=f"JWT {access_token_for_app}")
+    backend = JSONWebTokenBackend()
+    user = backend.authenticate(request)
+    assert user == staff_user
+    user_permissions = user.effective_permissions
+    limited_permissions = get_permissions_from_names(expected_limited_permissions)
+    assert set(user_permissions) == set(limited_permissions)
+
+
+@pytest.mark.parametrize("prefix", ["JWT", "Bearer"])
+def test_user_payload_doesnt_have_user_token(prefix, rf, staff_user, settings):
+    access_payload = jwt_user_payload(
+        staff_user, JWT_ACCESS_TYPE, settings.JWT_TTL_ACCESS
+    )
+    del access_payload["token"]
+    access_token = jwt_encode(access_payload)
+
+    request = rf.request(HTTP_AUTHORIZATION=f"{prefix} {access_token}")
+    backend = JSONWebTokenBackend()
+    with pytest.raises(InvalidTokenError):
+        backend.authenticate(request)
