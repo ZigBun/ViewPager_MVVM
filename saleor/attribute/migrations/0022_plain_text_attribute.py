@@ -28,4 +28,16 @@ class Migration(migrations.Migration):
                     ("multiselect", "Multi Select"),
                     ("file", "File"),
                     ("reference", "Reference"),
-                    ("n
+                    ("numeric", "Numeric"),
+                    ("rich-text", "Rich Text"),
+                    ("plain-text", "Plain Text"),
+                    ("swatch", "Swatch"),
+                    ("boolean", "Boolean"),
+                    ("date", "Date"),
+                    ("date-time", "Date Time"),
+                ],
+                default="dropdown",
+                max_length=50,
+            ),
+        ),
+    ]
