@@ -28,4 +28,48 @@ class GiftCardEventsByGiftCardIdLoader(DataLoader):
         events_map = defaultdict(list)
         for event in events.iterator():
             events_map[event.gift_card_id].append(event)
-        return [events_ma
+        return [events_map.get(gift_card_id, []) for gift_card_id in keys]
+
+
+class GiftCardTagsByGiftCardIdLoader(DataLoader):
+    context_key = "giftcardtags_by_giftcard"
+
+    def batch_load(self, keys):
+        # there is no typing information available for through models
+        # so we resolve to getattr, which is safer than ignoring everything
+        gift_card_gift_card_tags = GiftCard.tags.through.objects.using(
+            self.database_connection_name
+        ).filter(giftcard_id__in=keys)
+        tags_ids = [
+            getattr(gift_card_tag, "giftcardtag_id")
+            for gift_card_tag in gift_card_gift_card_tags
+        ]
+        tags = GiftCardTag.objects.using(self.database_connection_name).in_bulk(
+            tags_ids
+        )
+        tags_map = defaultdict(list)
+        for gift_card_tag in gift_card_gift_card_tags:
+            tags_map[getattr(gift_card_tag, "giftcard_id")].append(
+                tags[getattr(gift_card_tag, "giftcardtag_id")]
+            )
+        return [tags_map.get(gift_card_id, []) for gift_card_id in keys]
+
+
+class GiftCardsByOrderIdLoader(DataLoader):
+    context_key = "gift_cards_by_order_id"
+
+    def batch_load(self, keys):
+        # there is no typing information available for through models
+        # so we resolve to getattr, which is safer than ignoring everything
+        gift_card_orders = Order.gift_cards.through.objects.using(
+            self.database_connection_name
+        ).filter(order_id__in=keys)
+        gift_cards = GiftCard.objects.using(self.database_connection_name).in_bulk(
+            [getattr(order, "giftcard_id") for order in gift_card_orders]
+        )
+        cards_map = defaultdict(list)
+        for gift_card_order in gift_card_orders:
+            cards_map[getattr(gift_card_order, "order_id")].append(
+                gift_cards[getattr(gift_card_order, "giftcard_id")]
+            )
+        return [cards_map.get(order_id, []) for order_id in keys]
