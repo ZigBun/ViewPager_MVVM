@@ -45,4 +45,25 @@ class ProductVariantPreorderDeactivate(BaseMutation):
         variant = cls.get_node_or_error(
             info, id, field="id", only_type=ProductVariant, qs=qs
         )
-        if not variant.is_p
+        if not variant.is_preorder:
+            raise ValidationError(
+                {
+                    "id": ValidationError(
+                        "This variant is not in preorder.",
+                        code=ProductErrorCode.INVALID.value,
+                    )
+                }
+            )
+        # transaction ensures triggering event on commit
+        with traced_atomic_transaction():
+            try:
+                deactivate_preorder_for_variant(variant)
+            except PreorderAllocationError as error:
+                raise ValidationError(
+                    str(error),
+                    code=ProductErrorCode.PREORDER_VARIANT_CANNOT_BE_DEACTIVATED.value,
+                )
+            manager = get_plugin_manager_promise(info.context).get()
+            variant = ChannelContext(node=variant, channel_slug=None)
+            cls.call_event(manager.product_variant_updated, variant.node)
+        return ProductVariantPreorderDeactivate(product_variant=variant)
