@@ -21,4 +21,7 @@ class Migration(migrations.Migration):
                     ("fully-refunded", "Fully refunded"),
                 ],
                 default="not-charged",
-              
+                max_length=20,
+            ),
+        )
+    ]
