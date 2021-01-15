@@ -476,4 +476,219 @@ class PluginsManager(PaymentInterface):
         self,
         order: "Order",
         order_line: "OrderLine",
-        variant: "Pro
+        variant: "ProductVariant",
+        product: "Product",
+    ) -> OrderTaxedPricesData:
+        default_value = OrderTaxedPricesData(
+            undiscounted_price=TaxedMoney(
+                order_line.undiscounted_base_unit_price,
+                order_line.undiscounted_base_unit_price,
+            ),
+            price_with_discounts=TaxedMoney(
+                order_line.base_unit_price,
+                order_line.base_unit_price,
+            ),
+        )
+        currency = order_line.currency
+        line_unit = self.__run_method_on_plugins(
+            "calculate_order_line_unit",
+            default_value,
+            order,
+            order_line,
+            variant,
+            product,
+            channel_slug=order.channel.slug,
+        )
+        line_unit.price_with_discounts = quantize_price(
+            line_unit.price_with_discounts, currency
+        )
+        line_unit.undiscounted_price = quantize_price(
+            line_unit.undiscounted_price, currency
+        )
+        return line_unit
+
+    def get_checkout_line_tax_rate(
+        self,
+        checkout_info: "CheckoutInfo",
+        lines: Iterable["CheckoutLineInfo"],
+        checkout_line_info: "CheckoutLineInfo",
+        address: Optional["Address"],
+        discounts: Iterable[DiscountInfo],
+        unit_price: TaxedMoney,
+    ) -> Decimal:
+        default_value = calculate_tax_rate(unit_price)
+        return self.__run_method_on_plugins(
+            "get_checkout_line_tax_rate",
+            default_value,
+            checkout_info,
+            lines,
+            checkout_line_info,
+            address,
+            discounts,
+            channel_slug=checkout_info.channel.slug,
+        ).quantize(Decimal(".0001"))
+
+    def get_order_line_tax_rate(
+        self,
+        order: "Order",
+        product: "Product",
+        variant: "ProductVariant",
+        address: Optional["Address"],
+        unit_price: TaxedMoney,
+    ) -> Decimal:
+        default_value = calculate_tax_rate(unit_price)
+        return self.__run_method_on_plugins(
+            "get_order_line_tax_rate",
+            default_value,
+            order,
+            product,
+            variant,
+            address,
+            channel_slug=order.channel.slug,
+        ).quantize(Decimal(".0001"))
+
+    def get_tax_rate_type_choices(self) -> List[TaxType]:
+        default_value: list = []
+        return self.__run_method_on_plugins("get_tax_rate_type_choices", default_value)
+
+    def show_taxes_on_storefront(self) -> bool:
+        default_value = False
+        return self.__run_method_on_plugins("show_taxes_on_storefront", default_value)
+
+    def get_taxes_for_checkout(self, checkout_info, lines) -> Optional[TaxData]:
+        return self.__run_plugin_method_until_first_success(
+            "get_taxes_for_checkout",
+            checkout_info,
+            lines,
+            channel_slug=checkout_info.channel.slug,
+        )
+
+    def get_taxes_for_order(self, order: "Order") -> Optional[TaxData]:
+        return self.__run_plugin_method_until_first_success(
+            "get_taxes_for_order", order, channel_slug=order.channel.slug
+        )
+
+    def preprocess_order_creation(
+        self,
+        checkout_info: "CheckoutInfo",
+        discounts: Iterable[DiscountInfo],
+        lines: Optional[Iterable["CheckoutLineInfo"]] = None,
+    ):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "preprocess_order_creation",
+            default_value,
+            checkout_info,
+            discounts,
+            lines,
+            channel_slug=checkout_info.channel.slug,
+        )
+
+    def customer_created(self, customer: "User"):
+        default_value = None
+        return self.__run_method_on_plugins("customer_created", default_value, customer)
+
+    def customer_deleted(self, customer: "User"):
+        default_value = None
+        return self.__run_method_on_plugins("customer_deleted", default_value, customer)
+
+    def customer_updated(self, customer: "User"):
+        default_value = None
+        return self.__run_method_on_plugins("customer_updated", default_value, customer)
+
+    def customer_metadata_updated(self, customer: "User"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "customer_metadata_updated", default_value, customer
+        )
+
+    def collection_created(self, collection: "Collection"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "collection_created", default_value, collection
+        )
+
+    def collection_updated(self, collection: "Collection"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "collection_updated", default_value, collection
+        )
+
+    def collection_deleted(self, collection: "Collection"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "collection_deleted", default_value, collection
+        )
+
+    def collection_metadata_updated(self, collection: "Collection"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "collection_metadata_updated", default_value, collection
+        )
+
+    def product_created(self, product: "Product"):
+        default_value = None
+        return self.__run_method_on_plugins("product_created", default_value, product)
+
+    def product_updated(self, product: "Product"):
+        default_value = None
+        return self.__run_method_on_plugins("product_updated", default_value, product)
+
+    def product_deleted(self, product: "Product", variants: List[int]):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "product_deleted", default_value, product, variants
+        )
+
+    def product_media_created(self, media: "ProductMedia"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "product_media_created", default_value, media
+        )
+
+    def product_media_updated(self, media: "ProductMedia"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "product_media_updated", default_value, media
+        )
+
+    def product_media_deleted(self, media: "ProductMedia"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "product_media_deleted", default_value, media
+        )
+
+    def product_metadata_updated(self, product: "Product"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "product_metadata_updated", default_value, product
+        )
+
+    def product_variant_created(self, product_variant: "ProductVariant"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "product_variant_created", default_value, product_variant
+        )
+
+    def product_variant_updated(self, product_variant: "ProductVariant"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "product_variant_updated", default_value, product_variant
+        )
+
+    def product_variant_deleted(self, product_variant: "ProductVariant"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "product_variant_deleted",
+            default_value,
+            product_variant,
+        )
+
+    def product_variant_out_of_stock(self, stock: "Stock"):
+        default_value = None
+        self.__run_method_on_plugins(
+            "product_variant_out_of_stock", default_value, stock
+        )
+
+    def product_variant_back_in_stock(self, stock: "Stock"):
+      
