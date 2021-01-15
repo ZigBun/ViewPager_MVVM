@@ -691,4 +691,229 @@ class PluginsManager(PaymentInterface):
         )
 
     def product_variant_back_in_stock(self, stock: "Stock"):
-      
+        default_value = None
+        self.__run_method_on_plugins(
+            "product_variant_back_in_stock", default_value, stock
+        )
+
+    def product_variant_stock_updated(self, stock: "Stock"):
+        default_value = None
+        self.__run_method_on_plugins(
+            "product_variant_stock_updated", default_value, stock
+        )
+
+    def product_variant_metadata_updated(self, product_variant: "ProductVariant"):
+        default_value = None
+        self.__run_method_on_plugins(
+            "product_variant_metadata_updated", default_value, product_variant
+        )
+
+    def order_created(self, order: "Order"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "order_created", default_value, order, channel_slug=order.channel.slug
+        )
+
+    def event_delivery_retry(self, event_delivery: "EventDelivery"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "event_delivery_retry", default_value, event_delivery
+        )
+
+    def order_confirmed(self, order: "Order"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "order_confirmed", default_value, order, channel_slug=order.channel.slug
+        )
+
+    def draft_order_created(self, order: "Order"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "draft_order_created", default_value, order, channel_slug=order.channel.slug
+        )
+
+    def draft_order_updated(self, order: "Order"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "draft_order_updated", default_value, order, channel_slug=order.channel.slug
+        )
+
+    def draft_order_deleted(self, order: "Order"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "draft_order_deleted", default_value, order, channel_slug=order.channel.slug
+        )
+
+    def sale_created(self, sale: "Sale", current_catalogue):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "sale_created", default_value, sale, current_catalogue
+        )
+
+    def sale_deleted(self, sale: "Sale", previous_catalogue):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "sale_deleted", default_value, sale, previous_catalogue
+        )
+
+    def sale_updated(self, sale: "Sale", previous_catalogue, current_catalogue):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "sale_updated", default_value, sale, previous_catalogue, current_catalogue
+        )
+
+    def sale_toggle(self, sale: "Sale", catalogue):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "sale_toggle", default_value, sale, catalogue
+        )
+
+    def invoice_request(
+        self, order: "Order", invoice: "Invoice", number: Optional[str]
+    ):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "invoice_request",
+            default_value,
+            order,
+            invoice,
+            number,
+            channel_slug=order.channel.slug,
+        )
+
+    def invoice_delete(self, invoice: "Invoice"):
+        default_value = None
+        channel_slug = invoice.order.channel.slug if invoice.order else None
+        return self.__run_method_on_plugins(
+            "invoice_delete",
+            default_value,
+            invoice,
+            channel_slug=channel_slug,
+        )
+
+    def invoice_sent(self, invoice: "Invoice", email: str):
+        default_value = None
+        channel_slug = invoice.order.channel.slug if invoice.order else None
+        return self.__run_method_on_plugins(
+            "invoice_sent",
+            default_value,
+            invoice,
+            email,
+            channel_slug=channel_slug,
+        )
+
+    def order_fully_paid(self, order: "Order"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "order_fully_paid", default_value, order, channel_slug=order.channel.slug
+        )
+
+    def order_updated(self, order: "Order"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "order_updated", default_value, order, channel_slug=order.channel.slug
+        )
+
+    def order_cancelled(self, order: "Order"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "order_cancelled", default_value, order, channel_slug=order.channel.slug
+        )
+
+    def order_fulfilled(self, order: "Order"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "order_fulfilled", default_value, order, channel_slug=order.channel.slug
+        )
+
+    def order_metadata_updated(self, order: "Order"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "order_metadata_updated", default_value, order
+        )
+
+    def fulfillment_created(self, fulfillment: "Fulfillment"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "fulfillment_created",
+            default_value,
+            fulfillment,
+            channel_slug=fulfillment.order.channel.slug,
+        )
+
+    def fulfillment_canceled(self, fulfillment: "Fulfillment"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "fulfillment_canceled",
+            default_value,
+            fulfillment,
+            channel_slug=fulfillment.order.channel.slug,
+        )
+
+    def fulfillment_approved(self, fulfillment: "Fulfillment"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "fulfillment_approved",
+            default_value,
+            fulfillment,
+            channel_slug=fulfillment.order.channel.slug,
+        )
+
+    def fulfillment_metadata_updated(self, fulfillment: "Fulfillment"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "fulfillment_metadata_updated", default_value, fulfillment
+        )
+
+    def tracking_number_updated(self, fulfillment: "Fulfillment"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "tracking_number_updated",
+            default_value,
+            fulfillment,
+            channel_slug=fulfillment.order.channel.slug,
+        )
+
+    def checkout_created(self, checkout: "Checkout"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "checkout_created",
+            default_value,
+            checkout,
+            channel_slug=checkout.channel.slug,
+        )
+
+    def checkout_updated(self, checkout: "Checkout"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "checkout_updated",
+            default_value,
+            checkout,
+            channel_slug=checkout.channel.slug,
+        )
+
+    def checkout_metadata_updated(self, checkout: "Checkout"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "checkout_metadata_updated", default_value, checkout
+        )
+
+    def page_created(self, page: "Page"):
+        default_value = None
+        return self.__run_method_on_plugins("page_created", default_value, page)
+
+    def page_updated(self, page: "Page"):
+        default_value = None
+        return self.__run_method_on_plugins("page_updated", default_value, page)
+
+    def page_deleted(self, page: "Page"):
+        default_value = None
+        return self.__run_method_on_plugins("page_deleted", default_value, page)
+
+    def page_type_created(self, page_type: "PageType"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "page_type_created", default_value, page_type
+        )
+
+    def page_type_updated(
