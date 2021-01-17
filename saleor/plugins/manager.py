@@ -916,4 +916,211 @@ class PluginsManager(PaymentInterface):
             "page_type_created", default_value, page_type
         )
 
-    def page_type_updated(
+    def page_type_updated(self, page_type: "PageType"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "page_type_updated", default_value, page_type
+        )
+
+    def page_type_deleted(self, page_type: "PageType"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "page_type_deleted", default_value, page_type
+        )
+
+    def permission_group_created(self, group: "Group"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "permission_group_created", default_value, group
+        )
+
+    def permission_group_updated(self, group: "Group"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "permission_group_updated", default_value, group
+        )
+
+    def permission_group_deleted(self, group: "Group"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "permission_group_deleted", default_value, group
+        )
+
+    def transaction_action_request(
+        self, payment_data: "TransactionActionData", channel_slug: str
+    ):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "transaction_action_request",
+            default_value,
+            payment_data,
+            channel_slug=channel_slug,
+        )
+
+    def transaction_item_metadata_updated(self, transaction_item: "TransactionItem"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "transaction_item_metadata_updated", default_value, transaction_item
+        )
+
+    def address_created(self, address: "Address"):
+        default_value = None
+        return self.__run_method_on_plugins("address_created", default_value, address)
+
+    def address_updated(self, address: "Address"):
+        default_value = None
+        return self.__run_method_on_plugins("address_updated", default_value, address)
+
+    def address_deleted(self, address: "Address"):
+        default_value = None
+        return self.__run_method_on_plugins("address_deleted", default_value, address)
+
+    def app_installed(self, app: "App"):
+        default_value = None
+        return self.__run_method_on_plugins("app_installed", default_value, app)
+
+    def app_updated(self, app: "App"):
+        default_value = None
+        return self.__run_method_on_plugins("app_updated", default_value, app)
+
+    def app_deleted(self, app: "App"):
+        default_value = None
+        return self.__run_method_on_plugins("app_deleted", default_value, app)
+
+    def app_status_changed(self, app: "App"):
+        default_value = None
+        return self.__run_method_on_plugins("app_status_changed", default_value, app)
+
+    def attribute_created(self, attribute: "Attribute"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "attribute_created", default_value, attribute
+        )
+
+    def attribute_updated(self, attribute: "Attribute"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "attribute_updated", default_value, attribute
+        )
+
+    def attribute_deleted(self, attribute: "Attribute"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "attribute_deleted", default_value, attribute
+        )
+
+    def attribute_value_created(self, attribute_value: "AttributeValue"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "attribute_value_created", default_value, attribute_value
+        )
+
+    def attribute_value_updated(self, attribute_value: "AttributeValue"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "attribute_value_updated", default_value, attribute_value
+        )
+
+    def attribute_value_deleted(self, attribute_value: "AttributeValue"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "attribute_value_deleted", default_value, attribute_value
+        )
+
+    def category_created(self, category: "Category"):
+        default_value = None
+        return self.__run_method_on_plugins("category_created", default_value, category)
+
+    def category_updated(self, category: "Category"):
+        default_value = None
+        return self.__run_method_on_plugins("category_updated", default_value, category)
+
+    def category_deleted(self, category: "Category"):
+        default_value = None
+        return self.__run_method_on_plugins("category_deleted", default_value, category)
+
+    def channel_created(self, channel: "Channel"):
+        default_value = None
+        return self.__run_method_on_plugins("channel_created", default_value, channel)
+
+    def channel_updated(self, channel: "Channel"):
+        default_value = None
+        return self.__run_method_on_plugins("channel_updated", default_value, channel)
+
+    def channel_deleted(self, channel: "Channel"):
+        default_value = None
+        return self.__run_method_on_plugins("channel_deleted", default_value, channel)
+
+    def channel_status_changed(self, channel: "Channel"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "channel_status_changed", default_value, channel
+        )
+
+    def gift_card_created(self, gift_card: "GiftCard"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "gift_card_created", default_value, gift_card
+        )
+
+    def gift_card_updated(self, gift_card: "GiftCard"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "gift_card_updated", default_value, gift_card
+        )
+
+    def gift_card_deleted(self, gift_card: "GiftCard"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "gift_card_deleted", default_value, gift_card
+        )
+
+    def gift_card_status_changed(self, gift_card: "GiftCard"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "gift_card_status_changed", default_value, gift_card
+        )
+
+    def gift_card_metadata_updated(self, gift_card: "GiftCard"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "gift_card_metadata_updated", default_value, gift_card
+        )
+
+    def menu_created(self, menu: "Menu"):
+        default_value = None
+        return self.__run_method_on_plugins("menu_created", default_value, menu)
+
+    def menu_updated(self, menu: "Menu"):
+        default_value = None
+        return self.__run_method_on_plugins("menu_updated", default_value, menu)
+
+    def menu_deleted(self, menu: "Menu"):
+        default_value = None
+        return self.__run_method_on_plugins("menu_deleted", default_value, menu)
+
+    def menu_item_created(self, menu_item: "MenuItem"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "menu_item_created", default_value, menu_item
+        )
+
+    def menu_item_updated(self, menu_item: "MenuItem"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "menu_item_updated", default_value, menu_item
+        )
+
+    def menu_item_deleted(self, menu_item: "MenuItem"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "menu_item_deleted", default_value, menu_item
+        )
+
+    def shipping_price_created(self, shipping_method: "ShippingMethod"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "shipping_price_created", default_value, shipping_method
+        )
+
+    def shipping_price_updated(self, ship
