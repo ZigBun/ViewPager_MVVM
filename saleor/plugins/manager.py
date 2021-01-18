@@ -1123,4 +1123,218 @@ class PluginsManager(PaymentInterface):
             "shipping_price_created", default_value, shipping_method
         )
 
-    def shipping_price_updated(self, ship
+    def shipping_price_updated(self, shipping_method: "ShippingMethod"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "shipping_price_updated", default_value, shipping_method
+        )
+
+    def shipping_price_deleted(self, shipping_method: "ShippingMethod"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "shipping_price_deleted", default_value, shipping_method
+        )
+
+    def shipping_zone_created(self, shipping_zone: "ShippingZone"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "shipping_zone_created", default_value, shipping_zone
+        )
+
+    def shipping_zone_updated(self, shipping_zone: "ShippingZone"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "shipping_zone_updated", default_value, shipping_zone
+        )
+
+    def shipping_zone_deleted(self, shipping_zone: "ShippingZone"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "shipping_zone_deleted", default_value, shipping_zone
+        )
+
+    def shipping_zone_metadata_updated(self, shipping_zone: "ShippingZone"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "shipping_zone_metadata_updated", default_value, shipping_zone
+        )
+
+    def staff_created(self, staff_user: "User"):
+        default_value = None
+        return self.__run_method_on_plugins("staff_created", default_value, staff_user)
+
+    def staff_updated(self, staff_user: "User"):
+        default_value = None
+        return self.__run_method_on_plugins("staff_updated", default_value, staff_user)
+
+    def staff_deleted(self, staff_user: "User"):
+        default_value = None
+        return self.__run_method_on_plugins("staff_deleted", default_value, staff_user)
+
+    def thumbnail_created(
+        self,
+        thumbnail: "Thumbnail",
+    ):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "thumbnail_created", default_value, thumbnail
+        )
+
+    def warehouse_created(self, warehouse: "Warehouse"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "warehouse_created", default_value, warehouse
+        )
+
+    def warehouse_updated(self, warehouse: "Warehouse"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "warehouse_updated", default_value, warehouse
+        )
+
+    def warehouse_deleted(self, warehouse: "Warehouse"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "warehouse_deleted", default_value, warehouse
+        )
+
+    def warehouse_metadata_updated(self, warehouse: "Warehouse"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "warehouse_metadata_updated", default_value, warehouse
+        )
+
+    def voucher_created(self, voucher: "Voucher"):
+        default_value = None
+        return self.__run_method_on_plugins("voucher_created", default_value, voucher)
+
+    def voucher_updated(self, voucher: "Voucher"):
+        default_value = None
+        return self.__run_method_on_plugins("voucher_updated", default_value, voucher)
+
+    def voucher_deleted(self, voucher: "Voucher"):
+        default_value = None
+        return self.__run_method_on_plugins("voucher_deleted", default_value, voucher)
+
+    def voucher_metadata_updated(self, voucher: "Voucher"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "voucher_metadata_updated", default_value, voucher
+        )
+
+    def initialize_payment(
+        self, gateway, payment_data: dict, channel_slug: str
+    ) -> Optional["InitializedPaymentResponse"]:
+        method_name = "initialize_payment"
+        default_value = None
+        gtw = self.get_plugin(gateway, channel_slug)
+        if not gtw:
+            return None
+
+        return self.__run_method_on_single_plugin(
+            gtw,
+            method_name,
+            previous_value=default_value,
+            payment_data=payment_data,
+        )
+
+    def authorize_payment(
+        self, gateway: str, payment_information: "PaymentData", channel_slug: str
+    ) -> "GatewayResponse":
+        return self.__run_payment_method(
+            gateway, "authorize_payment", payment_information, channel_slug=channel_slug
+        )
+
+    def capture_payment(
+        self, gateway: str, payment_information: "PaymentData", channel_slug: str
+    ) -> "GatewayResponse":
+        return self.__run_payment_method(
+            gateway, "capture_payment", payment_information, channel_slug=channel_slug
+        )
+
+    def refund_payment(
+        self, gateway: str, payment_information: "PaymentData", channel_slug: str
+    ) -> "GatewayResponse":
+        return self.__run_payment_method(
+            gateway, "refund_payment", payment_information, channel_slug=channel_slug
+        )
+
+    def void_payment(
+        self, gateway: str, payment_information: "PaymentData", channel_slug: str
+    ) -> "GatewayResponse":
+        return self.__run_payment_method(
+            gateway, "void_payment", payment_information, channel_slug=channel_slug
+        )
+
+    def confirm_payment(
+        self, gateway: str, payment_information: "PaymentData", channel_slug: str
+    ) -> "GatewayResponse":
+        return self.__run_payment_method(
+            gateway, "confirm_payment", payment_information, channel_slug=channel_slug
+        )
+
+    def process_payment(
+        self, gateway: str, payment_information: "PaymentData", channel_slug: str
+    ) -> "GatewayResponse":
+        return self.__run_payment_method(
+            gateway, "process_payment", payment_information, channel_slug=channel_slug
+        )
+
+    def token_is_required_as_payment_input(
+        self, gateway: str, channel_slug: str
+    ) -> bool:
+        method_name = "token_is_required_as_payment_input"
+        default_value = True
+        gtw = self.get_plugin(gateway, channel_slug=channel_slug)
+        if gtw is not None:
+            return self.__run_method_on_single_plugin(
+                gtw,
+                method_name,
+                previous_value=default_value,
+            )
+        return default_value
+
+    def get_client_token(
+        self,
+        gateway,
+        token_config: "TokenConfig",
+        channel_slug: str,
+    ) -> str:
+        method_name = "get_client_token"
+        default_value = None
+        gtw = self.get_plugin(gateway, channel_slug=channel_slug)
+        return self.__run_method_on_single_plugin(
+            gtw, method_name, default_value, token_config=token_config
+        )
+
+    def list_payment_sources(
+        self,
+        gateway: str,
+        customer_id: str,
+        channel_slug: str,
+    ) -> List["CustomerSource"]:
+        default_value: list = []
+        gtw = self.get_plugin(gateway, channel_slug=channel_slug)
+        if gtw is not None:
+            return self.__run_method_on_single_plugin(
+                gtw, "list_payment_sources", default_value, customer_id=customer_id
+            )
+        raise Exception(f"Payment plugin {gateway} is inaccessible!")
+
+    def translation_created(self, translation: "Translation"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "translation_created", default_value, translation
+        )
+
+    def translation_updated(self, translation: "Translation"):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "translation_updated", default_value, translation
+        )
+
+    def get_plugins(
+        self, channel_slug: Optional[str] = None, active_only=False
+    ) -> List["BasePlugin"]:
+        """Return list of plugins for a given channel."""
+        if channel_sl
