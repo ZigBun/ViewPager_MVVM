@@ -1337,4 +1337,209 @@ class PluginsManager(PaymentInterface):
         self, channel_slug: Optional[str] = None, active_only=False
     ) -> List["BasePlugin"]:
         """Return list of plugins for a given channel."""
-        if channel_sl
+        if channel_slug:
+            plugins = self.plugins_per_channel[channel_slug]
+        else:
+            plugins = self.all_plugins
+
+        if active_only:
+            plugins = [plugin for plugin in plugins if plugin.active]
+        return plugins
+
+    def list_payment_gateways(
+        self,
+        currency: Optional[str] = None,
+        checkout: Optional["Checkout"] = None,
+        channel_slug: Optional[str] = None,
+        active_only: bool = True,
+    ) -> List["PaymentGateway"]:
+        channel_slug = checkout.channel.slug if checkout else channel_slug
+        plugins = self.get_plugins(channel_slug=channel_slug, active_only=active_only)
+        payment_plugins = [
+            plugin for plugin in plugins if "process_payment" in type(plugin).__dict__
+        ]
+
+        # if currency is given return only gateways which support given currency
+        gateways = []
+        for plugin in payment_plugins:
+            gateways.extend(
+                plugin.get_payment_gateways(
+                    currency=currency, checkout=checkout, previous_value=None
+                )
+            )
+        return gateways
+
+    def list_shipping_methods_for_checkout(
+        self,
+        checkout: "Checkout",
+        channel_slug: Optional[str] = None,
+        active_only: bool = True,
+    ) -> List["ShippingMethodData"]:
+        channel_slug = channel_slug if channel_slug else checkout.channel.slug
+        plugins = self.get_plugins(channel_slug=channel_slug, active_only=active_only)
+        shipping_plugins = [
+            plugin
+            for plugin in plugins
+            if hasattr(plugin, "get_shipping_methods_for_checkout")
+        ]
+
+        shipping_methods = []
+        for plugin in shipping_plugins:
+            shipping_methods.extend(
+                # https://github.com/python/mypy/issues/9975
+                getattr(plugin, "get_shipping_methods_for_checkout")(checkout, None)
+            )
+        return shipping_methods
+
+    def get_shipping_method(
+        self,
+        shipping_method_id: str,
+        checkout: Optional["Checkout"] = None,
+        channel_slug: Optional[str] = None,
+    ):
+        if checkout:
+            methods = {
+                method.id: method
+                for method in self.list_shipping_methods_for_checkout(
+                    checkout=checkout, channel_slug=channel_slug
+                )
+            }
+            return methods.get(shipping_method_id)
+        return None
+
+    def list_external_authentications(self, active_only: bool = True) -> List[dict]:
+        auth_basic_method = "external_obtain_access_tokens"
+        plugins = self.get_plugins(active_only=active_only)
+        return [
+            {"id": plugin.PLUGIN_ID, "name": plugin.PLUGIN_NAME}
+            for plugin in plugins
+            if auth_basic_method in type(plugin).__dict__
+        ]
+
+    def __run_payment_method(
+        self,
+        gateway: str,
+        method_name: str,
+        payment_information: "PaymentData",
+        channel_slug: str,
+        **kwargs,
+    ) -> "GatewayResponse":
+        default_value = None
+        plugin = self.get_plugin(gateway, channel_slug)
+        if plugin is not None:
+            resp = self.__run_method_on_single_plugin(
+                plugin,
+                method_name,
+                previous_value=default_value,
+                payment_information=payment_information,
+                **kwargs,
+            )
+            if resp is not None:
+                return resp
+
+        raise Exception(
+            f"Payment plugin {gateway} for {method_name}"
+            " payment method is inaccessible!"
+        )
+
+    def __run_plugin_method_until_first_success(
+        self,
+        method_name: str,
+        *args,
+        channel_slug: Optional[str] = None,
+    ):
+        plugins = self.get_plugins(channel_slug=channel_slug)
+        for plugin in plugins:
+            result = self.__run_method_on_single_plugin(
+                plugin, method_name, None, *args
+            )
+            if result is not None:
+                return result
+        return None
+
+    def _get_all_plugin_configs(self):
+        with opentracing.global_tracer().start_active_span("_get_all_plugin_configs"):
+            if not hasattr(self, "_plugin_configs"):
+                plugin_configurations = PluginConfiguration.objects.prefetch_related(
+                    "channel"
+                ).all()
+                self._plugin_configs_per_channel: DefaultDict[
+                    Channel, Dict
+                ] = defaultdict(dict)
+                self._global_plugin_configs = {}
+                for pc in plugin_configurations:
+                    channel = pc.channel
+                    if channel is None:
+                        self._global_plugin_configs[pc.identifier] = pc
+                    else:
+                        self._plugin_configs_per_channel[channel][pc.identifier] = pc
+            return self._global_plugin_configs, self._plugin_configs_per_channel
+
+    # FIXME these methods should be more generic
+
+    def assign_tax_code_to_object_meta(self, obj: "TaxClass", tax_code: Optional[str]):
+        default_value = None
+        return self.__run_method_on_plugins(
+            "assign_tax_code_to_object_meta", default_value, obj, tax_code
+        )
+
+    def get_tax_code_from_object_meta(
+        self, obj: Union["Product", "ProductType", "TaxClass"]
+    ) -> TaxType:
+        default_value = TaxType(code="", description="")
+        return self.__run_method_on_plugins(
+            "get_tax_code_from_object_meta", default_value, obj
+        )
+
+    def save_plugin_configuration(
+        self, plugin_id, channel_slug: Optional[str], cleaned_data: dict
+    ):
+        if channel_slug:
+            plugins = self.get_plugins(channel_slug=channel_slug)
+            channel = Channel.objects.filter(slug=channel_slug).first()
+            if not channel:
+                return None
+        else:
+            channel = None
+            plugins = self.global_plugins
+
+        for plugin in plugins:
+            if plugin.PLUGIN_ID == plugin_id:
+                plugin_configuration, _ = PluginConfiguration.objects.get_or_create(
+                    identifier=plugin_id,
+                    channel=channel,
+                    defaults={"configuration": plugin.configuration},
+                )
+                configuration = plugin.save_plugin_configuration(
+                    plugin_configuration, cleaned_data
+                )
+                configuration.name = plugin.PLUGIN_NAME
+                configuration.description = plugin.PLUGIN_DESCRIPTION
+                plugin.active = configuration.active
+                plugin.configuration = configuration.configuration
+                return configuration
+
+    def get_plugin(
+        self, plugin_id: str, channel_slug: Optional[str] = None
+    ) -> Optional["BasePlugin"]:
+        plugins = self.get_plugins(channel_slug=channel_slug)
+        for plugin in plugins:
+            if plugin.check_plugin_id(plugin_id):
+                return plugin
+        return None
+
+    def webhook_endpoint_without_channel(
+        self, request: SaleorContext, plugin_id: str
+    ) -> HttpResponse:
+        # This should be removed in 3.0.0-a.25 as we want to give a possibility to have
+        # no downtime between RCs
+        split_path = request.path.split(plugin_id, maxsplit=1)
+        path = None
+        if len(split_path) == 2:
+            path = split_path[1]
+
+        default_value = HttpResponseNotFound()
+        plugin = self.get_plugin(plugin_id)
+        if not plugin:
+            return default_value
+        return self.__run_method_on_si
