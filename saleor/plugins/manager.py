@@ -1542,4 +1542,176 @@ class PluginsManager(PaymentInterface):
         plugin = self.get_plugin(plugin_id)
         if not plugin:
             return default_value
-        return self.__run_method_on_si
+        return self.__run_method_on_single_plugin(
+            plugin, "webhook", default_value, request, path
+        )
+
+    def webhook(
+        self, request: SaleorContext, plugin_id: str, channel_slug: Optional[str] = None
+    ) -> HttpResponse:
+        split_path = request.path.split(plugin_id, maxsplit=1)
+        path = None
+        if len(split_path) == 2:
+            path = split_path[1]
+
+        default_value = HttpResponseNotFound()
+        plugin = self.get_plugin(plugin_id, channel_slug=channel_slug)
+        if not plugin:
+            return default_value
+
+        if not plugin.active:
+            return default_value
+
+        if plugin.CONFIGURATION_PER_CHANNEL and not channel_slug:
+            return HttpResponseNotFound(
+                "Incorrect endpoint. Use /plugins/channel/<channel_slug>/"
+                f"{plugin.PLUGIN_ID}/"
+            )
+
+        return self.__run_method_on_single_plugin(
+            plugin, "webhook", default_value, request, path
+        )
+
+    def notify(
+        self,
+        event: "NotifyEventTypeChoice",
+        payload: dict,
+        channel_slug: Optional[str] = None,
+        plugin_id: Optional[str] = None,
+    ):
+        default_value = None
+        if plugin_id:
+            plugin = self.get_plugin(plugin_id, channel_slug=channel_slug)
+            return self.__run_method_on_single_plugin(
+                plugin=plugin,
+                method_name="notify",
+                previous_value=default_value,
+                event=event,
+                payload=payload,
+            )
+        return self.__run_method_on_plugins(
+            "notify", default_value, event, payload, channel_slug=channel_slug
+        )
+
+    def external_obtain_access_tokens(
+        self, plugin_id: str, data: dict, request: SaleorContext
+    ) -> ExternalAccessTokens:
+        """Obtain access tokens from authentication plugin."""
+        default_value = ExternalAccessTokens()
+        plugin = self.get_plugin(plugin_id)
+        return self.__run_method_on_single_plugin(
+            plugin, "external_obtain_access_tokens", default_value, data, request
+        )
+
+    def external_authentication_url(
+        self, plugin_id: str, data: dict, request: SaleorContext
+    ) -> dict:
+        """Handle authentication request."""
+        default_value = {}  # type: ignore
+        plugin = self.get_plugin(plugin_id)
+        return self.__run_method_on_single_plugin(
+            plugin, "external_authentication_url", default_value, data, request
+        )
+
+    def external_refresh(
+        self, plugin_id: str, data: dict, request: SaleorContext
+    ) -> ExternalAccessTokens:
+        """Handle authentication refresh request."""
+        default_value = ExternalAccessTokens()
+        plugin = self.get_plugin(plugin_id)
+        return self.__run_method_on_single_plugin(
+            plugin, "external_refresh", default_value, data, request
+        )
+
+    def authenticate_user(self, request: SaleorContext) -> Optional["User"]:
+        """Authenticate user which should be assigned to the request."""
+        default_value = None
+        return self.__run_method_on_plugins("authenticate_user", default_value, request)
+
+    def external_logout(
+        self, plugin_id: str, data: dict, request: SaleorContext
+    ) -> dict:
+        """Logout the user."""
+        default_value: Dict[str, str] = {}
+        plugin = self.get_plugin(plugin_id)
+        return self.__run_method_on_single_plugin(
+            plugin, "external_logout", default_value, data, request
+        )
+
+    def external_verify(
+        self, plugin_id: str, data: dict, request: SaleorContext
+    ) -> Tuple[Optional["User"], dict]:
+        """Verify the provided authentication data."""
+        default_data: Dict[str, str] = dict()
+        default_user: Optional["User"] = None
+        default_value = default_user, default_data
+        plugin = self.get_plugin(plugin_id)
+        return self.__run_method_on_single_plugin(
+            plugin, "external_verify", default_value, data, request
+        )
+
+    def excluded_shipping_methods_for_order(
+        self,
+        order: "Order",
+        available_shipping_methods: List["ShippingMethodData"],
+    ) -> List[ExcludedShippingMethod]:
+        return self.__run_method_on_plugins(
+            "excluded_shipping_methods_for_order",
+            [],
+            order,
+            available_shipping_methods,
+            channel_slug=order.channel.slug,
+        )
+
+    def excluded_shipping_methods_for_checkout(
+        self,
+        checkout: "Checkout",
+        available_shipping_methods: List["ShippingMethodData"],
+    ) -> List[ExcludedShippingMethod]:
+        return self.__run_method_on_plugins(
+            "excluded_shipping_methods_for_checkout",
+            [],
+            checkout,
+            available_shipping_methods,
+            channel_slug=checkout.channel.slug,
+        )
+
+    def perform_mutation(
+        self, mutation_cls: Mutation, root, info: ResolveInfo, data: dict
+    ) -> Optional[Union[ExecutionResult, GraphQLError]]:
+        """Invoke before each mutation is executed.
+
+        This allows to trigger specific logic before the mutation is executed
+        but only once the permissions are checked.
+
+        Returns one of:
+            - null if the execution shall continue
+            - graphql.GraphQLError
+            - graphql.execution.ExecutionResult
+        """
+        return self.__run_method_on_plugins(
+            "perform_mutation",
+            default_value=None,
+            mutation_cls=mutation_cls,
+            root=root,
+            info=info,
+            data=data,
+        )
+
+    def is_event_active_for_any_plugin(
+        self, event: str, channel_slug: Optional[str] = None
+    ) -> bool:
+        """Check if any plugin supports defined event."""
+        plugins = (
+            self.plugins_per_channel[channel_slug] if channel_slug else self.all_plugins
+        )
+        only_active_plugins = [plugin for plugin in plugins if plugin.active]
+        return any([plugin.is_event_active(event) for plugin in only_active_plugins])
+
+
+def get_plugins_manager(
+    requestor_getter: Optional[Callable[[], "Requestor"]] = None,
+    allow_replica=True,
+) -> PluginsManager:
+    with opentracing.global_tracer().start_active_span("get_plugins_manager"):
+        return PluginsManager(settings.PLUGINS, requestor_getter, allow_replica)
