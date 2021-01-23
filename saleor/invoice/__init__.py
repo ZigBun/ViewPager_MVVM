@@ -9,4 +9,6 @@ class InvoiceEvents:
         (REQUESTED, "The invoice was requested"),
         (REQUESTED_DELETION, "The invoice was requested for deletion"),
         (CREATED, "The invoice was created"),
-        (DELETED, "The invoice 
+        (DELETED, "The invoice was deleted"),
+        (SENT, "The invoice has been sent"),
+    ]
