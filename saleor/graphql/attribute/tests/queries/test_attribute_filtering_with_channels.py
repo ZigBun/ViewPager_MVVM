@@ -208,4 +208,256 @@ def test_products_with_filtering_with_channel_as_staff_user(
 ):
     # given
     if "Collection" in tested_field:
-        filtered_by_node_id = graphene.Node.to_glob
+        filtered_by_node_id = graphene.Node.to_global_id("Collection", collection.pk)
+    elif "Category" in tested_field:
+        filtered_by_node_id = graphene.Node.to_global_id("Category", category.pk)
+    else:
+        raise AssertionError(tested_field)
+    filter_by = {tested_field: filtered_by_node_id}
+
+    variables = {"filter": filter_by, "channel": channel_USD.slug}
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_ATTRIBUTES_FILTERING,
+        variables,
+        permissions=[permission_manage_products],
+        check_no_permissions=False,
+    )
+
+    # then
+    content = get_graphql_content(response)
+    attribute_nodes = content["data"]["attributes"]["edges"]
+    assert len(attribute_nodes) == attribute_count
+
+
+def test_products_with_alternative_filtering_with_channel_as_staff_user(
+    staff_api_client,
+    permission_manage_products,
+    attributes_for_filtering_with_channels,
+    category,
+    channel_USD,
+):
+    # given
+    filtered_by_node_id = graphene.Node.to_global_id("Category", category.pk)
+    filter_by = {"inCategory": filtered_by_node_id}
+    filter_by["channel"] = channel_USD.slug
+
+    variables = {"filter": filter_by}
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_ATTRIBUTES_FILTERING,
+        variables,
+        permissions=[permission_manage_products],
+        check_no_permissions=False,
+    )
+
+    # then
+    content = get_graphql_content(response)
+    attribute_nodes = content["data"]["attributes"]["edges"]
+    assert len(attribute_nodes) == 5
+
+
+@pytest.mark.parametrize(
+    "tested_field, attribute_count",
+    [("inCategory", 5), ("inCollection", 5)],
+)
+def test_products_with_filtering_as_anonymous_client(
+    tested_field,
+    attribute_count,
+    api_client,
+    attributes_for_filtering_with_channels,
+    category,
+    collection,
+    channel_USD,
+):
+    # given
+    if "Collection" in tested_field:
+        filtered_by_node_id = graphene.Node.to_global_id("Collection", collection.pk)
+    elif "Category" in tested_field:
+        filtered_by_node_id = graphene.Node.to_global_id("Category", category.pk)
+    else:
+        raise AssertionError(tested_field)
+    filter_by = {tested_field: filtered_by_node_id}
+
+    variables = {"filter": filter_by, "channel": channel_USD.slug}
+
+    # when
+    response = api_client.post_graphql(QUERY_ATTRIBUTES_FILTERING, variables)
+
+    # then
+    content = get_graphql_content(response)
+    attribute_nodes = content["data"]["attributes"]["edges"]
+    assert len(attribute_nodes) == attribute_count
+
+
+@pytest.mark.parametrize(
+    "tested_field, attribute_count",
+    [("inCategory", 5), ("inCollection", 5)],
+)
+def test_products_with_filtering_with_not_visible_in_listings_as_staff_user(
+    tested_field,
+    attribute_count,
+    staff_api_client,
+    permission_manage_products,
+    attributes_for_filtering_with_channels,
+    category,
+    collection,
+    channel_PLN,
+):
+    # given
+    if "Collection" in tested_field:
+        filtered_by_node_id = graphene.Node.to_global_id("Collection", collection.pk)
+    elif "Category" in tested_field:
+        filtered_by_node_id = graphene.Node.to_global_id("Category", category.pk)
+    else:
+        raise AssertionError(tested_field)
+    filter_by = {tested_field: filtered_by_node_id}
+
+    variables = {"filter": filter_by, "channel": channel_PLN.slug}
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_ATTRIBUTES_FILTERING,
+        variables,
+        permissions=[permission_manage_products],
+        check_no_permissions=False,
+    )
+
+    # then
+    content = get_graphql_content(response)
+    attribute_nodes = content["data"]["attributes"]["edges"]
+    assert len(attribute_nodes) == attribute_count
+
+
+@pytest.mark.parametrize(
+    "tested_field, attribute_count",
+    [
+        ("inCategory", 0),
+        # Products not visible in listings should be visible in collections
+        ("inCollection", 5),
+    ],
+)
+def test_products_with_filtering_with_not_visible_in_listings_as_anonymous_client(
+    tested_field,
+    attribute_count,
+    api_client,
+    attributes_for_filtering_with_channels,
+    category,
+    collection,
+    channel_PLN,
+):
+    # given
+    if "Collection" in tested_field:
+        filtered_by_node_id = graphene.Node.to_global_id("Collection", collection.pk)
+    elif "Category" in tested_field:
+        filtered_by_node_id = graphene.Node.to_global_id("Category", category.pk)
+    else:
+        raise AssertionError(tested_field)
+    filter_by = {tested_field: filtered_by_node_id}
+
+    variables = {"filter": filter_by, "channel": channel_PLN.slug}
+
+    # when
+    response = api_client.post_graphql(QUERY_ATTRIBUTES_FILTERING, variables)
+
+    # then
+    content = get_graphql_content(response)
+    attribute_nodes = content["data"]["attributes"]["edges"]
+    assert len(attribute_nodes) == attribute_count
+
+
+@pytest.mark.parametrize(
+    "tested_field, attribute_count",
+    [("inCategory", 5), ("inCollection", 5)],
+)
+def test_products_with_filtering_with_not_published_as_staff_user(
+    tested_field,
+    attribute_count,
+    staff_api_client,
+    permission_manage_products,
+    attributes_for_filtering_with_channels,
+    category,
+    collection,
+    other_channel_USD,
+):
+    # given
+    if "Collection" in tested_field:
+        filtered_by_node_id = graphene.Node.to_global_id("Collection", collection.pk)
+    elif "Category" in tested_field:
+        filtered_by_node_id = graphene.Node.to_global_id("Category", category.pk)
+    else:
+        raise AssertionError(tested_field)
+    filter_by = {tested_field: filtered_by_node_id}
+
+    variables = {"filter": filter_by, "channel": other_channel_USD.slug}
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_ATTRIBUTES_FILTERING,
+        variables,
+        permissions=[permission_manage_products],
+        check_no_permissions=False,
+    )
+
+    # then
+    content = get_graphql_content(response)
+    attribute_nodes = content["data"]["attributes"]["edges"]
+    assert len(attribute_nodes) == attribute_count
+
+
+@pytest.mark.parametrize(
+    "tested_field, attribute_count",
+    [("inCategory", 0), ("inCollection", 0)],
+)
+def test_products_with_filtering_with_not_published_as_anonymous_client(
+    tested_field,
+    attribute_count,
+    api_client,
+    attributes_for_filtering_with_channels,
+    category,
+    collection,
+    other_channel_USD,
+):
+    # given
+    if "Collection" in tested_field:
+        filtered_by_node_id = graphene.Node.to_global_id("Collection", collection.pk)
+    elif "Category" in tested_field:
+        filtered_by_node_id = graphene.Node.to_global_id("Category", category.pk)
+    else:
+        raise AssertionError(tested_field)
+    filter_by = {tested_field: filtered_by_node_id}
+
+    variables = {"filter": filter_by, "channel": other_channel_USD.slug}
+
+    # when
+    response = api_client.post_graphql(QUERY_ATTRIBUTES_FILTERING, variables)
+
+    # then
+    content = get_graphql_content(response)
+    attribute_nodes = content["data"]["attributes"]["edges"]
+    assert len(attribute_nodes) == attribute_count
+
+
+@pytest.mark.parametrize(
+    "tested_field",
+    ["inCategory", "inCollection"],
+)
+def test_products_with_filtering_not_existing_channel(
+    tested_field,
+    api_client,
+    attributes_for_filtering_with_channels,
+    category,
+    collection,
+):
+    # given
+    if "Collection" in tested_field:
+        filtered_by_node_id = graphene.Node.to_global_id("Collection", collection.pk)
+    elif "Category" in tested_field:
+        filtered_by_node_id = graphene.Node.to_global_id("Category", category.pk)
+    else:
+        raise AssertionError(tested_field)
+    filter_by = {tested_field: filtered_by_node_id}
+
+    variables
