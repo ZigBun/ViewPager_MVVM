@@ -460,4 +460,12 @@ def test_products_with_filtering_not_existing_channel(
         raise AssertionError(tested_field)
     filter_by = {tested_field: filtered_by_node_id}
 
-    variables
+    variables = {"filter": filter_by, "channel": "Not-existing"}
+
+    # when
+    response = api_client.post_graphql(QUERY_ATTRIBUTES_FILTERING, variables)
+
+    # then
+    content = get_graphql_content(response)
+    attribute_nodes = content["data"]["attributes"]["edges"]
+    assert len(attribute_nodes) == 0
