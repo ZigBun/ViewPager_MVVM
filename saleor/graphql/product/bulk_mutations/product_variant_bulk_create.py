@@ -221,4 +221,218 @@ class ProductVariantBulkCreate(BaseMutation):
 
     class Arguments:
         variants = NonNullList(
-            ProductVar
+            ProductVariantBulkCreateInput,
+            required=True,
+            description="Input list of product variants to create.",
+        )
+        product_id = graphene.ID(
+            description="ID of the product to create the variants for.",
+            name="product",
+            required=True,
+        )
+        error_policy = ErrorPolicyEnum(
+            required=False,
+            default_value=ErrorPolicyEnum.REJECT_EVERYTHING.value,
+            description=(
+                "Policies of error handling. DEFAULT: "
+                + ErrorPolicyEnum.REJECT_EVERYTHING.name
+                + ADDED_IN_311
+                + PREVIEW_FEATURE
+            ),
+        )
+
+    class Meta:
+        description = "Creates product variants for a given product."
+        permissions = (ProductPermissions.MANAGE_PRODUCTS,)
+        error_type_class = BulkProductError
+        error_type_field = "bulk_product_errors"
+        support_meta_field = True
+        support_private_meta_field = True
+
+    @classmethod
+    def clean_attributes(
+        cls,
+        cleaned_input,
+        product_type,
+        variant_attributes,
+        variant_attributes_ids,
+        used_attribute_values,
+        errors,
+        variant_index,
+        index_error_map,
+    ):
+        attributes_errors_count = 0
+        if attributes_input := cleaned_input.get("attributes"):
+            attributes_ids = {attr["id"] for attr in attributes_input or []}
+            invalid_attributes = attributes_ids - variant_attributes_ids
+            if len(invalid_attributes) > 0:
+                message = "Given attributes are not a variant attributes."
+                code = ProductVariantBulkErrorCode.ATTRIBUTE_CANNOT_BE_ASSIGNED.value
+                index_error_map[variant_index].append(
+                    ProductVariantBulkError(
+                        field="attributes", message=message, code=code
+                    )
+                )
+                if errors is not None:
+                    errors["attributes"].append(
+                        ValidationError(
+                            message,
+                            code=code,
+                            params={
+                                "attributes": invalid_attributes,
+                                "index": variant_index,
+                            },
+                        )
+                    )
+                attributes_errors_count += 1
+
+            if product_type.has_variants:
+                try:
+                    cleaned_attributes = AttributeAssignmentMixin.clean_input(
+                        attributes_input, variant_attributes
+                    )
+                    ProductVariantCreate.validate_duplicated_attribute_values(
+                        cleaned_attributes, used_attribute_values, None
+                    )
+                    cleaned_input["attributes"] = cleaned_attributes
+                except ValidationError as exc:
+                    for error in exc.error_list:
+                        attributes = (
+                            error.params.get("attributes") if error.params else None
+                        )
+                        index_error_map[variant_index].append(
+                            ProductVariantBulkError(
+                                field="attributes",
+                                message=error.message,
+                                code=error.code,
+                                attributes=attributes,
+                            )
+                        )
+                    if errors is not None:
+                        exc.params = {"index": variant_index}
+                        errors["attributes"].append(exc)
+                    attributes_errors_count += 1
+            else:
+                message = "Cannot assign attributes for product type without variants"
+                index_error_map[variant_index].append(
+                    ProductVariantBulkError(
+                        field="attributes",
+                        message=message,
+                        code=ProductVariantBulkErrorCode.INVALID.value,
+                    )
+                )
+                if errors is not None:
+                    errors["attributes"].append(
+                        ValidationError(
+                            message,
+                            code=ProductVariantBulkErrorCode.INVALID.value,
+                            params={
+                                "attributes": invalid_attributes,
+                                "index": variant_index,
+                            },
+                        )
+                    )
+                attributes_errors_count += 1
+        return attributes_errors_count
+
+    @classmethod
+    def clean_prices(
+        cls,
+        price,
+        cost_price,
+        currency_code,
+        channel_id,
+        variant_index,
+        errors,
+        index_error_map,
+    ):
+        clean_price(
+            price,
+            "price",
+            currency_code,
+            channel_id,
+            variant_index,
+            errors,
+            index_error_map,
+        )
+        clean_price(
+            cost_price,
+            "cost_price",
+            currency_code,
+            channel_id,
+            variant_index,
+            errors,
+            index_error_map,
+        )
+
+    @classmethod
+    def clean_channel_listings(
+        cls,
+        channel_listings,
+        product_channel_global_id_to_instance_map,
+        errors,
+        variant_index,
+        index_error_map,
+    ):
+        channel_ids = [
+            channel_listing["channel_id"] for channel_listing in channel_listings
+        ]
+        listings_to_create = []
+
+        duplicates = get_duplicated_values(channel_ids)
+        if duplicates:
+            message = "Duplicated channel ID."
+            index_error_map[variant_index].append(
+                ProductVariantBulkError(
+                    field="channelListings",
+                    message=message,
+                    code=ProductVariantBulkErrorCode.DUPLICATED_INPUT_ITEM.value,
+                    channels=duplicates,
+                )
+            )
+            if errors is not None:
+                errors["channel_listings"] = ValidationError(
+                    message=message,
+                    code=ProductVariantBulkErrorCode.DUPLICATED_INPUT_ITEM.value,
+                    params={"channels": duplicates, "index": variant_index},
+                )
+
+        channels_not_assigned_to_product = [
+            channel_id
+            for channel_id in channel_ids
+            if channel_id not in product_channel_global_id_to_instance_map.keys()
+        ]
+
+        if channels_not_assigned_to_product:
+            message = "Product not available in channels."
+            code = ProductVariantBulkErrorCode.PRODUCT_NOT_ASSIGNED_TO_CHANNEL.value
+            index_error_map[variant_index].append(
+                ProductVariantBulkError(
+                    field="channelId",
+                    message=message,
+                    code=code,
+                    channels=channels_not_assigned_to_product,
+                )
+            )
+            if errors is not None:
+                errors["channel_id"].append(
+                    ValidationError(
+                        message=message,
+                        code=code,
+                        params={
+                            "index": variant_index,
+                            "channels": channels_not_assigned_to_product,
+                        },
+                    )
+                )
+
+        for channel_listing in channel_listings:
+            channel_id = channel_listing["channel_id"]
+
+            if (
+                channel_id in channels_not_assigned_to_product
+                or channel_id in duplicates
+            ):
+                continue
+
+            channel_listing["ch
