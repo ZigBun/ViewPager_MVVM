@@ -435,4 +435,202 @@ class ProductVariantBulkCreate(BaseMutation):
             ):
                 continue
 
-            channel_listing["ch
+            channel_listing["channel"] = product_channel_global_id_to_instance_map[
+                channel_id
+            ]
+            price = channel_listing.get("price")
+            cost_price = channel_listing.get("cost_price")
+            currency_code = channel_listing["channel"].currency_code
+
+            errors_count_before_prices = len(index_error_map[variant_index])
+
+            cls.clean_prices(
+                price,
+                cost_price,
+                currency_code,
+                channel_id,
+                variant_index,
+                errors,
+                index_error_map,
+            )
+
+            if len(index_error_map[variant_index]) > errors_count_before_prices:
+                continue
+
+            listings_to_create.append(channel_listing)
+
+        return listings_to_create
+
+    @classmethod
+    def clean_stocks(
+        cls,
+        stocks_data,
+        warehouse_global_id_to_instance_map,
+        errors,
+        variant_index,
+        index_error_map,
+    ):
+        stocks_to_create = []
+        warehouse_ids = [stock["warehouse"] for stock in stocks_data]
+
+        wrong_warehouse_ids = {
+            warehouse_id
+            for warehouse_id in warehouse_ids
+            if warehouse_id not in warehouse_global_id_to_instance_map.keys()
+        }
+
+        if wrong_warehouse_ids:
+            message = "Not existing warehouse ID."
+            index_error_map[variant_index].append(
+                ProductVariantBulkError(
+                    field="warehouses",
+                    message=message,
+                    code=ProductVariantBulkErrorCode.NOT_FOUND.value,
+                    warehouses=wrong_warehouse_ids,
+                )
+            )
+            if errors is not None:
+                errors["warehouses"] = ValidationError(
+                    message,
+                    code=ProductVariantBulkErrorCode.NOT_FOUND.value,
+                    params={"warehouses": wrong_warehouse_ids, "index": variant_index},
+                )
+
+        duplicates = get_duplicated_values(warehouse_ids)
+        if duplicates:
+            message = "Duplicated warehouse ID."
+            index_error_map[variant_index].append(
+                ProductVariantBulkError(
+                    field="stocks",
+                    message=message,
+                    code=ProductVariantBulkErrorCode.DUPLICATED_INPUT_ITEM.value,
+                    warehouses=duplicates,
+                )
+            )
+            if errors is not None:
+                errors["stocks"] = ValidationError(
+                    message,
+                    code=ProductVariantBulkErrorCode.DUPLICATED_INPUT_ITEM.value,
+                    params={"warehouses": duplicates, "index": variant_index},
+                )
+
+        for stock_data in stocks_data:
+            if (
+                stock_data["warehouse"] in duplicates
+                or stock_data["warehouse"] in wrong_warehouse_ids
+            ):
+                continue
+            else:
+                stock_data["warehouse"] = warehouse_global_id_to_instance_map[
+                    stock_data["warehouse"]
+                ]
+                stocks_to_create.append(stock_data)
+
+        return stocks_to_create
+
+    @classmethod
+    def add_indexes_to_errors(cls, index, error, error_dict, index_error_map):
+        """Append errors with index in params to mutation error dict."""
+        for key, value in error.error_dict.items():
+            for e in value:
+                if e.params:
+                    e.params["index"] = index
+                else:
+                    e.params = {"index": index}
+                index_error_map[index].append(
+                    ProductVariantBulkError(
+                        field=to_camel_case(key),
+                        message=e.messages[0],
+                        code=e.code,
+                    )
+                )
+            error_dict[key].extend(value)
+
+    @classmethod
+    def create_variants(
+        cls, info, cleaned_inputs_map, product, errors, index_error_map
+    ):
+        instances_data_and_errors_list = []
+
+        for index, cleaned_input in cleaned_inputs_map.items():
+            if not cleaned_input:
+                instances_data_and_errors_list.append(
+                    {"instance": None, "errors": index_error_map[index]}
+                )
+                continue
+            try:
+                metadata_list = cleaned_input.pop("metadata", None)
+                private_metadata_list = cleaned_input.pop("private_metadata", None)
+                instance = models.ProductVariant()
+                cleaned_input["product"] = product
+                instance = cls.construct_instance(instance, cleaned_input)
+                cls.validate_and_update_metadata(
+                    instance, metadata_list, private_metadata_list
+                )
+                cls.clean_instance(info, instance)
+                instances_data_and_errors_list.append(
+                    {
+                        "instance": instance,
+                        "errors": index_error_map[index],
+                        "cleaned_input": cleaned_input,
+                    }
+                )
+            except ValidationError as exc:
+                cls.add_indexes_to_errors(index, exc, errors, index_error_map)
+                instances_data_and_errors_list.append(
+                    {"instance": None, "errors": index_error_map[index]}
+                )
+        return instances_data_and_errors_list
+
+    @classmethod
+    def validate_base_fields(
+        cls, cleaned_input, duplicated_sku, errors, index_error_map, index
+    ):
+        base_fields_errors_count = 0
+        weight = cleaned_input.get("weight")
+        if weight and weight.value < 0:
+            message = "Product variant can't have negative weight."
+            code = ProductVariantBulkErrorCode.INVALID.value
+            index_error_map[index].append(
+                ProductVariantBulkError(
+                    field="weight",
+                    message=message,
+                    code=code,
+                )
+            )
+            if errors is not None:
+                errors["weight"].append(
+                    ValidationError(message, code, params={"index": index})
+                )
+            base_fields_errors_count += 1
+
+        quantity_limit = cleaned_input.get("quantity_limit_per_customer")
+        if quantity_limit is not None and quantity_limit < 1:
+            message = (
+                "Product variant can't have "
+                "quantity_limit_per_customer lower than 1."
+            )
+            code = ProductVariantBulkErrorCode.INVALID.value
+            index_error_map[index].append(
+                ProductVariantBulkError(
+                    field="quantity_limit_per_customer",
+                    message=message,
+                    code=code,
+                )
+            )
+            if errors is not None:
+                errors["quantity_limit_per_customer"].append(
+                    ValidationError(message, code, params={"index": index})
+                )
+            base_fields_errors_count += 1
+
+        sku = cleaned_input.get("sku")
+        if sku is not None and sku in duplicated_sku:
+            message = "Duplicated SKU."
+            code = ProductVariantBulkErrorCode.UNIQUE.value
+            index_error_map[index].append(
+                ProductVariantBulkError(field="sku", message=message, code=code)
+            )
+            if errors is not None:
+                errors["sku"].append(
+                    ValidationError(message, code, params={"index"
