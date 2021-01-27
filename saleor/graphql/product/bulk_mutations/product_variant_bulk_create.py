@@ -633,4 +633,222 @@ class ProductVariantBulkCreate(BaseMutation):
             )
             if errors is not None:
                 errors["sku"].append(
-                    ValidationError(message, code, params={"index"
+                    ValidationError(message, code, params={"index": index})
+                )
+            base_fields_errors_count += 1
+
+        return base_fields_errors_count
+
+    @classmethod
+    def clean_variant(
+        cls,
+        info,
+        variant_data,
+        product_channel_global_id_to_instance_map,
+        warehouse_global_id_to_instance_map,
+        variant_attributes,
+        used_attribute_values,
+        variant_attributes_ids,
+        duplicated_sku,
+        index_error_map,
+        index,
+        errors,
+    ):
+        cleaned_input = ModelMutation.clean_input(
+            info, None, variant_data, input_cls=ProductVariantBulkCreateInput
+        )
+
+        sku = cleaned_input.get("sku")
+        if sku is not None:
+            cleaned_input["sku"] = clean_variant_sku(sku)
+
+        preorder_settings = cleaned_input.get("preorder")
+        if preorder_settings:
+            cleaned_input["is_preorder"] = True
+            cleaned_input["preorder_global_threshold"] = preorder_settings.get(
+                "global_threshold"
+            )
+            cleaned_input["preorder_end_date"] = preorder_settings.get("end_date")
+
+        base_fields_errors_count = cls.validate_base_fields(
+            cleaned_input, duplicated_sku, errors, index_error_map, index
+        )
+
+        attributes_errors_count = cls.clean_attributes(
+            cleaned_input,
+            variant_data["product_type"],
+            variant_attributes,
+            variant_attributes_ids,
+            used_attribute_values,
+            errors,
+            index,
+            index_error_map,
+        )
+
+        if listings_data := cleaned_input.get("channel_listings"):
+            cleaned_input["channel_listings"] = cls.clean_channel_listings(
+                listings_data,
+                product_channel_global_id_to_instance_map,
+                errors,
+                index,
+                index_error_map,
+            )
+
+        if stocks_data := cleaned_input.get("stocks"):
+            cleaned_input["stocks"] = cls.clean_stocks(
+                stocks_data,
+                warehouse_global_id_to_instance_map,
+                errors,
+                index,
+                index_error_map,
+            )
+
+        if base_fields_errors_count > 0 or attributes_errors_count > 0:
+            return None
+
+        return cleaned_input if cleaned_input else None
+
+    @classmethod
+    def clean_variants(cls, info, variants, product, errors, index_error_map):
+        cleaned_inputs_map = {}
+        product_type = product.product_type
+
+        warehouse_global_id_to_instance_map = {
+            graphene.Node.to_global_id("Warehouse", warehouse.id): warehouse
+            for warehouse in warehouse_models.Warehouse.objects.all()
+        }
+        product_channel_global_id_to_instance_map = {
+            graphene.Node.to_global_id("Channel", listing.channel_id): listing.channel
+            for listing in models.ProductChannelListing.objects.select_related(
+                "channel"
+            ).filter(product=product.id)
+        }
+
+        variant_attributes = product_type.variant_attributes.annotate(
+            variant_selection=F("attributevariant__variant_selection")
+        )
+        variant_attributes_ids = {
+            graphene.Node.to_global_id("Attribute", variant_attribute.id)
+            for variant_attribute in variant_attributes
+        }
+        used_attribute_values = get_used_variants_attribute_values(product)
+
+        duplicated_sku = get_duplicated_values(
+            [variant.sku for variant in variants if variant.sku]
+        )
+
+        for index, variant_data in enumerate(variants):
+            variant_data["product_type"] = product_type
+            variant_data["product"] = product
+
+            cleaned_input = cls.clean_variant(
+                info,
+                variant_data,
+                product_channel_global_id_to_instance_map,
+                warehouse_global_id_to_instance_map,
+                variant_attributes,
+                used_attribute_values,
+                variant_attributes_ids,
+                duplicated_sku,
+                index_error_map,
+                index,
+                errors,
+            )
+            cleaned_inputs_map[index] = cleaned_input
+
+        return cleaned_inputs_map
+
+    @classmethod
+    def prepare_channel_listings(cls, variant, listings_input, listings_to_create):
+        listings_to_create += [
+            models.ProductVariantChannelListing(
+                channel=listing_data["channel"],
+                variant=variant,
+                price_amount=listing_data["price"],
+                cost_price_amount=listing_data.get("cost_price"),
+                currency=listing_data["channel"].currency_code,
+                preorder_quantity_threshold=listing_data.get("preorder_threshold"),
+            )
+            for listing_data in listings_input
+        ]
+
+    @classmethod
+    def set_variant_name(cls, variant, cleaned_input):
+        attributes_input = cleaned_input.get("attributes", [])
+        sku = cleaned_input.get("sku")
+        attributes_display: list = []
+
+        for attribute_data in attributes_input:
+            if (
+                attribute_data[0].type == AttributeType.PRODUCT_TYPE
+                and attribute_data[0].variant_selection
+            ):
+                attributes_display.append(
+                    ", ".join([value for value in attribute_data[1].values])
+                )
+
+        name = " / ".join(sorted(attributes_display))
+        if not name:
+            name = sku or variant.get_global_id()
+
+        variant.name = name
+
+    @classmethod
+    @traced_atomic_transaction()
+    def save_variants(cls, variants_data_with_errors_list, product):
+        variants_to_create: list = []
+        stocks_to_create: list = []
+        listings_to_create: list = []
+        attributes_to_save: list = []
+
+        for variant_data in variants_data_with_errors_list:
+            variant = variant_data["instance"]
+
+            if not variant:
+                continue
+
+            variants_to_create.append(variant)
+            cleaned_input = variant_data["cleaned_input"]
+
+            if stocks_input := cleaned_input.get("stocks"):
+                cls.prepare_stocks(variant, stocks_input, stocks_to_create)
+
+            if listings_input := cleaned_input.get("channel_listings"):
+                cls.prepare_channel_listings(
+                    variant, listings_input, listings_to_create
+                )
+
+            if attributes := variant_data["cleaned_input"].get("attributes"):
+                attributes_to_save.append((variant, attributes))
+
+            if not variant.name:
+                cls.set_variant_name(variant, cleaned_input)
+
+        models.ProductVariant.objects.bulk_create(variants_to_create)
+
+        for variant, attributes in attributes_to_save:
+            AttributeAssignmentMixin.save(variant, attributes)
+
+        warehouse_models.Stock.objects.bulk_create(stocks_to_create)
+        models.ProductVariantChannelListing.objects.bulk_create(listings_to_create)
+
+        if not product.default_variant and variants_to_create:
+            product.default_variant = variants_to_create[0]
+            product.save(update_fields=["default_variant", "updated_at"])
+
+    @classmethod
+    def prepare_stocks(cls, variant, stocks_input, stocks_to_create):
+        stocks_to_create += [
+            warehouse_models.Stock(
+                product_variant=variant,
+                warehouse=stock_data["warehouse"],
+                quantity=stock_data["quantity"],
+            )
+            for stock_data in stocks_input
+        ]
+
+    @classmethod
+    def post_save_actions(cls, info, instances, product):
+        manager = get_plugin_manager_promise(info.context).get()
+
+        # Recalculate the "discounted price" for the parent product
