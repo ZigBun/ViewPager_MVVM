@@ -852,3 +852,62 @@ class ProductVariantBulkCreate(BaseMutation):
         manager = get_plugin_manager_promise(info.context).get()
 
         # Recalculate the "discounted price" for the parent product
+        update_product_discounted_price_task.delay(product.pk)
+        update_product_search_vector(product)
+
+        for instance in instances:
+            cls.call_event(manager.product_variant_created, instance.node)
+
+    @classmethod
+    @traced_atomic_transaction()
+    def perform_mutation(cls, _root, info, **data):
+        product = cast(
+            models.Product,
+            cls.get_node_or_error(info, data["product_id"], only_type="Product"),
+        )
+        error_policy = data["error_policy"]
+        errors: dict = defaultdict(list)
+        index_error_map: dict = defaultdict(list)
+
+        cleaned_inputs_map = cls.clean_variants(
+            info, data["variants"], product, errors, index_error_map
+        )
+        instances_data_with_errors_list = cls.create_variants(
+            info, cleaned_inputs_map, product, errors, index_error_map
+        )
+
+        if errors:
+            if error_policy == ErrorPolicyEnum.REJECT_EVERYTHING.value:
+                results = get_results(instances_data_with_errors_list, True)
+                return ProductVariantBulkCreate(
+                    count=0,
+                    results=results,
+                    errors=validation_error_to_error_type(
+                        ValidationError(errors), cls._meta.error_type_class
+                    ),
+                )
+
+            if error_policy == ErrorPolicyEnum.REJECT_FAILED_ROWS.value:
+                for data in instances_data_with_errors_list:
+                    if data["errors"] and data["instance"]:
+                        data["instance"] = None
+
+        cls.save_variants(instances_data_with_errors_list, product)
+
+        # prepare and return data
+        results = get_results(instances_data_with_errors_list)
+        instances = [
+            result.product_variant for result in results if result.product_variant
+        ]
+        cls.post_save_actions(info, instances, product)
+
+        return ProductVariantBulkCreate(
+            count=len(instances),
+            product_variants=instances,
+            results=results,
+            errors=validation_error_to_error_type(
+                ValidationError(errors), cls._meta.error_type_class
+            )
+            if errors
+            else None,
+        )
