@@ -111,4 +111,28 @@ def test_initialize_payment_for_apple_pay(mocked_request, mocked_tmp_file):
     }
 
     mocked_request.assert_called_with(
-        validation_url, json=expected_data, cert=mocked_cert_
+        validation_url, json=expected_data, cert=mocked_cert_file_name
+    )
+
+
+@mock.patch("saleor.payment.gateways.adyen.utils.apple_pay.requests.post")
+def test_initialize_payment_for_apple_pay_request_failed(mocked_request):
+    mocked_response = mock.Mock()
+    mocked_response.ok = False
+    mocked_response.json.return_value = {}
+    mocked_request.return_value = mocked_response
+
+    validation_url = "https://apple-pay-gateway.apple.com/paymentservices/startSession"
+    merchant_identifier = "merchant.com.identifier"
+    domain = "saleor.com"
+    display_name = "Saleor Shop"
+    certificate = "certifiate data"
+
+    with pytest.raises(PaymentError):
+        initialize_apple_pay_session(
+            validation_url,
+            merchant_identifier,
+            domain,
+            display_name,
+            certificate,
+        )
