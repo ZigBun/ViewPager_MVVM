@@ -64,4 +64,55 @@ def update_non_unique_slugs_for_models(apps, schema_editor):
         queryset = Model.objects.filter(slug__in=slugs_counter.keys()).order_by("name")
 
         for instance in queryset:
-            
+            slugs_counter[instance.slug] -= 1
+            slug = update_slug_to_unique_value(instance.slug, slugs_counter)
+            instance.slug = slug
+            instance.save(update_fields=["slug"])
+            slugs_counter[slug] += 1
+
+
+def update_slug_to_unique_value(slug_value, slugs_counter):
+    unique_slug = slug_value
+    extension = 1
+
+    while unique_slug in slugs_counter and slugs_counter[unique_slug] > 0:
+        extension += 1
+        unique_slug = f"{slug_value}-{extension}"
+
+    return unique_slug
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("product", "0111_auto_20191209_0437"),
+    ]
+
+    operations = [
+        migrations.RunPython(
+            update_non_unique_slugs_for_models, migrations.RunPython.noop
+        ),
+        migrations.AddField(
+            model_name="producttype",
+            name="slug",
+            field=models.SlugField(null=True, max_length=128, unique=True),
+            preserve_default=False,
+        ),
+        migrations.AlterField(
+            model_name="category",
+            name="slug",
+            field=models.SlugField(max_length=128, unique=True),
+        ),
+        migrations.AlterField(
+            model_name="collection",
+            name="slug",
+            field=models.SlugField(max_length=128, unique=True),
+        ),
+        migrations.RunPython(
+            create_unique_slugs_for_producttypes, migrations.RunPython.noop
+        ),
+        migrations.AlterField(
+            model_name="producttype",
+            name="slug",
+            field=models.SlugField(max_length=128, unique=True),
+        ),
+    ]
