@@ -125,4 +125,216 @@ def test_process_payment_with_adyen_auto_capture(
 
 @pytest.mark.vcr
 def test_process_payment_with_auto_capture(
-    payment_adyen_for_checkout, checkout_with_items, adyen_plugin, adyen_payment_me
+    payment_adyen_for_checkout, checkout_with_items, adyen_plugin, adyen_payment_method
+):
+    payment_info = create_payment_information(
+        payment_adyen_for_checkout,
+        additional_data={"paymentMethod": adyen_payment_method},
+    )
+    adyen_plugin = adyen_plugin(auto_capture=True)
+    response = adyen_plugin.process_payment(payment_info, None)
+    assert response.is_success is True
+    assert response.action_required is False
+    assert response.kind == TransactionKind.CAPTURE
+    assert response.amount == Decimal("80.00")
+    assert response.currency == checkout_with_items.currency
+    assert response.transaction_id == "853610014787942J"  # ID returned by Adyen
+    assert response.error is None
+    assert response.action_required_data is None
+
+
+@pytest.mark.vcr
+def test_process_payment_with_3ds_redirect(
+    payment_adyen_for_checkout,
+    adyen_additional_data_for_3ds,
+    checkout_with_items,
+    adyen_plugin,
+):
+    payment_adyen_for_checkout.extra_data = ""
+    payment_adyen_for_checkout.save(update_fields=["extra_data"])
+    payment_info = create_payment_information(
+        payment_adyen_for_checkout, additional_data=adyen_additional_data_for_3ds
+    )
+    adyen_plugin = adyen_plugin(auto_capture=True)
+    response = adyen_plugin.process_payment(payment_info, None)
+    assert response.is_success is True
+    assert response.action_required is True
+    assert response.kind == TransactionKind.AUTH
+    assert response.amount == Decimal("80.00")
+    assert response.currency == checkout_with_items.currency
+    assert response.error is None
+
+    action_required_data = response.action_required_data
+    assert action_required_data["type"] == "redirect"
+    assert action_required_data["paymentMethodType"] == "scheme"
+    assert action_required_data["paymentData"]
+
+    payment_data = action_required_data["paymentData"]
+    payment_adyen_for_checkout.refresh_from_db()
+    assert payment_adyen_for_checkout.extra_data == json.dumps(
+        [{"payment_data": payment_data, "parameters": ["MD", "PaRes"]}]
+    )
+
+
+@pytest.mark.vcr
+def test_process_payment_with_klarna(
+    payment_adyen_for_checkout,
+    adyen_additional_data_for_klarna,
+    checkout_with_items,
+    address_usa,
+    adyen_plugin,
+):
+    payment_adyen_for_checkout.extra_data = ""
+    payment_adyen_for_checkout.save(update_fields=["extra_data"])
+    checkout_with_items.billing_address = address_usa
+    checkout_with_items.shipping_address = address_usa
+    checkout_with_items.save(update_fields=["billing_address", "shipping_address"])
+
+    line = checkout_with_items.lines.first()
+    line.quantity = 2
+    line.save(update_fields=["quantity"])
+
+    payment_info = create_payment_information(
+        payment_adyen_for_checkout, additional_data=adyen_additional_data_for_klarna
+    )
+    adyen_plugin = adyen_plugin(auto_capture=True)
+    response = adyen_plugin.process_payment(payment_info, None)
+    assert response.is_success is True
+    assert response.action_required is True
+    assert response.kind == TransactionKind.AUTH
+    assert response.amount == Decimal("80.00")
+    assert response.currency == checkout_with_items.currency
+    assert response.error is None
+
+    action_required_data = response.action_required_data
+    assert action_required_data["type"] == "redirect"
+    assert action_required_data["paymentMethodType"] == "klarna_account"
+    assert action_required_data["paymentData"]
+
+    payment_data = action_required_data["paymentData"]
+    payment_adyen_for_checkout.refresh_from_db()
+    assert payment_adyen_for_checkout.extra_data == json.dumps(
+        [{"payment_data": payment_data, "parameters": ["redirectResult"]}]
+    )
+
+
+@mock.patch("saleor.payment.gateways.adyen.plugin.api_call")
+def test_process_payment_additional_action(
+    api_call_mock, payment_adyen_for_checkout, checkout_with_items, adyen_plugin
+):
+    payment_adyen_for_checkout.extra_data = ""
+    payment_adyen_for_checkout.save(update_fields=["extra_data"])
+    payment_data = "Ab02b4c0!B"
+    action_data = {
+        "method": "GET",
+        "paymentData": payment_data,
+        "paymentMethodType": "ideal",
+        "type": "redirect",
+        "url": "https://test.adyen.com/hpp/redirectIdeal.shtml?brandCode=ideal",
+    }
+    message = {
+        "resultCode": "RedirectShopper",
+        "action": action_data,
+        "details": [{"key": "payload", "type": "text"}],
+        "pspReference": "882595494831959A",
+    }
+    api_call_mock.return_value.message = message
+
+    payment_info = create_payment_information(
+        payment_adyen_for_checkout,
+        additional_data={"paymentMethod": {"paymentdata": ""}},
+    )
+    adyen_plugin = adyen_plugin(auto_capture=True)
+    response = adyen_plugin.process_payment(payment_info, None)
+    assert response.is_success is True
+    assert response.action_required is True
+    assert response.kind == TransactionKind.AUTH
+    assert response.amount == Decimal("80.00")
+    assert response.currency == checkout_with_items.currency
+    assert response.transaction_id == "882595494831959A"
+    assert response.error is None
+    assert response.action_required_data == action_data
+
+    payment_adyen_for_checkout.refresh_from_db()
+    assert payment_adyen_for_checkout.extra_data == json.dumps(
+        [{"payment_data": payment_data, "parameters": ["payload"]}]
+    )
+
+
+@mock.patch("saleor.payment.gateways.adyen.plugin.api_call")
+def test_process_payment_additional_action_payment_does_not_exists(
+    api_call_mock, payment_adyen_for_checkout, checkout_with_items, adyen_plugin
+):
+    action_data = {
+        "method": "GET",
+        "paymentData": "Ab02b4c0!B",
+        "paymentMethodType": "ideal",
+        "type": "redirect",
+        "url": "https://test.adyen.com/hpp/redirectIdeal.shtml?brandCode=ideal",
+    }
+    message = {
+        "resultCode": "RedirectShopper",
+        "action": action_data,
+        "details": [{"key": "payload", "type": "text"}],
+        "pspReference": "882595494831959A",
+    }
+    api_call_mock.return_value.message = message
+
+    payment_info = create_payment_information(
+        payment_adyen_for_checkout,
+        additional_data={"paymentMethod": {"paymentdata": ""}},
+    )
+
+    Payment.objects.all().delete()
+
+    adyen_plugin = adyen_plugin(auto_capture=True)
+
+    with pytest.raises(PaymentError) as e:
+        adyen_plugin.process_payment(payment_info, None)
+
+    assert str(e.value) == "Payment cannot be performed. Payment does not exists."
+
+
+@mock.patch("saleor.payment.gateways.adyen.plugin.api_call")
+def test_process_payment_additional_action_checkout_does_not_exists(
+    api_call_mock, payment_adyen_for_checkout, checkout_with_items, adyen_plugin
+):
+    action_data = {
+        "method": "GET",
+        "paymentData": "Ab02b4c0!B",
+        "paymentMethodType": "ideal",
+        "type": "redirect",
+        "url": "https://test.adyen.com/hpp/redirectIdeal.shtml?brandCode=ideal",
+    }
+    message = {
+        "resultCode": "RedirectShopper",
+        "action": action_data,
+        "details": [{"key": "payload", "type": "text"}],
+        "pspReference": "882595494831959A",
+    }
+    api_call_mock.return_value.message = message
+
+    payment_info = create_payment_information(
+        payment_adyen_for_checkout,
+        additional_data={"paymentMethod": {"paymentdata": ""}},
+    )
+
+    payment_adyen_for_checkout.checkout = None
+    payment_adyen_for_checkout.save()
+
+    adyen_plugin = adyen_plugin(auto_capture=True)
+
+    with pytest.raises(PaymentError) as e:
+        adyen_plugin.process_payment(payment_info, None)
+
+    assert (
+        str(e.value)
+        == "Payment cannot be performed. Checkout for this payment does not exist."
+    )
+
+
+def test_confirm_payment(payment_adyen_for_order, adyen_plugin):
+    payment_info = create_payment_information(
+        payment_adyen_for_order,
+    )
+    gateway_respon
