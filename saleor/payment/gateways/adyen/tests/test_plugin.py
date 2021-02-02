@@ -555,4 +555,165 @@ def test_void_payment(
         payment=payment_adyen_for_order,
         payment_information=payment_info,
         kind=TransactionKind.AUTH,
-        gateway_response=gateway_respo
+        gateway_response=gateway_response,
+    )
+    response = adyen_plugin().void_payment(payment_info, None)
+    assert response.is_success is True
+    assert response.action_required is False
+    assert response.kind == TransactionKind.VOID
+    assert response.amount == Decimal("80.00")
+    assert response.currency == order_with_lines.currency
+    assert response.transaction_id == "852610010936232E"  # ID returned by Adyen
+
+
+@pytest.mark.vcr
+def test_capture_payment(
+    payment_adyen_for_order, order_with_lines, adyen_plugin, adyen_payment_method
+):
+    payment_info = create_payment_information(
+        payment_adyen_for_order,
+        payment_token="882595494831959A",
+        additional_data={"paymentMethod": adyen_payment_method},
+    )
+    gateway_response = GatewayResponse(
+        kind=TransactionKind.AUTH,
+        action_required=False,
+        transaction_id="882595494831959A",
+        is_success=True,
+        amount=payment_info.amount,
+        currency=payment_info.currency,
+        error="",
+        raw_response={},
+    )
+
+    create_transaction(
+        payment=payment_adyen_for_order,
+        payment_information=payment_info,
+        kind=TransactionKind.AUTH,
+        gateway_response=gateway_response,
+    )
+    response = adyen_plugin().capture_payment(payment_info, None)
+    assert response.is_success is True
+    assert response.action_required is False
+    assert response.kind == TransactionKind.CAPTURE
+    assert response.amount == Decimal("80.00")
+    assert response.currency == order_with_lines.currency
+    assert response.transaction_id == "852610007697063J"  # ID returned by Adyen
+
+
+@mock.patch("saleor.payment.gateways.adyen.utils.apple_pay.requests.post")
+def test_validate_plugin_configuration_incorrect_certificate(
+    mocked_request, adyen_plugin
+):
+    plugin = adyen_plugin(apple_pay_cert="cert")
+    mocked_request.side_effect = SSLError()
+    configuration = PluginConfiguration.objects.get()
+    with pytest.raises(ValidationError):
+        plugin.validate_plugin_configuration(configuration)
+
+
+@mock.patch("saleor.payment.gateways.adyen.utils.apple_pay.requests.post")
+def test_validate_plugin_configuration_correct_cert(mocked_request, adyen_plugin):
+    plugin = adyen_plugin(apple_pay_cert="correct_cert")
+    mocked_request.side_effect = RequestException()
+    configuration = PluginConfiguration.objects.get()
+    plugin.validate_plugin_configuration(configuration)
+
+
+def test_validate_plugin_configuration_without_apple_cert(adyen_plugin):
+    plugin = adyen_plugin(apple_pay_cert="correct_cert")
+    configuration = [
+        {"name": "api-key", "value": "key"},
+    ]
+    plugin_configuration = PluginConfiguration.objects.get()
+    plugin_configuration.configuration = configuration
+    plugin.validate_plugin_configuration(plugin_configuration)
+
+
+@mock.patch("saleor.payment.gateways.adyen.plugin.api_call")
+def test_adyen_check_payment_balance(
+    api_call_mock, adyen_plugin, adyen_check_balance_response
+):
+    api_call_mock.return_value = adyen_check_balance_response
+    plugin = adyen_plugin()
+
+    data = {
+        "gatewayId": "mirumee.payments.gateway",
+        "method": "givex",
+        "card": {
+            "cvc": "9891",
+            "code": "1234567910",
+            "money": {"currency": "GBP", "amount": Decimal(100.0)},
+        },
+    }
+
+    result = plugin.check_payment_balance(data, None)
+
+    assert result["pspReference"] == "851634546949980A"
+    assert result["resultCode"] == "Success"
+    assert result["balance"] == {"currency": "GBP", "value": 10000}
+    api_call_mock.assert_called_once_with(
+        {
+            "merchantAccount": "SaleorECOM",
+            "paymentMethod": {
+                "type": "givex",
+                "number": "1234567910",
+                "securityCode": "9891",
+            },
+            "amount": {"currency": "GBP", "value": "10000"},
+        },
+        plugin.adyen.checkout.client.call_checkout_api,
+        action="paymentMethods/balance",
+    )
+
+
+@mock.patch("saleor.payment.gateways.adyen.plugin.api_call")
+def test_adyen_check_payment_balance_adyen_raises_error(api_call_mock, adyen_plugin):
+    api_call_mock.return_value = Adyen.AdyenError("Error")
+    plugin = adyen_plugin()
+
+    data = {
+        "gatewayId": "mirumee.payments.gateway",
+        "method": "givex",
+        "card": {
+            "cvc": "9891",
+            "code": "1234567910",
+            "money": {"currency": "GBP", "amount": Decimal(100.0)},
+        },
+    }
+
+    result = plugin.check_payment_balance(data, None)
+
+    assert result == "Error"
+    api_call_mock.assert_called_once_with(
+        {
+            "merchantAccount": "SaleorECOM",
+            "paymentMethod": {
+                "type": "givex",
+                "number": "1234567910",
+                "securityCode": "9891",
+            },
+            "amount": {"currency": "GBP", "value": "10000"},
+        },
+        plugin.adyen.checkout.client.call_checkout_api,
+        action="paymentMethods/balance",
+    )
+
+
+@mock.patch("requests.post")
+def test_adyen_check_payment_timeout(request_post_mock, adyen_plugin):
+    plugin = adyen_plugin()
+
+    data = {
+        "gatewayId": "mirumee.payments.gateway",
+        "method": "givex",
+        "card": {
+            "cvc": "9891",
+            "code": "1234567910",
+            "money": {"currency": "GBP", "amount": Decimal(100.0)},
+        },
+    }
+
+    request_post_mock.side_effect = ConnectTimeout()
+    res = plugin.check_payment_balance(data, None)
+    assert res.startswith("Unable to process the payment request")
