@@ -1,0 +1,5 @@
+interactions:
+- request:
+    body: '{"merchantAccount": "SaleorECOM", "modificationAmount": {"value": "8000",
+      "currency": "USD"}, "originalReference": "882595494831959A", "reference": "UGF5bWVudDoxMTQ0",
+   
