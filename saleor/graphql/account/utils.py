@@ -166,4 +166,201 @@ class StaffDeleteMixin(UserDeleteMixin):
             errors[field] = [error]
 
 
-def get
+def get_required_fields_camel_case(required_fields: set) -> set:
+    """Return set of AddressValidationRules required fields in camel case."""
+    return {validation_field_to_camel_case(field) for field in required_fields}
+
+
+def get_upper_fields_camel_case(upper_fields: set) -> set:
+    """Return set of AddressValidationRules upper fields in camel case."""
+    return {validation_field_to_camel_case(field) for field in upper_fields}
+
+
+def validation_field_to_camel_case(name: str) -> str:
+    """Convert name of the field from snake case to camel case."""
+    name = to_camel_case(name)
+    if name == "streetAddress":
+        return "streetAddress1"
+    return name
+
+
+def get_allowed_fields_camel_case(allowed_fields: set) -> set:
+    """Return set of AddressValidationRules allowed fields in camel case."""
+    fields = {validation_field_to_camel_case(field) for field in allowed_fields}
+    if "streetAddress1" in fields:
+        fields.add("streetAddress2")
+    return fields
+
+
+def get_user_permissions(user: "User") -> "QuerySet":
+    """Return all user permissions - from user groups and user_permissions field."""
+    return user.effective_permissions
+
+
+def get_out_of_scope_permissions(
+    requestor: Union["User", "App", None], permissions: List[str]
+) -> List[str]:
+    """Return permissions that the requestor hasn't got."""
+    missing_permissions = []
+    for perm in permissions:
+        if not requestor or not requestor.has_perm(perm):
+            missing_permissions.append(perm)
+    return missing_permissions
+
+
+def get_out_of_scope_users(root_user: "User", users: List["User"]):
+    """Return users whose permission scope is wider than the given user."""
+    out_of_scope_users = []
+    for user in users:
+        user_permissions = user.get_all_permissions()
+        if not root_user.has_perms(user_permissions):
+            out_of_scope_users.append(user)
+    return out_of_scope_users
+
+
+def can_user_manage_group(user: "User", group: Group) -> bool:
+    """User can't manage a group with permission that is out of the user's scope."""
+    permissions = get_group_permission_codes(group)
+    return user.has_perms(permissions)
+
+
+def can_manage_app(requestor: Union["User", "App", None], app: "App") -> bool:
+    """Requestor can't manage app with wider scope of permissions."""
+    permissions = app.get_permissions()
+    if not requestor:
+        return False
+    return requestor.has_perms(permissions)
+
+
+def get_group_permission_codes(group: Group) -> "QuerySet":
+    """Return group permissions in the format '<app label>.<permission codename>'."""
+    return group.permissions.annotate(
+        formated_codename=Concat("content_type__app_label", Value("."), "codename")
+    ).values_list("formated_codename", flat=True)
+
+
+def get_groups_which_user_can_manage(user: "User") -> List[Group]:
+    """Return groups which user can manage."""
+    if not user.is_staff:
+        return []
+
+    user_permissions = get_user_permissions(user)
+    user_permission_pks = set(user_permissions.values_list("pk", flat=True))
+
+    groups = Group.objects.all().annotate(group_perms=ArrayAgg("permissions"))
+
+    editable_groups: List[Group] = []
+    for group in groups.iterator():
+        out_of_scope_permissions = set(group.group_perms) - user_permission_pks
+        out_of_scope_permissions.discard(None)
+        if not out_of_scope_permissions:
+            editable_groups.append(group)
+
+    return editable_groups
+
+
+def get_not_manageable_permissions_when_deactivate_or_remove_users(users: List["User"]):
+    """Return permissions that cannot be managed after deactivating or removing users.
+
+    After removing or deactivating users, for each user permission which he can manage,
+    there should be at least one active staff member who can manage it
+    (has both “manage staff” and this permission).
+    """
+    # check only users who can manage permissions
+    users_to_check = {
+        user for user in users if user.has_perm(AccountPermissions.MANAGE_STAFF.value)
+    }
+
+    if not users_to_check:
+        return set()
+
+    user_pks = set()
+    not_manageable_permissions = set()
+    for user in users_to_check:
+        not_manageable_permissions.update(user.get_all_permissions())
+        user_pks.add(user.pk)
+
+    groups_data = get_group_to_permissions_and_users_mapping()
+
+    # get users from groups with manage staff
+    manage_staff_users = get_users_and_look_for_permissions_in_groups_with_manage_staff(
+        groups_data, set()
+    )
+
+    if not manage_staff_users:
+        return not_manageable_permissions
+
+    # remove deactivating or removing users from manage staff users
+    manage_staff_users = manage_staff_users - user_pks
+
+    # look for not_manageable_permissions in user with manage staff permissions groups,
+    # if any of not_manageable_permissions is found it is removed from set
+    look_for_permission_in_users_with_manage_staff(
+        groups_data, manage_staff_users, not_manageable_permissions
+    )
+
+    # return remaining not managable permissions
+    return not_manageable_permissions
+
+
+def get_not_manageable_permissions_after_removing_perms_from_group(
+    group: Group, permissions: List["str"]
+):
+    """Return permissions that cannot be managed after removing permissions from group.
+
+    After removing permissions from group, for each permission, there should be at least
+    one staff member who can manage it (has both “manage staff” and this permission).
+    """
+    groups_data = get_group_to_permissions_and_users_mapping()
+    groups_data.pop(group.pk)
+    not_manageable_permissions = set(permissions)
+
+    return get_not_manageable_permissions(groups_data, not_manageable_permissions)
+
+
+def get_not_manageable_permissions_after_removing_users_from_group(
+    group: Group, users: List["User"]
+):
+    """Return permissions that cannot be managed after removing users from group.
+
+    After removing users from group, for each permission, there should be at least
+    one staff member who can manage it (has both “manage staff” and this permission).
+    """
+    group_users = group.user_set.all()
+    group_permissions = group.permissions.values_list("codename", flat=True)
+    # if group has manage_staff permission and some users will stay in group
+    # given users can me removed (permissions will be manageable)
+    manage_staff_codename = AccountPermissions.MANAGE_STAFF.codename
+    if len(group_users) > len(users) and manage_staff_codename in group_permissions:
+        return set()
+
+    # check if any of remaining group user has manage staff permission
+    # if True, all group permissions can be managed
+    group_remaining_users = set(group_users) - set(users)
+    manage_staff_permission = AccountPermissions.MANAGE_STAFF.value
+    if any([user.has_perm(manage_staff_permission) for user in group_remaining_users]):
+        return set()
+
+    # if group and any of remaining group user doesn't have manage staff permission
+    # we can treat the situation as this when group is removing
+    not_manageable_permissions = get_not_manageable_permissions_after_group_deleting(
+        group
+    )
+
+    return not_manageable_permissions
+
+
+def get_not_manageable_permissions_after_group_deleting(group):
+    """Return permissions that cannot be managed after deleting the group.
+
+    After removing group, for each permission, there should be at least one staff member
+    who can manage it (has both “manage staff” and this permission).
+    """
+    groups_data = get_group_to_permissions_and_users_mapping()
+    not_manageable_permissions = groups_data.pop(group.pk)["permissions"]
+    return get_not_manageable_permissions(groups_data, not_manageable_permissions)
+
+
+def get_not_manageable_permissions(
+    groups_data: dict,
+    not_mana
