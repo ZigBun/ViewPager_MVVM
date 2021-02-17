@@ -363,4 +363,150 @@ def get_not_manageable_permissions_after_group_deleting(group):
 
 def get_not_manageable_permissions(
     groups_data: dict,
-    not_mana
+    not_manageable_permissions: Set[str],
+):
+    # get users from groups with manage staff and look for not_manageable_permissions
+    # if any of not_manageable_permissions is found it is removed from set
+    manage_staff_users = get_users_and_look_for_permissions_in_groups_with_manage_staff(
+        groups_data, not_manageable_permissions
+    )
+
+    # check if management of all permissions provided by other groups
+    if not not_manageable_permissions:
+        return set()
+
+    # check lack of users with manage staff in other groups
+    if not manage_staff_users:
+        return not_manageable_permissions
+
+    # look for remaining permissions from not_manageable_permissions in user with
+    # manage staff permissions groups, if any of not_manageable_permissions is found
+    # it is removed from set
+    look_for_permission_in_users_with_manage_staff(
+        groups_data, manage_staff_users, not_manageable_permissions
+    )
+
+    # return remaining not managable permissions
+    return not_manageable_permissions
+
+
+def get_group_to_permissions_and_users_mapping():
+    """Return group mapping with data about their permissions and user.
+
+    Get all groups and return mapping in structure:
+        {
+            group1_pk: {
+                "permissions": ["perm_codename1", "perm_codename2"],
+                "users": [user_pk1, user_pk2]
+            },
+        }
+    """
+    mapping = {}
+    groups_data = (
+        Group.objects.all()
+        .annotate(
+            perm_codenames=ArrayAgg(
+                Concat(
+                    "permissions__content_type__app_label",
+                    Value("."),
+                    "permissions__codename",
+                ),
+                filter=Q(permissions__isnull=False),
+            ),
+            users=ArrayAgg("user", filter=Q(user__is_active=True)),
+        )
+        .values("pk", "perm_codenames", "users")
+    )
+
+    for data in groups_data:
+        mapping[data["pk"]] = {
+            "permissions": set(data["perm_codenames"]),
+            "users": set(data["users"]),
+        }
+
+    return mapping
+
+
+def get_users_and_look_for_permissions_in_groups_with_manage_staff(
+    groups_data: dict,
+    permissions_to_find: Set[str],
+):
+    """Search for permissions in groups with manage staff and return their users.
+
+    Args:
+        groups_data: dict with groups data, key is a group pk and value is group data
+            with permissions and users
+        permissions_to_find: searched permissions
+
+    """
+    users_with_manage_staff: Set[int] = set()
+    for data in groups_data.values():
+        permissions = data["permissions"]
+        users = data["users"]
+        has_manage_staff = AccountPermissions.MANAGE_STAFF.value in permissions
+        has_users = bool(users)
+        # only consider groups with active users and manage_staff permission
+        if has_users and has_manage_staff:
+            common_permissions = permissions_to_find & permissions
+            # remove found permission from set
+            permissions_to_find.difference_update(common_permissions)
+            users_with_manage_staff.update(users)
+
+    return users_with_manage_staff
+
+
+def look_for_permission_in_users_with_manage_staff(
+    groups_data: dict,
+    users_to_check: Set[int],
+    permissions_to_find: Set[str],
+):
+    """Search for permissions in user with manage staff groups.
+
+    Args:
+        groups_data: dict with groups data, key is a group pk and value is group data
+            with permissions and users
+        users_to_check: users with manage_staff
+        permissions_to_find: searched permissions
+
+    """
+    for data in groups_data.values():
+        permissions = data["permissions"]
+        users = data["users"]
+        common_users = users_to_check & users
+        if common_users:
+            common_permissions = permissions_to_find & permissions
+            # remove found permission from set
+            permissions_to_find.difference_update(common_permissions)
+
+
+def is_owner_or_has_one_of_perms(
+    requestor: Union["User", "App", None], owner: Optional[Union["User", "App"]], *perms
+) -> bool:
+    """Check if requestor can access data.
+
+    :param requestor: Requestor user or app.
+    :param owner: Data owner.
+    :param perms:
+        Permissions which can give the access to the data.
+        Requestor needs to have at least one of given permissions
+        to get access to protected resource.
+    """
+    return requestor == owner or has_one_of_permissions(requestor, perms)
+
+
+def check_is_owner_or_has_one_of_perms(
+    requestor: Union["User", "App", None], owner: Optional["User"], *perms
+) -> None:
+    """Confirm that requestor can access data, raise `PermissionDenied` otherwise.
+
+    :param requestor: Requestor user or app.
+    :param owner: Data owner.
+    :param perms:
+        Permissions which can give the access to the data.
+        Requestor needs to have at least one of given permissions
+        to get access to protected resource.
+
+    :raises PermissionDenied: if requestor cannot access data
+    """
+    if not is_owner_or_has_one_of_perms(requestor, owner, *perms):
+        raise PermissionDenied(permissions=list(perms) + [AuthorizationFilters.OWNER])
