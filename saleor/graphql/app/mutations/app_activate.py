@@ -26,4 +26,5 @@ class AppActivate(ModelMutation):
         app.is_active = True
         cls.save(info, app, None)
         manager = get_plugin_manager_promise(info.context).get()
-        cls
+        cls.call_event(manager.app_status_changed, app)
+        return cls.success_response(app)
