@@ -493,4 +493,210 @@ def test_checkout_create_with_inactive_channel_slug(
 
 def test_checkout_create(api_client, stock, graphql_address_data, channel_USD):
     """Create checkout object using GraphQL API."""
-  
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    test_email = "test@example.com"
+    shipping_address = graphql_address_data
+    variables = {
+        "checkoutInput": {
+            "channel": channel_USD.slug,
+            "lines": [{"quantity": 1, "variantId": variant_id}],
+            "email": test_email,
+            "shippingAddress": shipping_address,
+        }
+    }
+    assert not Checkout.objects.exists()
+    response = api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    content = get_graphql_content(response)["data"]["checkoutCreate"]
+
+    new_checkout = Checkout.objects.first()
+    assert new_checkout is not None
+    checkout_data = content["checkout"]
+    assert checkout_data["token"] == str(new_checkout.token)
+    assert new_checkout.lines.count() == 1
+    checkout_line = new_checkout.lines.first()
+    assert checkout_line.variant == variant
+    assert checkout_line.quantity == 1
+    assert new_checkout.shipping_address is not None
+    assert new_checkout.shipping_address.first_name == shipping_address["firstName"]
+    assert new_checkout.shipping_address.last_name == shipping_address["lastName"]
+    assert (
+        new_checkout.shipping_address.street_address_1
+        == shipping_address["streetAddress1"]
+    )
+    assert (
+        new_checkout.shipping_address.street_address_2
+        == shipping_address["streetAddress2"]
+    )
+    assert new_checkout.shipping_address.postal_code == shipping_address["postalCode"]
+    assert new_checkout.shipping_address.country == shipping_address["country"]
+    assert new_checkout.shipping_address.city == shipping_address["city"].upper()
+    assert not Reservation.objects.exists()
+
+
+def test_checkout_create_with_custom_price(
+    app_api_client,
+    stock,
+    graphql_address_data,
+    channel_USD,
+    permission_handle_checkouts,
+):
+    """Ensure that app with handle checkouts permission can set custom price."""
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    test_email = "test@example.com"
+    shipping_address = graphql_address_data
+    price = 12.25
+    variables = {
+        "checkoutInput": {
+            "channel": channel_USD.slug,
+            "lines": [{"quantity": 1, "variantId": variant_id, "price": price}],
+            "email": test_email,
+            "shippingAddress": shipping_address,
+        }
+    }
+    assert not Checkout.objects.exists()
+    response = app_api_client.post_graphql(
+        MUTATION_CHECKOUT_CREATE, variables, permissions=[permission_handle_checkouts]
+    )
+    content = get_graphql_content(response)["data"]["checkoutCreate"]
+
+    new_checkout = Checkout.objects.first()
+    assert new_checkout is not None
+    checkout_data = content["checkout"]
+    assert checkout_data["token"] == str(new_checkout.token)
+    assert new_checkout.lines.count() == 1
+    checkout_line = new_checkout.lines.first()
+    assert checkout_line.variant == variant
+    assert checkout_line.quantity == 1
+    assert checkout_line.price_override == price
+
+
+def test_checkout_create_with_metadata_in_line(
+    api_client, stock, graphql_address_data, channel_USD
+):
+    """Ensure that app with handle checkouts permission can set custom price."""
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    test_email = "test@example.com"
+    shipping_address = graphql_address_data
+    metadata_key = "md key"
+    metadata_value = "md value"
+    variables = {
+        "checkoutInput": {
+            "channel": channel_USD.slug,
+            "lines": [
+                {
+                    "quantity": 1,
+                    "variantId": variant_id,
+                    "metadata": [{"key": metadata_key, "value": metadata_value}],
+                }
+            ],
+            "email": test_email,
+            "shippingAddress": shipping_address,
+        }
+    }
+    assert not Checkout.objects.exists()
+    response = api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    content = get_graphql_content(response)["data"]["checkoutCreate"]
+
+    new_checkout = Checkout.objects.first()
+    assert new_checkout is not None
+    checkout_data = content["checkout"]
+    assert checkout_data["token"] == str(new_checkout.token)
+    assert new_checkout.lines.count() == 1
+    checkout_line = new_checkout.lines.first()
+    assert checkout_line.variant == variant
+    assert checkout_line.quantity == 1
+    assert checkout_line.metadata == {metadata_key: metadata_value}
+
+
+def test_checkout_create_with_custom_price_duplicated_items(
+    app_api_client,
+    stock,
+    graphql_address_data,
+    channel_USD,
+    permission_handle_checkouts,
+):
+    """Ensure that when the same item with a custom price is provided multiple times,
+    the price from the last occurrence will be set."""
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    test_email = "test@example.com"
+    shipping_address = graphql_address_data
+    price_1 = 12.25
+    price_2 = 20.25
+    variables = {
+        "checkoutInput": {
+            "channel": channel_USD.slug,
+            "lines": [
+                {"quantity": 1, "variantId": variant_id, "price": price_1},
+                {"quantity": 1, "variantId": variant_id, "price": price_2},
+            ],
+            "email": test_email,
+            "shippingAddress": shipping_address,
+        }
+    }
+    assert not Checkout.objects.exists()
+    response = app_api_client.post_graphql(
+        MUTATION_CHECKOUT_CREATE, variables, permissions=[permission_handle_checkouts]
+    )
+    content = get_graphql_content(response)["data"]["checkoutCreate"]
+
+    new_checkout = Checkout.objects.first()
+    assert new_checkout is not None
+    checkout_data = content["checkout"]
+    assert checkout_data["token"] == str(new_checkout.token)
+    assert new_checkout.lines.count() == 1
+    checkout_line = new_checkout.lines.first()
+    assert checkout_line.variant == variant
+    assert checkout_line.quantity == 2
+    assert checkout_line.price_override == price_2
+
+
+def test_checkout_create_with_force_new_line(
+    app_api_client,
+    stock,
+    graphql_address_data,
+    channel_USD,
+    permission_handle_checkouts,
+):
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    test_email = "test@example.com"
+    shipping_address = graphql_address_data
+
+    variables = {
+        "checkoutInput": {
+            "channel": channel_USD.slug,
+            "lines": [
+                {"quantity": 1, "variantId": variant_id},
+                {"quantity": 1, "variantId": variant_id, "forceNewLine": True},
+            ],
+            "email": test_email,
+            "shippingAddress": shipping_address,
+        }
+    }
+    assert not Checkout.objects.exists()
+    response = app_api_client.post_graphql(
+        MUTATION_CHECKOUT_CREATE,
+        variables,
+        permissions=[permission_handle_checkouts],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)["data"]["checkoutCreate"]
+
+    new_checkout = Checkout.objects.first()
+    new_checkout_lines = new_checkout.lines.all()
+    assert new_checkout is not None
+    checkout_data = content["checkout"]
+    assert checkout_data["token"] == str(new_checkout.token)
+    assert len(new_checkout_lines) == 2
+
+    for line in new_checkout_lines:
+        assert line.variant == variant
+        assert line.quantity == 1
+
+
+def test_checkout_create_with_custom_price_by_app_no_perm(
+    a
