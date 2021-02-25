@@ -1302,4 +1302,209 @@ def test_checkout_create_when_all_stocks_exceeded(
     content = get_graphql_content(response)
     data = content["data"]["checkoutCreate"]
     assert data["errors"][0]["message"] == (
-        "Could not add item
+        "Could not add items SKU_A. Only 0 remaining in stock."
+    )
+    assert data["errors"][0]["field"] == "quantity"
+
+
+def test_checkout_create_when_one_stock_exceeded(
+    user_api_client, variant_with_many_stocks, graphql_address_data, channel_USD
+):
+    variant = variant_with_many_stocks
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    variables = {
+        "checkoutInput": {
+            "lines": [{"quantity": 16, "variantId": variant_id}],
+            "email": "test@example.com",
+            "shippingAddress": graphql_address_data,
+            "channel": channel_USD.slug,
+        }
+    }
+
+    # make first stock exceeded
+    stock = variant.stocks.first()
+    stock.quantity = -1
+    stock.save()
+
+    response = user_api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["checkoutCreate"]
+    assert data["errors"][0]["message"] == (
+        "Could not add items SKU_A. Only 2 remaining in stock."
+    )
+    assert data["errors"][0]["field"] == "quantity"
+
+
+@override_settings(DEFAULT_COUNTRY="DE")
+def test_checkout_create_sets_country_from_shipping_address_country(
+    user_api_client,
+    variant_with_many_stocks_different_shipping_zones,
+    graphql_address_data,
+    channel_USD,
+):
+    variant = variant_with_many_stocks_different_shipping_zones
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    test_email = "test@example.com"
+    shipping_address = graphql_address_data
+    shipping_address["country"] = "US"
+    shipping_address["countryArea"] = "New York"
+    shipping_address["postalCode"] = 10001
+    variables = {
+        "checkoutInput": {
+            "channel": channel_USD.slug,
+            "lines": [{"quantity": 1, "variantId": variant_id}],
+            "email": test_email,
+            "shippingAddress": shipping_address,
+        }
+    }
+    assert not Checkout.objects.exists()
+    response = user_api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    content = get_graphql_content(response)
+    content["data"]["checkoutCreate"]
+    checkout = Checkout.objects.first()
+    assert checkout.country == "US"
+
+
+def test_checkout_create_sets_country_when_no_shipping_address_is_given(
+    api_client, variant_with_many_stocks_different_shipping_zones, channel_USD
+):
+    variant = variant_with_many_stocks_different_shipping_zones
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    test_email = "test@example.com"
+    variables = {
+        "checkoutInput": {
+            "channel": channel_USD.slug,
+            "lines": [{"quantity": 1, "variantId": variant_id}],
+            "email": test_email,
+        }
+    }
+    assert not Checkout.objects.exists()
+
+    # should set channel's default_country
+    api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    checkout = Checkout.objects.first()
+    assert checkout.country == channel_USD.default_country
+
+
+@override_settings(DEFAULT_COUNTRY="DE")
+def test_checkout_create_check_lines_quantity_for_zone_insufficient_stocks(
+    user_api_client,
+    variant_with_many_stocks_different_shipping_zones,
+    graphql_address_data,
+    channel_USD,
+):
+    """Check if insufficient stock exception will be raised.
+    If item from checkout will not have enough quantity in correct shipping zone for
+    shipping address INSUFICIENT_STOCK checkout error should be raised."""
+    variant = variant_with_many_stocks_different_shipping_zones
+    Stock.objects.filter(
+        warehouse__shipping_zones__countries__contains="US", product_variant=variant
+    ).update(quantity=0)
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    test_email = "test@example.com"
+    shipping_address = graphql_address_data
+    shipping_address["country"] = "US"
+    shipping_address["countryArea"] = "New York"
+    shipping_address["postalCode"] = 10001
+    variables = {
+        "checkoutInput": {
+            "lines": [{"quantity": 1, "variantId": variant_id}],
+            "email": test_email,
+            "shippingAddress": shipping_address,
+            "channel": channel_USD.slug,
+        }
+    }
+    assert not Checkout.objects.exists()
+    response = user_api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["checkoutCreate"]
+    assert not data["checkout"]
+    errors = data["errors"]
+    assert errors[0]["code"] == CheckoutErrorCode.INSUFFICIENT_STOCK.name
+    assert errors[0]["field"] == "quantity"
+
+
+def test_checkout_create_check_lines_quantity(
+    user_api_client, stock, graphql_address_data, channel_USD
+):
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    test_email = "test@example.com"
+    shipping_address = graphql_address_data
+    variables = {
+        "checkoutInput": {
+            "lines": [{"quantity": 16, "variantId": variant_id}],
+            "email": test_email,
+            "shippingAddress": shipping_address,
+            "channel": channel_USD.slug,
+        }
+    }
+    assert not Checkout.objects.exists()
+    response = user_api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["checkoutCreate"]
+    assert data["errors"][0]["message"] == (
+        "Could not add items SKU_A. Only 15 remaining in stock."
+    )
+    assert data["errors"][0]["field"] == "quantity"
+
+
+@pytest.mark.parametrize("is_preorder", [True, False])
+def test_checkout_create_check_lines_quantity_when_limit_per_variant_is_set_raise_err(
+    user_api_client, stock, graphql_address_data, channel_USD, is_preorder
+):
+    limit_per_customer = 5
+    variant = stock.product_variant
+    variant.quantity_limit_per_customer = limit_per_customer
+    variant.is_preorder = is_preorder
+    variant.preorder_end_date = timezone.now() + datetime.timedelta(days=1)
+    variant.save(
+        update_fields=[
+            "quantity_limit_per_customer",
+            "is_preorder",
+            "preorder_end_date",
+        ]
+    )
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    shipping_address = graphql_address_data
+    test_email = "test@example.com"
+    variables = {
+        "checkoutInput": {
+            "lines": [{"quantity": 6, "variantId": variant_id}],
+            "email": test_email,
+            "shippingAddress": shipping_address,
+            "channel": channel_USD.slug,
+        }
+    }
+    assert not Checkout.objects.exists()
+
+    response = user_api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["checkoutCreate"]
+
+    assert data["errors"][0]["message"] == (
+        f"Cannot add more than {limit_per_customer} times this item: {variant}."
+    )
+    assert data["errors"][0]["field"] == "quantity"
+
+
+@pytest.mark.parametrize("is_preorder", [True, False])
+def test_checkout_create_check_lines_quantity_limit_when_variant_in_multiple_lines(
+    user_api_client, stock, graphql_address_data, channel_USD, is_preorder
+):
+    limit_per_customer = 5
+    variant = stock.product_variant
+    variant.quantity_limit_per_customer = limit_per_customer
+    variant.is_preorder = is_preorder
+    variant.preorder_end_date = timezone.now() + datetime.timedelta(days=1)
+    variant.save(
+        update_fields=[
+            "quantity_limit_per_customer",
+            "is_preorder",
+            "preorder_end_date",
+        ]
+    )
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    shipping_address = graphql_address_data
+    test_email = "test@example.com"
+    variables = {
