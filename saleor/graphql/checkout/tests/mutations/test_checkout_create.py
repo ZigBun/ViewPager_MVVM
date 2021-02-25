@@ -1112,4 +1112,194 @@ def test_checkout_create_required_country_shipping_address(
     }
 
     response = api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
-    content = 
+    content = get_graphql_content(response)
+
+    checkout_errors = content["data"]["checkoutCreate"]["errors"]
+    assert checkout_errors[0]["field"] == "country"
+    assert checkout_errors[0]["code"] == CheckoutErrorCode.REQUIRED.name
+    assert checkout_errors[0]["addressType"] == AddressType.SHIPPING.upper()
+
+
+def test_checkout_create_required_country_billing_address(
+    api_client, stock, graphql_address_data, channel_USD
+):
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    billing_address = graphql_address_data
+    del billing_address["country"]
+    variables = {
+        "checkoutInput": {
+            "lines": [{"quantity": 1, "variantId": variant_id}],
+            "email": "test@example.com",
+            "billingAddress": billing_address,
+            "channel": channel_USD.slug,
+        }
+    }
+
+    response = api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    content = get_graphql_content(response)
+
+    checkout_errors = content["data"]["checkoutCreate"]["errors"]
+    assert checkout_errors[0]["field"] == "country"
+    assert checkout_errors[0]["code"] == CheckoutErrorCode.REQUIRED.name
+    assert checkout_errors[0]["addressType"] == AddressType.BILLING.upper()
+
+
+def test_checkout_create_default_email_for_logged_in_customer(
+    user_api_client, stock, channel_USD
+):
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    variables = {
+        "checkoutInput": {
+            "lines": [{"quantity": 1, "variantId": variant_id}],
+            "channel": channel_USD.slug,
+        }
+    }
+    response = user_api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    customer = user_api_client.user
+    content = get_graphql_content(response)
+    new_checkout = Checkout.objects.first()
+    assert new_checkout is not None
+    checkout_data = content["data"]["checkoutCreate"]["checkout"]
+    assert checkout_data["email"] == str(customer.email)
+    assert new_checkout.user.id == customer.id
+    assert new_checkout.email == customer.email
+
+
+def test_checkout_create_logged_in_customer(user_api_client, stock, channel_USD):
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    variables = {
+        "checkoutInput": {
+            "channel": channel_USD.slug,
+            "email": user_api_client.user.email,
+            "lines": [{"quantity": 1, "variantId": variant_id}],
+        }
+    }
+    assert not Checkout.objects.exists()
+    response = user_api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    content = get_graphql_content(response)
+    new_checkout = Checkout.objects.first()
+    assert new_checkout is not None
+    checkout_data = content["data"]["checkoutCreate"]["checkout"]
+    assert checkout_data["token"] == str(new_checkout.token)
+    checkout_user = new_checkout.user
+    customer = user_api_client.user
+    assert customer.id == checkout_user.id
+    assert new_checkout.shipping_address is None
+    assert new_checkout.billing_address is None
+    assert customer.email == new_checkout.email
+
+
+def test_checkout_create_logged_in_customer_custom_email(
+    user_api_client, stock, channel_USD
+):
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    customer = user_api_client.user
+    custom_email = "custom@example.com"
+    variables = {
+        "checkoutInput": {
+            "channel": channel_USD.slug,
+            "lines": [{"quantity": 1, "variantId": variant_id}],
+            "email": custom_email,
+        }
+    }
+    assert not Checkout.objects.exists()
+    assert not custom_email == customer.email
+    response = user_api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    content = get_graphql_content(response)
+    new_checkout = Checkout.objects.first()
+    assert new_checkout is not None
+    checkout_data = content["data"]["checkoutCreate"]["checkout"]
+    assert checkout_data["token"] == str(new_checkout.token)
+    checkout_user = new_checkout.user
+    assert customer.id == checkout_user.id
+    assert new_checkout.email == custom_email
+
+
+def test_checkout_create_logged_in_customer_custom_addresses(
+    user_api_client, stock, graphql_address_data, channel_USD
+):
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    shipping_address = graphql_address_data
+    billing_address = graphql_address_data
+    variables = {
+        "checkoutInput": {
+            "channel": channel_USD.slug,
+            "email": user_api_client.user.email,
+            "lines": [{"quantity": 1, "variantId": variant_id}],
+            "shippingAddress": shipping_address,
+            "billingAddress": billing_address,
+        }
+    }
+    assert not Checkout.objects.exists()
+    response = user_api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    content = get_graphql_content(response)
+    new_checkout = Checkout.objects.first()
+    assert new_checkout is not None
+    checkout_data = content["data"]["checkoutCreate"]["checkout"]
+    assert checkout_data["token"] == str(new_checkout.token)
+    checkout_user = new_checkout.user
+    customer = user_api_client.user
+    assert customer.id == checkout_user.id
+    assert not (
+        customer.default_shipping_address_id == new_checkout.shipping_address_id
+    )
+    assert not (customer.default_billing_address_id == new_checkout.billing_address_id)
+    assert new_checkout.shipping_address.first_name == shipping_address["firstName"]
+    assert new_checkout.billing_address.first_name == billing_address["firstName"]
+
+
+def test_checkout_create_check_lines_quantity_multiple_warehouse(
+    user_api_client, variant_with_many_stocks, graphql_address_data, channel_USD
+):
+    variant = variant_with_many_stocks
+
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    test_email = "test@example.com"
+    shipping_address = graphql_address_data
+    variables = {
+        "checkoutInput": {
+            "lines": [{"quantity": 16, "variantId": variant_id}],
+            "email": test_email,
+            "shippingAddress": shipping_address,
+            "channel": channel_USD.slug,
+        }
+    }
+    assert not Checkout.objects.exists()
+    response = user_api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["checkoutCreate"]
+    assert data["errors"][0]["message"] == (
+        "Could not add items SKU_A. Only 7 remaining in stock."
+    )
+    assert data["errors"][0]["field"] == "quantity"
+
+
+def test_checkout_create_when_all_stocks_exceeded(
+    user_api_client, variant_with_many_stocks, graphql_address_data, channel_USD
+):
+    variant = variant_with_many_stocks
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+    variables = {
+        "checkoutInput": {
+            "lines": [{"quantity": 16, "variantId": variant_id}],
+            "email": "test@example.com",
+            "shippingAddress": graphql_address_data,
+            "channel": channel_USD.slug,
+        }
+    }
+
+    # make stocks exceeded and assert
+    variant.stocks.update(quantity=-99)
+    for stock in variant.stocks.all():
+        assert stock.quantity == -99
+
+    response = user_api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["checkoutCreate"]
+    assert data["errors"][0]["message"] == (
+        "Could not add item
