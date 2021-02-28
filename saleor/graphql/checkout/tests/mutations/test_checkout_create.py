@@ -2229,4 +2229,172 @@ def test_checkout_create_with_skip_value_and_skip_required_saves_address(
     # then
     created_checkout = Checkout.objects.first()
     data = get_graphql_content(response)["data"]["checkoutCreate"]
-    assert not data["err
+    assert not data["errors"]
+
+    assert created_checkout
+    assert getattr(created_checkout, address_db_field_name)
+    assert getattr(created_checkout, address_db_field_name).country.code == country_code
+    assert getattr(created_checkout, address_db_field_name).postal_code == postal_code
+    assert getattr(created_checkout, address_db_field_name).city == city
+    assert getattr(created_checkout, address_db_field_name).street_address_1 == ""
+
+
+def test_checkout_create_with_shipping_address_disabled_fields_normalization(
+    api_client, stock, channel_USD
+):
+    # given
+    address_data = {
+        "country": "US",
+        "city": "Washington",
+        "countryArea": "District of Columbia",
+        "streetAddress1": "1600 Pennsylvania Avenue NW",
+        "postalCode": "20500",
+    }
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+
+    variables = {
+        "checkoutInput": {
+            "lines": [{"quantity": 1, "variantId": variant_id}],
+            "email": "test@example.com",
+            "shippingAddress": address_data,
+            "validationRules": {
+                "shippingAddress": {"enableFieldsNormalization": False}
+            },
+            "channel": channel_USD.slug,
+        }
+    }
+
+    # when
+    response = api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+
+    # then
+    data = get_graphql_content(response)["data"]["checkoutCreate"]
+    assert not data["errors"]
+    created_checkout = Checkout.objects.first()
+    assert created_checkout
+    shipping_address = created_checkout.shipping_address
+    assert shipping_address
+    assert shipping_address.city == address_data["city"]
+    assert shipping_address.country_area == address_data["countryArea"]
+    assert shipping_address.postal_code == address_data["postalCode"]
+    assert shipping_address.street_address_1 == address_data["streetAddress1"]
+
+
+def test_checkout_create_with_billing_address_disabled_fields_normalization(
+    api_client, stock, channel_USD
+):
+    # given
+    address_data = {
+        "country": "US",
+        "city": "Washington",
+        "countryArea": "District of Columbia",
+        "streetAddress1": "1600 Pennsylvania Avenue NW",
+        "postalCode": "20500",
+    }
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+
+    variables = {
+        "checkoutInput": {
+            "lines": [{"quantity": 1, "variantId": variant_id}],
+            "email": "test@example.com",
+            "billingAddress": address_data,
+            "validationRules": {"billingAddress": {"enableFieldsNormalization": False}},
+            "channel": channel_USD.slug,
+        }
+    }
+
+    # when
+    response = api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+
+    # then
+    data = get_graphql_content(response)["data"]["checkoutCreate"]
+    assert not data["errors"]
+    created_checkout = Checkout.objects.first()
+    assert created_checkout
+    billing_address = created_checkout.billing_address
+    assert billing_address
+    assert billing_address.city == address_data["city"]
+    assert billing_address.country_area == address_data["countryArea"]
+    assert billing_address.postal_code == address_data["postalCode"]
+    assert billing_address.street_address_1 == address_data["streetAddress1"]
+
+
+def test_checkout_create_with_disabled_fields_normalization_raises_required_error(
+    api_client, stock, channel_USD
+):
+    # given
+    address_data = {
+        "city": "Wroclaw",
+        "country": "PL",
+        "firstName": "John",
+        "lastName": "Doe",
+        "phone": "+12125094995",
+        "streetAddress1": "Teczowa 7",
+    }
+    variant = stock.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.id)
+
+    variables = {
+        "checkoutInput": {
+            "lines": [{"quantity": 1, "variantId": variant_id}],
+            "email": "test@example.com",
+            "shippingAddress": address_data,
+            "validationRules": {
+                "shippingAddress": {"enableFieldsNormalization": False}
+            },
+            "channel": channel_USD.slug,
+        }
+    }
+
+    # when
+    response = api_client.post_graphql(MUTATION_CHECKOUT_CREATE, variables)
+
+    # then
+    data = get_graphql_content(response)["data"]["checkoutCreate"]
+    assert len(data["errors"]) == 1
+    assert data["errors"][0]["field"] == "postalCode"
+    assert data["errors"][0]["code"] == "REQUIRED"
+
+
+@pytest.mark.parametrize("with_shipping_address", (True, False))
+def test_create_checkout_with_digital(
+    api_client,
+    digital_content,
+    graphql_address_data,
+    with_shipping_address,
+    channel_USD,
+):
+    """Test creating a checkout with a shipping address gets the address ignored."""
+
+    address_count = Address.objects.count()
+
+    variant = digital_content.product_variant
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+
+    checkout_input = {
+        "channel": channel_USD.slug,
+        "lines": [{"quantity": 1, "variantId": variant_id}],
+        "email": "customer@example.com",
+    }
+
+    if with_shipping_address:
+        checkout_input["shippingAddress"] = graphql_address_data
+
+    get_graphql_content(
+        api_client.post_graphql(
+            MUTATION_CHECKOUT_CREATE, {"checkoutInput": checkout_input}
+        )
+    )["data"]["checkoutCreate"]
+
+    # Retrieve the created checkout
+    checkout = Checkout.objects.get()
+
+    # Check that the shipping address was ignored, thus not created
+    assert (
+        checkout.shipping_address is None
+    ), "The address shouldn't have been associated"
+    assert (
+        Address.objects.count() == address_count
+    ), "No address should have been created"
