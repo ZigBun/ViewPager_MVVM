@@ -17,4 +17,9 @@ class Migration(migrations.Migration):
             field=models.JSONField(
                 blank=True,
                 default=dict,
-                encoder=saleor.core.utils.json_serializer.Cust
+                encoder=saleor.core.utils.json_serializer.CustomJsonEncoder,
+                null=True,
+                validators=[saleor.webhook.validators.custom_headers_validator],
+            ),
+        ),
+    ]
