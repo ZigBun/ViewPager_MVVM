@@ -306,4 +306,210 @@ def fetch_checkout_prices_if_expired(
             "subtotal_net_amount",
             "subtotal_gross_amount",
             "shipping_price_net_amount",
-          
+            "shipping_price_gross_amount",
+            "shipping_tax_rate",
+            "price_expiration",
+            "translated_discount_name",
+            "discount_amount",
+            "discount_name",
+            "currency",
+        ],
+        using=settings.DATABASE_CONNECTION_DEFAULT_NAME,
+    )
+    checkout.lines.bulk_update(
+        [line_info.line for line_info in lines],
+        [
+            "total_price_net_amount",
+            "total_price_gross_amount",
+            "tax_rate",
+        ],
+    )
+    return checkout_info, lines
+
+
+def _calculate_and_add_tax(
+    tax_calculation_strategy: str,
+    checkout: "Checkout",
+    manager: "PluginsManager",
+    checkout_info: "CheckoutInfo",
+    lines: Iterable["CheckoutLineInfo"],
+    prices_entered_with_tax: bool,
+    address: Optional["Address"] = None,
+    discounts: Optional[Iterable["DiscountInfo"]] = None,
+):
+    if tax_calculation_strategy == TaxCalculationStrategy.TAX_APP:
+        # Call the tax plugins.
+        _apply_tax_data_from_plugins(
+            checkout, manager, checkout_info, lines, address, discounts
+        )
+        # Get the taxes calculated with apps and apply to checkout.
+        tax_data = manager.get_taxes_for_checkout(checkout_info, lines)
+        _apply_tax_data(checkout, lines, tax_data)
+    else:
+        # Get taxes calculated with flat rates and apply to checkout.
+        update_checkout_prices_with_flat_rates(
+            checkout, checkout_info, lines, prices_entered_with_tax, address, discounts
+        )
+
+
+def _remove_tax(checkout, lines_info):
+    checkout.total_gross_amount = checkout.total_net_amount
+    checkout.subtotal_gross_amount = checkout.subtotal_net_amount
+    checkout.shipping_price_gross_amount = checkout.shipping_price_net_amount
+    checkout.shipping_tax_rate = Decimal("0.00")
+
+    for line_info in lines_info:
+        total_price_net_amount = line_info.line.total_price_net_amount
+        line_info.line.total_price_gross_amount = total_price_net_amount
+        line_info.line.tax_rate = Decimal("0.00")
+
+
+def _calculate_checkout_total(checkout, currency):
+    total = checkout.subtotal + checkout.shipping_price
+    return quantize_price(
+        total,
+        currency,
+    )
+
+
+def _calculate_checkout_subtotal(lines, currency):
+    line_totals = [line_info.line.total_price for line_info in lines]
+    total = sum(line_totals, zero_taxed_money(currency))
+    return quantize_price(
+        total,
+        currency,
+    )
+
+
+def _apply_tax_data(
+    checkout: "Checkout",
+    lines: Iterable["CheckoutLineInfo"],
+    tax_data: Optional[TaxData],
+) -> None:
+    if not tax_data:
+        return
+
+    currency = checkout.currency
+    for line_info, tax_line_data in zip(lines, tax_data.lines):
+        line = line_info.line
+
+        line.total_price = quantize_price(
+            TaxedMoney(
+                net=Money(tax_line_data.total_net_amount, currency),
+                gross=Money(tax_line_data.total_gross_amount, currency),
+            ),
+            currency,
+        )
+        line.tax_rate = normalize_tax_rate_for_db(tax_line_data.tax_rate)
+
+    checkout.shipping_tax_rate = normalize_tax_rate_for_db(tax_data.shipping_tax_rate)
+    checkout.shipping_price = quantize_price(
+        TaxedMoney(
+            net=Money(tax_data.shipping_price_net_amount, currency),
+            gross=Money(tax_data.shipping_price_gross_amount, currency),
+        ),
+        currency,
+    )
+    checkout.subtotal = _calculate_checkout_subtotal(lines, currency)
+    checkout.total = _calculate_checkout_total(checkout, currency)
+
+
+def _apply_tax_data_from_plugins(
+    checkout: "Checkout",
+    manager: "PluginsManager",
+    checkout_info: "CheckoutInfo",
+    lines: Iterable["CheckoutLineInfo"],
+    address: Optional["Address"],
+    discounts: Optional[Iterable[DiscountInfo]] = None,
+) -> None:
+    if not discounts:
+        discounts = []
+
+    for line_info in lines:
+        line = line_info.line
+
+        total_price = manager.calculate_checkout_line_total(
+            checkout_info,
+            lines,
+            line_info,
+            address,
+            discounts,
+        )
+        line.total_price = total_price
+
+        unit_price = manager.calculate_checkout_line_unit_price(
+            checkout_info,
+            lines,
+            line_info,
+            address,
+            discounts,
+        )
+
+        line.tax_rate = manager.get_checkout_line_tax_rate(
+            checkout_info,
+            lines,
+            line_info,
+            address,
+            discounts,
+            unit_price,
+        )
+
+    checkout.shipping_price = manager.calculate_checkout_shipping(
+        checkout_info, lines, address, discounts
+    )
+    checkout.shipping_tax_rate = manager.get_checkout_shipping_tax_rate(
+        checkout_info, lines, address, discounts, checkout.shipping_price
+    )
+    checkout.subtotal = manager.calculate_checkout_subtotal(
+        checkout_info, lines, address, discounts
+    )
+    checkout.total = manager.calculate_checkout_total(
+        checkout_info, lines, address, discounts
+    )
+
+
+def _get_checkout_base_prices(
+    checkout: "Checkout",
+    checkout_info: "CheckoutInfo",
+    lines: Iterable["CheckoutLineInfo"],
+    discounts: Optional[Iterable[DiscountInfo]] = None,
+) -> None:
+    if not discounts:
+        discounts = []
+
+    currency = checkout_info.checkout.currency
+    subtotal = zero_money(currency)
+
+    for line_info in lines:
+        line = line_info.line
+        quantity = line.quantity
+
+        unit_price = base_calculations.calculate_base_line_unit_price(
+            line_info, checkout_info.channel, discounts
+        )
+        total_price = base_calculations.apply_checkout_discount_on_checkout_line(
+            checkout_info, lines, line_info, discounts, unit_price * quantity
+        )
+        line_total_price = quantize_price(total_price, currency)
+        subtotal += line_total_price
+
+        line.total_price = TaxedMoney(net=line_total_price, gross=line_total_price)
+
+        # Set zero tax rate since net and gross are equal.
+        line.tax_rate = Decimal("0.0")
+
+    # Calculate shipping price
+    shipping_price = base_calculations.base_checkout_delivery_price(
+        checkout_info, lines
+    )
+    checkout.shipping_price = quantize_price(
+        TaxedMoney(shipping_price, shipping_price), currency
+    )
+    checkout.shipping_tax_rate = Decimal("0.0")
+
+    # Set subtotal
+    checkout.subtotal = TaxedMoney(net=subtotal, gross=subtotal)
+
+    # Calculate checkout total
+    total = subtotal + shipping_price
+    checkout.total = quantize_price(TaxedMoney(net=total, gross=total), currency)

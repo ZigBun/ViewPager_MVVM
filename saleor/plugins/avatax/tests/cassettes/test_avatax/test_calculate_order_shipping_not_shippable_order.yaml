@@ -1,0 +1,5 @@
+interactions:
+- request:
+    body: '{"createTransactionModel": {"companyCode": "DEFAULT", "type": "SalesInvoice",
+      "lines": [{"quantity": 3, "amount": "36.900", "taxCode": "O9999999", "taxIncluded":
+      true, "itemCode": "SKU_A", "discounted": false, "description":
