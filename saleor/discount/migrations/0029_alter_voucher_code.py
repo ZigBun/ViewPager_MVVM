@@ -10,4 +10,8 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AlterField(
-            model_nam
+            model_name="voucher",
+            name="code",
+            field=models.CharField(db_index=True, max_length=255, unique=True),
+        ),
+    ]
