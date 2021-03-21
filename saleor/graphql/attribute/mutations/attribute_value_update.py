@@ -86,3 +86,30 @@ class AttributeValueUpdate(AttributeValueCreate, ModelWithExtRefMutation):
             variants = product_models.ProductVariant.objects.filter(
                 Exists(instance.variantassignments.filter(variant_id=OuterRef("id")))
             )
+            # SELECT … FOR UPDATE needs to lock rows in a consistent order
+            # to avoid deadlocks between updates touching the same rows.
+            qs = (
+                product_models.Product.objects.select_for_update(of=("self",))
+                .filter(
+                    Q(search_index_dirty=False)
+                    & (
+                        Q(
+                            Exists(
+                                instance.productassignments.filter(
+                                    product_id=OuterRef("id")
+                                )
+                            )
+                        )
+                        | Q(Exists(variants.filter(product_id=OuterRef("id"))))
+                    )
+                )
+                .order_by("pk")
+            )
+            for batch_pks in queryset_in_batches(qs):
+                product_models.Product.objects.filter(pk__in=batch_pks).update(
+                    search_index_dirty=True
+                )
+
+        manager = get_plugin_manager_promise(info.context).get()
+        cls.call_event(manager.attribute_value_updated, instance)
+        cls.call_event(manager.attribute_updated, instance.attribute)
