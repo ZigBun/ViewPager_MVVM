@@ -184,4 +184,53 @@ class OrderQueries(graphene.ObjectType):
             )
         qs = resolve_draft_orders(info)
         qs = filter_connection_queryset(qs, kwargs)
-        return create_connection_slice(qs, info, kw
+        return create_connection_slice(qs, info, kwargs, OrderCountableConnection)
+
+    @staticmethod
+    def resolve_orders_total(_root, info: ResolveInfo, *, period, channel=None):
+        return resolve_orders_total(info, period, channel)
+
+    @staticmethod
+    def resolve_order_by_token(_root, _info: ResolveInfo, *, token):
+        return resolve_order_by_token(token)
+
+
+class OrderMutations(graphene.ObjectType):
+    draft_order_complete = DraftOrderComplete.Field()
+    draft_order_create = DraftOrderCreate.Field()
+    draft_order_delete = DraftOrderDelete.Field()
+    draft_order_bulk_delete = DraftOrderBulkDelete.Field()
+    draft_order_lines_bulk_delete = DraftOrderLinesBulkDelete.Field(
+        deprecation_reason=DEPRECATED_IN_3X_FIELD
+    )
+    draft_order_update = DraftOrderUpdate.Field()
+
+    order_add_note = OrderAddNote.Field()
+    order_cancel = OrderCancel.Field()
+    order_capture = OrderCapture.Field()
+    order_confirm = OrderConfirm.Field()
+
+    order_fulfill = OrderFulfill.Field()
+    order_fulfillment_cancel = FulfillmentCancel.Field()
+    order_fulfillment_approve = FulfillmentApprove.Field()
+    order_fulfillment_update_tracking = FulfillmentUpdateTracking.Field()
+    order_fulfillment_refund_products = FulfillmentRefundProducts.Field()
+    order_fulfillment_return_products = FulfillmentReturnProducts.Field()
+
+    order_lines_create = OrderLinesCreate.Field()
+    order_line_delete = OrderLineDelete.Field()
+    order_line_update = OrderLineUpdate.Field()
+
+    order_discount_add = OrderDiscountAdd.Field()
+    order_discount_update = OrderDiscountUpdate.Field()
+    order_discount_delete = OrderDiscountDelete.Field()
+
+    order_line_discount_update = OrderLineDiscountUpdate.Field()
+    order_line_discount_remove = OrderLineDiscountRemove.Field()
+
+    order_mark_as_paid = OrderMarkAsPaid.Field()
+    order_refund = OrderRefund.Field()
+    order_update = OrderUpdate.Field()
+    order_update_shipping = OrderUpdateShipping.Field()
+    order_void = OrderVoid.Field()
+    order_bulk_cancel = OrderBulkCancel.Field()
