@@ -10,4 +10,222 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("product", "0136_add_attribute_type_and_page_to_attribute_
+        ("product", "0136_add_attribute_type_and_page_to_attribute_relation"),
+        ("page", "0017_pagetype"),
+    ]
+
+    state_operations = [
+        migrations.CreateModel(
+            name="AssignedPageAttribute",
+            fields=[
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+            ],
+            options={"db_table": "product_assignedpageattribute"},
+        ),
+        migrations.CreateModel(
+            name="AssignedProductAttribute",
+            fields=[
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+            ],
+            options={"db_table": "product_assignedproductattribute"},
+        ),
+        migrations.CreateModel(
+            name="AssignedVariantAttribute",
+            fields=[
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+            ],
+            options={"db_table": "product_assignedvariantattribute"},
+        ),
+        migrations.CreateModel(
+            name="Attribute",
+            fields=[
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "private_metadata",
+                    models.JSONField(
+                        blank=True,
+                        default=dict,
+                        encoder=saleor.core.utils.json_serializer.CustomJsonEncoder,
+                        null=True,
+                    ),
+                ),
+                (
+                    "metadata",
+                    models.JSONField(
+                        blank=True,
+                        default=dict,
+                        encoder=saleor.core.utils.json_serializer.CustomJsonEncoder,
+                        null=True,
+                    ),
+                ),
+                (
+                    "slug",
+                    models.SlugField(allow_unicode=True, max_length=250, unique=True),
+                ),
+                ("name", models.CharField(max_length=255)),
+                (
+                    "type",
+                    models.CharField(
+                        choices=[
+                            ("product-type", "Product type"),
+                            ("page-type", "Page type"),
+                        ],
+                        max_length=50,
+                    ),
+                ),
+                (
+                    "input_type",
+                    models.CharField(
+                        choices=[
+                            ("dropdown", "Dropdown"),
+                            ("multiselect", "Multi Select"),
+                        ],
+                        default="dropdown",
+                        max_length=50,
+                    ),
+                ),
+                ("value_required", models.BooleanField(blank=True, default=False)),
+                ("is_variant_only", models.BooleanField(blank=True, default=False)),
+                (
+                    "visible_in_storefront",
+                    models.BooleanField(blank=True, default=True),
+                ),
+                (
+                    "filterable_in_storefront",
+                    models.BooleanField(blank=True, default=True),
+                ),
+                (
+                    "filterable_in_dashboard",
+                    models.BooleanField(blank=True, default=True),
+                ),
+                (
+                    "storefront_search_position",
+                    models.IntegerField(blank=True, default=0),
+                ),
+                ("available_in_grid", models.BooleanField(blank=True, default=True)),
+            ],
+            options={
+                "db_table": "product_attribute",
+                "ordering": ("storefront_search_position", "slug"),
+            },
+        ),
+        migrations.CreateModel(
+            name="AttributeValue",
+            fields=[
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "sort_order",
+                    models.IntegerField(db_index=True, editable=False, null=True),
+                ),
+                ("name", models.CharField(max_length=250)),
+                ("value", models.CharField(blank=True, default="", max_length=100)),
+                ("slug", models.SlugField(allow_unicode=True, max_length=255)),
+                (
+                    "attribute",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="values",
+                        to="attribute.attribute",
+                    ),
+                ),
+            ],
+            options={
+                "db_table": "product_attributevalue",
+                "ordering": ("sort_order", "pk"),
+                "unique_together": {("slug", "attribute")},
+            },
+        ),
+        migrations.CreateModel(
+            name="AttributeVariant",
+            fields=[
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "sort_order",
+                    models.IntegerField(db_index=True, editable=False, null=True),
+                ),
+                (
+                    "assigned_variants",
+                    models.ManyToManyField(
+                        blank=True,
+                        related_name="attributesrelated",
+                        through="attribute.AssignedVariantAttribute",
+                        to="product.ProductVariant",
+                    ),
+                ),
+                (
+                    "attribute",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="attributevariant",
+                        to="attribute.attribute",
+                    ),
+                ),
+                (
+                    "product_type",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="attributevariant",
+                        to="product.producttype",
+                    ),
+                ),
+            ],
+            options={
+                "db_table": "product_attributevariant",
+                "ordering": ("sort_order", "pk"),
+                "unique_together": {("attribute", "product_type")},
+            },
+        ),
+        migrations.CreateModel(
+            name="AttributeProduct",
+            fields=[
+                (
+                    "id",
+            
