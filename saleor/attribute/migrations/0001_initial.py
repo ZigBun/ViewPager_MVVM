@@ -442,4 +442,52 @@ class Migration(migrations.Migration):
                 ),
             ],
             options={
-              
+                "db_table": "product_attributevaluetranslation",
+                "unique_together": {("language_code", "attribute_value")},
+            },
+        ),
+        migrations.CreateModel(
+            name="AttributeTranslation",
+            fields=[
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("language_code", models.CharField(max_length=10)),
+                ("name", models.CharField(max_length=100)),
+                (
+                    "attribute",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="translations",
+                        to="attribute.attribute",
+                    ),
+                ),
+            ],
+            options={
+                "db_table": "product_attributetranslation",
+                "unique_together": {("language_code", "attribute")},
+            },
+        ),
+        migrations.AlterUniqueTogether(
+            name="assignedvariantattribute",
+            unique_together={("variant", "assignment")},
+        ),
+        migrations.AlterUniqueTogether(
+            name="assignedproductattribute",
+            unique_together={("product", "assignment")},
+        ),
+        migrations.AlterUniqueTogether(
+            name="assignedpageattribute",
+            unique_together={("page", "assignment")},
+        ),
+    ]
+
+    operations = [
+        migrations.SeparateDatabaseAndState(state_operations=state_operations)
+    ]
