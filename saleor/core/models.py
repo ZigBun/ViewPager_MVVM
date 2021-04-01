@@ -119,4 +119,67 @@ class ModelWithMetadata(models.Model):
 
 class ModelWithExternalReference(models.Model):
     external_reference = models.CharField(
-        ma
+        max_length=250,
+        unique=True,
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+
+    class Meta:
+        abstract = True
+
+
+class Job(models.Model):
+    status = models.CharField(
+        max_length=50, choices=JobStatus.CHOICES, default=JobStatus.PENDING
+    )
+    message = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+
+class EventPayload(models.Model):
+    payload = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class EventDelivery(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=255,
+        choices=EventDeliveryStatus.CHOICES,
+        default=EventDeliveryStatus.PENDING,
+    )
+    event_type = models.CharField(max_length=255)
+    payload = models.ForeignKey(
+        EventPayload, related_name="deliveries", null=True, on_delete=models.CASCADE
+    )
+    webhook = models.ForeignKey("webhook.Webhook", on_delete=models.CASCADE)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+
+class EventDeliveryAttempt(models.Model):
+    delivery = models.ForeignKey(
+        EventDelivery, related_name="attempts", null=True, on_delete=models.CASCADE
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    task_id = models.CharField(max_length=255, null=True)
+    duration = models.FloatField(null=True)
+    response = models.TextField(null=True)
+    response_headers = models.TextField(null=True)
+    response_status_code = models.PositiveSmallIntegerField(null=True)
+    request_headers = models.TextField(null=True)
+    status = models.CharField(
+        max_length=255,
+        choices=EventDeliveryStatus.CHOICES,
+        default=EventDeliveryStatus.PENDING,
+    )
+
+    class Meta:
+        ordering = ("-created_at",)
