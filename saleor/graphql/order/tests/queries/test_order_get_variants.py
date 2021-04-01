@@ -195,3 +195,21 @@ def test_get_variant_from_order_line_variant_not_exists_as_staff(
     staff_api_client, order_line, permission_manage_products
 ):
     # given
+    order = order_line.order
+    order.user = staff_api_client.user
+    order.save()
+    order_line.variant = None
+    order_line.save()
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_GET_VARIANTS_FROM_ORDER,
+        {},
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+
+    # then
+    content = get_graphql_content(response)
+    orders = content["data"]["me"]["orders"]["edges"]
+    assert orders[0]["node"]["lines"][0]["variant"] is None
