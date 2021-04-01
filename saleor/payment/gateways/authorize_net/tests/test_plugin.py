@@ -142,4 +142,8 @@ def test_payment_gateway_process_payment(
 
 @mock.patch("saleor.payment.gateways.authorize_net.plugin.list_client_sources")
 def test_payment_gateway_list_payment_sources(
-    mocked_list_client_source
+    mocked_list_client_sources, authorize_net_plugin
+):
+    mocked_list_client_sources.return_value = []
+    sources = authorize_net_plugin.list_payment_sources("1", [])
+    assert sources == []
