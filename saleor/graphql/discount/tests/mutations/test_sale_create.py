@@ -228,4 +228,31 @@ def test_create_sale_start_date_and_end_date_after_current_date(
     ]
     variables = {
         "input": {
-            "nam
+            "name": "test sale",
+            "type": DiscountValueTypeEnum.FIXED.name,
+            "startDate": start_date.isoformat(),
+            "endDate": end_date.isoformat(),
+            "products": product_ids,
+        }
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_discounts]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["saleCreate"]["sale"]
+
+    assert data["type"] == DiscountValueType.FIXED.upper()
+    assert data["name"] == "test sale"
+    assert data["startDate"] == start_date.isoformat()
+    assert data["endDate"] == end_date.isoformat()
+
+    sale = Sale.objects.filter(name="test sale").get()
+    assert sale.notification_sent_datetime is None
+
+    current_catalogue = convert_catalogue_info_to_global_ids(fetch_catalogue_info(sale))
+    created_webhook_mock.assert_called_once_with(sale, current_catalogue)
+    sale_toggle_mock.assert_not_called()
