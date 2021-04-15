@@ -300,4 +300,130 @@ class Channel(ModelObjectType):
     @staticmethod
     def resolve_default_country(root: models.Channel, _info: ResolveInfo):
         return CountryDisplay(
-            code=root.default_country.code, country=ro
+            code=root.default_country.code, country=root.default_country.name
+        )
+
+    @staticmethod
+    def resolve_warehouses(root: models.Channel, info: ResolveInfo):
+        return WarehousesByChannelIdLoader(info.context).load(root.id)
+
+    @staticmethod
+    def resolve_countries(root: models.Channel, info: ResolveInfo):
+        from ..shipping.dataloaders import ShippingZonesByChannelIdLoader
+
+        def get_countries(shipping_zones):
+            countries = []
+            for s_zone in shipping_zones:
+                countries.extend(s_zone.countries)
+            sorted_countries = list(set(countries))
+            sorted_countries.sort(key=lambda country: country.name)
+            return [
+                CountryDisplay(code=country.code, country=country.name)
+                for country in sorted_countries
+            ]
+
+        return (
+            ShippingZonesByChannelIdLoader(info.context)
+            .load(root.id)
+            .then(get_countries)
+        )
+
+    @staticmethod
+    def resolve_available_shipping_methods_per_country(
+        root: models.Channel, info, **data
+    ):
+        from ...shipping.utils import convert_to_shipping_method_data
+        from ..shipping.dataloaders import (
+            ShippingMethodChannelListingByChannelSlugLoader,
+            ShippingMethodsByShippingZoneIdLoader,
+            ShippingZonesByChannelIdLoader,
+        )
+
+        shipping_zones_loader = ShippingZonesByChannelIdLoader(info.context).load(
+            root.id
+        )
+        shipping_zone_countries: Dict[int, List[Country]] = collections.defaultdict(
+            list
+        )
+        requested_countries = data.get("countries", [])
+
+        def _group_shipping_methods_by_country(data):
+            shipping_methods, shipping_channel_listings = data
+            shipping_listing_map = {
+                listing.shipping_method_id: listing
+                for listing in shipping_channel_listings
+            }
+
+            shipping_methods_per_country = collections.defaultdict(list)
+            for shipping_method in shipping_methods:
+                countries = shipping_zone_countries.get(
+                    shipping_method.shipping_zone_id, []
+                )
+                for country in countries:
+                    listing = shipping_listing_map.get(shipping_method.id)
+                    if not listing:
+                        continue
+                    shipping_method_dataclass = convert_to_shipping_method_data(
+                        shipping_method, listing
+                    )
+                    shipping_methods_per_country[country.code].append(
+                        shipping_method_dataclass
+                    )
+
+            if requested_countries:
+                results = [
+                    {
+                        "country_code": code,
+                        "shipping_methods": shipping_methods_per_country.get(code, []),
+                    }
+                    for code in requested_countries
+                    if code in shipping_methods_per_country
+                ]
+            else:
+                results = [
+                    {
+                        "country_code": code,
+                        "shipping_methods": shipping_methods_per_country[code],
+                    }
+                    for code in shipping_methods_per_country.keys()
+                ]
+            results.sort(key=lambda item: item["country_code"])
+
+            return results
+
+        def filter_shipping_methods(shipping_methods):
+            shipping_methods = list(itertools.chain.from_iterable(shipping_methods))
+            shipping_listings = ShippingMethodChannelListingByChannelSlugLoader(
+                info.context
+            ).load(root.slug)
+            return Promise.all([shipping_methods, shipping_listings]).then(
+                _group_shipping_methods_by_country
+            )
+
+        def get_shipping_methods(shipping_zones: List["ShippingZone"]):
+            shipping_zones_keys = [shipping_zone.id for shipping_zone in shipping_zones]
+            for shipping_zone in shipping_zones:
+                shipping_zone_countries[shipping_zone.id] = shipping_zone.countries
+
+            return (
+                ShippingMethodsByShippingZoneIdLoader(info.context)
+                .load_many(shipping_zones_keys)
+                .then(filter_shipping_methods)
+            )
+
+        return shipping_zones_loader.then(get_shipping_methods)
+
+    @staticmethod
+    def resolve_stock_settings(root: models.Channel, _info: ResolveInfo):
+        return StockSettings(allocation_strategy=root.allocation_strategy)
+
+    @staticmethod
+    def resolve_order_settings(root: models.Channel, _info):
+        return OrderSettings(
+            automatically_confirm_all_new_orders=(
+                root.automatically_confirm_all_new_orders
+            ),
+            automatically_fulfill_non_shippable_gift_card=(
+                root.automatically_fulfill_non_shippable_gift_card
+            ),
+        )
