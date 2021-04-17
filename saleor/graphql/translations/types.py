@@ -132,4 +132,216 @@ class AttributeValueTranslatableContent(
     )
     attribute = graphene.Field(
         AttributeTranslatableContent,
-        description="Associated attribute that can be
+        description="Associated attribute that can be translated." + ADDED_IN_39,
+    )
+
+    class Meta:
+        model = attribute_models.AttributeValue
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_attribute_value(root: attribute_models.AttributeValue, _info):
+        return root
+
+    @staticmethod
+    def resolve_attribute(root: attribute_models.AttributeValue, info):
+        return AttributesByAttributeId(info.context).load(root.attribute_id)
+
+
+class ProductVariantTranslation(
+    BaseTranslationType[product_models.ProductVariantTranslation]
+):
+    id = graphene.GlobalID(required=True)
+    name = graphene.String(required=True)
+
+    class Meta:
+        model = product_models.ProductVariantTranslation
+        interfaces = [graphene.relay.Node]
+
+
+class ProductVariantTranslatableContent(ModelObjectType[product_models.ProductVariant]):
+    id = graphene.GlobalID(required=True)
+    name = graphene.String(required=True)
+    translation = TranslationField(
+        ProductVariantTranslation, type_name="product variant"
+    )
+    product_variant = graphene.Field(
+        "saleor.graphql.product.types.products.ProductVariant",
+        description=(
+            "Represents a version of a product such as different size or color."
+        ),
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Get model fields from the root level queries."
+        ),
+    )
+    attribute_values = NonNullList(
+        AttributeValueTranslatableContent,
+        required=True,
+        description="List of product variant attribute values that can be translated.",
+    )
+
+    class Meta:
+        model = product_models.ProductVariant
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_product_variant(root: product_models.ProductVariant, info):
+        return ChannelContext(node=root, channel_slug=None)
+
+    @staticmethod
+    def resolve_attribute_values(root: product_models.ProductVariant, info):
+        return (
+            SelectedAttributesByProductVariantIdLoader(info.context)
+            .load(root.id)
+            .then(get_translatable_attribute_values)
+        )
+
+
+class ProductTranslation(BaseTranslationType[product_models.ProductTranslation]):
+    id = graphene.GlobalID(required=True)
+    seo_title = graphene.String()
+    seo_description = graphene.String()
+    name = graphene.String()
+    description = JSONString(
+        description="Translated description of the product." + RICH_CONTENT
+    )
+    description_json = JSONString(
+        description="Translated description of the product." + RICH_CONTENT,
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Use the `description` field instead."
+        ),
+    )
+
+    class Meta:
+        model = product_models.ProductTranslation
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_description_json(root: product_models.ProductTranslation, _info):
+        description = root.description
+        return description if description is not None else {}
+
+
+class ProductTranslatableContent(ModelObjectType[product_models.Product]):
+    id = graphene.GlobalID(required=True)
+    seo_title = graphene.String()
+    seo_description = graphene.String()
+    name = graphene.String(required=True)
+    description = JSONString(description="Description of the product." + RICH_CONTENT)
+    description_json = JSONString(
+        description="Description of the product." + RICH_CONTENT,
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Use the `description` field instead."
+        ),
+    )
+    translation = TranslationField(ProductTranslation, type_name="product")
+    product = graphene.Field(
+        "saleor.graphql.product.types.products.Product",
+        description="Represents an individual item for sale in the storefront.",
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Get model fields from the root level queries."
+        ),
+    )
+    attribute_values = NonNullList(
+        AttributeValueTranslatableContent,
+        required=True,
+        description="List of product attribute values that can be translated.",
+    )
+
+    class Meta:
+        model = product_models.Product
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_product(root: product_models.Product, info):
+        return ChannelContext(node=root, channel_slug=None)
+
+    @staticmethod
+    def resolve_description_json(root: product_models.Product, _info):
+        description = root.description
+        return description if description is not None else {}
+
+    @staticmethod
+    def resolve_attribute_values(root: product_models.Product, info):
+        return (
+            SelectedAttributesByProductIdLoader(info.context)
+            .load(root.id)
+            .then(get_translatable_attribute_values)
+        )
+
+
+class CollectionTranslation(BaseTranslationType[product_models.CollectionTranslation]):
+    id = graphene.GlobalID(required=True)
+    seo_title = graphene.String()
+    seo_description = graphene.String()
+    name = graphene.String()
+    description = JSONString(
+        description="Translated description of the collection." + RICH_CONTENT
+    )
+    description_json = JSONString(
+        description="Translated description of the collection." + RICH_CONTENT,
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Use the `description` field instead."
+        ),
+    )
+
+    class Meta:
+        model = product_models.CollectionTranslation
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_description_json(root: product_models.CollectionTranslation, _info):
+        description = root.description
+        return description if description is not None else {}
+
+
+class CollectionTranslatableContent(ModelObjectType[product_models.Collection]):
+    id = graphene.GlobalID(required=True)
+    seo_title = graphene.String()
+    seo_description = graphene.String()
+    name = graphene.String(required=True)
+    description = JSONString(
+        description="Description of the collection." + RICH_CONTENT
+    )
+    description_json = JSONString(
+        description="Description of the collection." + RICH_CONTENT,
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Use the `description` field instead."
+        ),
+    )
+    translation = TranslationField(CollectionTranslation, type_name="collection")
+    collection = graphene.Field(
+        "saleor.graphql.product.types.collections.Collection",
+        description="Represents a collection of products.",
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Get model fields from the root level queries."
+        ),
+    )
+
+    class Meta:
+        model = product_models.Collection
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_collection(root: product_models.Collection, info):
+        collection = product_models.Collection.objects.all().filter(pk=root.id).first()
+        return (
+            ChannelContext(node=collection, channel_slug=None) if collection else None
+        )
+
+    @staticmethod
+    def resolve_description_json(root: product_models.Collection, _info):
+        description = root.description
+        return description if description is not None else {}
+
+
+class CategoryTranslation(BaseTranslationType[product_models.CategoryTranslation]):
+    id = graphene.GlobalID(required=True)
+    seo_title = graphene.String()
+    seo_description = graphene.String()
+    name = graphene.String()
+    description = JSONString(
+        description="Translated description of the category." + RICH_CONTENT
+    )
+    description_json = JSONString(
+        description="Tran
