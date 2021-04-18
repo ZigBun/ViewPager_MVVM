@@ -560,4 +560,70 @@ class MenuItemTranslation(BaseTranslationType[menu_models.MenuItemTranslation]):
 class MenuItemTranslatableContent(ModelObjectType[menu_models.MenuItem]):
     id = graphene.GlobalID(required=True)
     name = graphene.String(required=True)
-    translation = TranslationField(MenuItemTran
+    translation = TranslationField(MenuItemTranslation, type_name="menu item")
+    menu_item = graphene.Field(
+        "saleor.graphql.menu.types.MenuItem",
+        description=(
+            "Represents a single item of the related menu. Can store categories, "
+            "collection or pages."
+        ),
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Get model fields from the root level queries."
+        ),
+    )
+
+    class Meta:
+        model = menu_models.MenuItem
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_menu_item(root: menu_models.MenuItem, _info):
+        return ChannelContext(node=root, channel_slug=None)
+
+
+class ShippingMethodTranslation(
+    BaseTranslationType[shipping_models.ShippingMethodTranslation]
+):
+    id = graphene.GlobalID(required=True)
+    name = graphene.String()
+    description = JSONString(
+        description="Translated description of the shipping method." + RICH_CONTENT
+    )
+
+    class Meta:
+        model = shipping_models.ShippingMethodTranslation
+        interfaces = [graphene.relay.Node]
+
+
+class ShippingMethodTranslatableContent(
+    ModelObjectType[shipping_models.ShippingMethod]
+):
+    id = graphene.GlobalID(required=True)
+    name = graphene.String(required=True)
+    description = JSONString(
+        description="Description of the shipping method." + RICH_CONTENT
+    )
+    translation = TranslationField(
+        ShippingMethodTranslation, type_name="shipping method"
+    )
+    shipping_method = PermissionsField(
+        "saleor.graphql.shipping.types.ShippingMethodType",
+        description=(
+            "Shipping method are the methods you'll use to get customer's orders "
+            " to them. They are directly exposed to the customers."
+        ),
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Get model fields from the root level queries."
+        ),
+        permissions=[
+            ShippingPermissions.MANAGE_SHIPPING,
+        ],
+    )
+
+    class Meta:
+        model = shipping_models.ShippingMethod
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_shipping_method(root: shipping_models.ShippingMethod, _info):
+        return ChannelContext(node=root, channel_slug=None)
