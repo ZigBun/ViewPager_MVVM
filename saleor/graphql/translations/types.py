@@ -344,4 +344,220 @@ class CategoryTranslation(BaseTranslationType[product_models.CategoryTranslation
         description="Translated description of the category." + RICH_CONTENT
     )
     description_json = JSONString(
-        description="Tran
+        description="Translated description of the category." + RICH_CONTENT,
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Use the `description` field instead."
+        ),
+    )
+
+    class Meta:
+        model = product_models.CategoryTranslation
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_description_json(root: product_models.CategoryTranslation, _info):
+        description = root.description
+        return description if description is not None else {}
+
+
+class CategoryTranslatableContent(ModelObjectType[product_models.Category]):
+    id = graphene.GlobalID(required=True)
+    seo_title = graphene.String()
+    seo_description = graphene.String()
+    name = graphene.String(required=True)
+    description = JSONString(description="Description of the category." + RICH_CONTENT)
+    description_json = JSONString(
+        description="Description of the category." + RICH_CONTENT,
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Use the `description` field instead."
+        ),
+    )
+    translation = TranslationField(CategoryTranslation, type_name="category")
+    category = graphene.Field(
+        "saleor.graphql.product.types.categories.Category",
+        description="Represents a single category of products.",
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Get model fields from the root level queries."
+        ),
+    )
+
+    class Meta:
+        model = product_models.Category
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_category(root: product_models.Category, _info):
+        return root
+
+    @staticmethod
+    def resolve_description_json(root: product_models.Category, _info):
+        description = root.description
+        return description if description is not None else {}
+
+
+class PageTranslation(BaseTranslationType[page_models.PageTranslation]):
+    id = graphene.GlobalID(required=True)
+    seo_title = graphene.String()
+    seo_description = graphene.String()
+    title = graphene.String()
+    content = JSONString(description="Translated content of the page." + RICH_CONTENT)
+    content_json = JSONString(
+        description="Translated description of the page." + RICH_CONTENT,
+        deprecation_reason=f"{DEPRECATED_IN_3X_FIELD} Use the `content` field instead.",
+    )
+
+    class Meta:
+        model = page_models.PageTranslation
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_content_json(root: page_models.PageTranslation, _info):
+        content = root.content
+        return content if content is not None else {}
+
+
+class PageTranslatableContent(ModelObjectType[page_models.Page]):
+    id = graphene.GlobalID(required=True)
+    seo_title = graphene.String()
+    seo_description = graphene.String()
+    title = graphene.String(required=True)
+    content = JSONString(description="Content of the page." + RICH_CONTENT)
+    content_json = JSONString(
+        description="Content of the page." + RICH_CONTENT,
+        deprecation_reason=f"{DEPRECATED_IN_3X_FIELD} Use the `content` field instead.",
+    )
+    translation = TranslationField(PageTranslation, type_name="page")
+    page = graphene.Field(
+        "saleor.graphql.page.types.Page",
+        description=(
+            "A static page that can be manually added by a shop operator "
+            "through the dashboard."
+        ),
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Get model fields from the root level queries."
+        ),
+    )
+    attribute_values = NonNullList(
+        AttributeValueTranslatableContent,
+        required=True,
+        description="List of page content attribute values that can be translated.",
+    )
+
+    class Meta:
+        model = page_models.Page
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_page(root: page_models.Page, info):
+        return (
+            page_models.Page.objects.visible_to_user(info.context.user)
+            .filter(pk=root.id)
+            .first()
+        )
+
+    @staticmethod
+    def resolve_content_json(root: page_models.Page, _info):
+        content = root.content
+        return content if content is not None else {}
+
+    @staticmethod
+    def resolve_attribute_values(root: page_models.Page, info):
+        return (
+            SelectedAttributesByPageIdLoader(info.context)
+            .load(root.id)
+            .then(get_translatable_attribute_values)
+        )
+
+
+class VoucherTranslation(BaseTranslationType[discount_models.VoucherTranslation]):
+    id = graphene.GlobalID(required=True)
+    name = graphene.String()
+
+    class Meta:
+        model = discount_models.VoucherTranslation
+        interfaces = [graphene.relay.Node]
+
+
+class VoucherTranslatableContent(ModelObjectType[discount_models.Voucher]):
+    id = graphene.GlobalID(required=True)
+    name = graphene.String()
+    translation = TranslationField(VoucherTranslation, type_name="voucher")
+    voucher = PermissionsField(
+        "saleor.graphql.discount.types.Voucher",
+        description=(
+            "Vouchers allow giving discounts to particular customers on categories, "
+            "collections or specific products. They can be used during checkout by "
+            "providing valid voucher codes."
+        ),
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Get model fields from the root level queries."
+        ),
+        permissions=[DiscountPermissions.MANAGE_DISCOUNTS],
+    )
+
+    class Meta:
+        model = discount_models.Voucher
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_voucher(root: discount_models.Voucher, _info):
+        return ChannelContext(node=root, channel_slug=None)
+
+
+class SaleTranslation(BaseTranslationType[discount_models.SaleTranslation]):
+    id = graphene.GlobalID(required=True)
+    name = graphene.String()
+
+    class Meta:
+        model = discount_models.SaleTranslation
+        interfaces = [graphene.relay.Node]
+
+
+class SaleTranslatableContent(ModelObjectType[discount_models.Sale]):
+    id = graphene.GlobalID(required=True)
+    name = graphene.String(required=True)
+    translation = TranslationField(SaleTranslation, type_name="sale")
+    sale = PermissionsField(
+        "saleor.graphql.discount.types.Sale",
+        description=(
+            "Sales allow creating discounts for categories, collections "
+            "or products and are visible to all the customers."
+        ),
+        deprecation_reason=(
+            f"{DEPRECATED_IN_3X_FIELD} Get model fields from the root level queries."
+        ),
+        permissions=[DiscountPermissions.MANAGE_DISCOUNTS],
+    )
+
+    class Meta:
+        model = discount_models.Sale
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_sale(root: discount_models.Sale, _info):
+        return ChannelContext(node=root, channel_slug=None)
+
+
+class ShopTranslation(BaseTranslationType[site_models.SiteSettingsTranslation]):
+    id = graphene.GlobalID(required=True)
+    header_text = graphene.String(required=True)
+    description = graphene.String(required=True)
+
+    class Meta:
+        model = site_models.SiteSettingsTranslation
+        interfaces = [graphene.relay.Node]
+
+
+class MenuItemTranslation(BaseTranslationType[menu_models.MenuItemTranslation]):
+    id = graphene.GlobalID(required=True)
+    name = graphene.String(required=True)
+
+    class Meta:
+        model = menu_models.MenuItemTranslation
+        interfaces = [graphene.relay.Node]
+
+
+class MenuItemTranslatableContent(ModelObjectType[menu_models.MenuItem]):
+    id = graphene.GlobalID(required=True)
+    name = graphene.String(required=True)
+    translation = TranslationField(MenuItemTran
