@@ -261,4 +261,63 @@ def refund_payment_intent(
         return refund, None
     except StripeError as error:
         logger.warning(
-            "Unable to r
+            "Unable to refund a payment intent",
+            extra=_extra_log_data(error),
+        )
+        return None, error
+
+
+def cancel_payment_intent(
+    api_key: str, payment_intent_id: str
+) -> Tuple[Optional[StripeObject], Optional[StripeError]]:
+    try:
+        with stripe_opentracing_trace("stripe.PaymentIntent.cancel"):
+            payment_intent = stripe.PaymentIntent.cancel(
+                payment_intent_id,
+                api_key=api_key,
+            )
+        return payment_intent, None
+    except StripeError as error:
+        logger.warning(
+            "Unable to cancel a payment intent",
+            extra=_extra_log_data(error),
+        )
+
+        return None, error
+
+
+def construct_stripe_event(
+    api_key: str, payload: bytes, sig_header: str, endpoint_secret: str
+) -> StripeObject:
+    with stripe_opentracing_trace("stripe.Webhook.construct_event"):
+        return stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret, api_key=api_key
+        )
+
+
+def get_payment_method_details(
+    payment_intent: StripeObject,
+) -> Optional[PaymentMethodInfo]:
+    charges = payment_intent.get("charges", None)
+    payment_method_info = None
+    if charges:
+        charges_data = charges.get("data", [])
+        if not charges_data:
+            return None
+        charge_data = charges_data[-1]
+        payment_method_details = charge_data.get("payment_method_details", {})
+
+        if payment_method_details.get("type") == "card":
+            card_details = payment_method_details.get("card", {})
+            exp_year = card_details.get("exp_year", "")
+            exp_year = int(exp_year) if exp_year else None
+            exp_month = card_details.get("exp_month", "")
+            exp_month = int(exp_month) if exp_month else None
+            payment_method_info = PaymentMethodInfo(
+                last_4=card_details.get("last4", ""),
+                exp_year=exp_year,
+                exp_month=exp_month,
+                brand=card_details.get("brand", ""),
+                type="card",
+            )
+    return payment_method_info
