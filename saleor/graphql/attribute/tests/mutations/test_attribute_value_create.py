@@ -336,4 +336,98 @@ def test_create_attribute_value_provide_not_allowed_input_data(
     # given
     attribute = color_attribute
     query = CREATE_ATTRIBUTE_VALUE_MUTATION
-    attrib
+    attribute_id = graphene.Node.to_global_id("Attribute", attribute.id)
+    name = "test name"
+    variables = {"name": name, field: value, "attributeId": attribute_id}
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["attributeValueCreate"]
+
+    assert not data["attributeValue"]
+    assert len(data["errors"]) == 1
+    assert data["errors"][0]["code"] == AttributeErrorCode.INVALID.name
+    assert data["errors"][0]["field"] == field
+
+
+def test_create_attribute_value_not_unique_name(
+    staff_api_client, color_attribute, permission_manage_products
+):
+    # given
+    attribute = color_attribute
+    query = CREATE_ATTRIBUTE_VALUE_MUTATION
+    attribute_id = graphene.Node.to_global_id("Attribute", attribute.id)
+    value_name = attribute.values.first().name
+    variables = {"name": value_name, "attributeId": attribute_id}
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["attributeValueCreate"]
+    assert not data["errors"]
+    assert data["attributeValue"]["slug"] == "red-2"
+
+
+def test_create_attribute_value_capitalized_name(
+    staff_api_client, color_attribute, permission_manage_products
+):
+    # given
+    attribute = color_attribute
+    query = CREATE_ATTRIBUTE_VALUE_MUTATION
+    attribute_id = graphene.Node.to_global_id("Attribute", attribute.id)
+    value_name = attribute.values.first().name
+    variables = {"name": value_name.upper(), "attributeId": attribute_id}
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["attributeValueCreate"]
+    assert not data["errors"]
+    assert data["attributeValue"]["slug"] == "red-2"
+
+
+def test_create_attribute_value_with_non_unique_external_reference(
+    staff_api_client, color_attribute, permission_manage_products
+):
+    # given
+    query = CREATE_ATTRIBUTE_VALUE_MUTATION
+
+    ext_ref = "test-ext-ref"
+    value = color_attribute.values.first()
+    value.external_reference = ext_ref
+    value.save(update_fields=["external_reference"])
+    attribute_id = graphene.Node.to_global_id("Attribute", color_attribute.id)
+
+    variables = {
+        "name": "some value name",
+        "attributeId": attribute_id,
+        "externalReference": ext_ref,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+
+    # then
+    error = content["data"]["attributeValueCreate"]["errors"][0]
+    assert error["field"] == "externalReference"
+    assert error["code"] == AttributeErrorCode.UNIQUE.name
+    assert (
+        error["message"]
+        == "Attribute value with this External reference already exists."
+    )
