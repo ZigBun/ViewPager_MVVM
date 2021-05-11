@@ -87,4 +87,50 @@ class TaxClassUpdate(ModelMutation):
         return super().clean_input(info, instance, data, **kwargs)
 
     @classmethod
-    def update_country_rates(cls, instance, c
+    def update_country_rates(cls, instance, country_rates):
+        input_data_by_country = {item["country_code"]: item for item in country_rates}
+
+        # Update existing instances.
+        to_update = instance.country_rates.filter(
+            country__in=input_data_by_country.keys()
+        )
+        updated_countries = []
+        for obj in to_update:
+            data = input_data_by_country[obj.country]
+            rate = data.get("rate")
+            if rate:
+                obj.rate = rate
+                updated_countries.append(obj.country.code)
+        models.TaxClassCountryRate.objects.bulk_update(to_update, fields=("rate",))
+
+        # Create new instances.
+        to_create = [
+            models.TaxClassCountryRate(
+                tax_class=instance, country=item["country_code"], rate=item["rate"]
+            )
+            for item in country_rates
+            if item["country_code"] not in updated_countries
+            and item.get("rate") is not None
+        ]
+        models.TaxClassCountryRate.objects.bulk_create(to_create)
+
+        # Delete instances where null rates were provided.
+        to_delete = [
+            item["country_code"] for item in country_rates if item.get("rate") is None
+        ]
+        models.TaxClassCountryRate.objects.filter(
+            country__in=to_delete,
+            tax_class=instance,
+        ).delete()
+
+    @classmethod
+    def remove_country_rates(cls, country_codes):
+        models.TaxClassCountryRate.objects.filter(country__in=country_codes).delete()
+
+    @classmethod
+    def save(cls, _info, instance, cleaned_input):
+        instance.save()
+        update_country_rates = cleaned_input.get("update_country_rates", [])
+        remove_country_rates = cleaned_input.get("remove_country_rates", [])
+        cls.update_country_rates(instance, update_country_rates)
+        cls.remove_country_rates(remove_country_rates)
