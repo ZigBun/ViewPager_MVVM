@@ -85,4 +85,91 @@ class Migration(migrations.Migration):
                         decimal_places=3, default=Decimal("0"), max_digits=12
                     ),
                 ),
-      
+                (
+                    "voided_value",
+                    models.DecimalField(
+                        decimal_places=3, default=Decimal("0"), max_digits=12
+                    ),
+                ),
+                (
+                    "checkout",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="payment_transactions",
+                        to="checkout.checkout",
+                    ),
+                ),
+                (
+                    "order",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="payment_transactions",
+                        to="order.order",
+                    ),
+                ),
+            ],
+            options={
+                "ordering": ("pk",),
+            },
+        ),
+        migrations.CreateModel(
+            name="TransactionEvent",
+            fields=[
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("pending", "Pending"),
+                            ("success", "Success"),
+                            ("failure", "Failure"),
+                        ],
+                        default="success",
+                        max_length=128,
+                    ),
+                ),
+                ("reference", models.CharField(blank=True, default="", max_length=512)),
+                ("name", models.CharField(blank=True, default="", max_length=512)),
+                (
+                    "transaction",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="events",
+                        to="payment.transactionitem",
+                    ),
+                ),
+            ],
+            options={
+                "ordering": ("pk",),
+            },
+        ),
+        migrations.AddIndex(
+            model_name="transactionitem",
+            index=django.contrib.postgres.indexes.GinIndex(
+                fields=["private_metadata"], name="transactionitem_p_meta_idx"
+            ),
+        ),
+        migrations.AddIndex(
+            model_name="transactionitem",
+            index=django.contrib.postgres.indexes.GinIndex(
+                fields=["metadata"], name="transactionitem_meta_idx"
+            ),
+        ),
+        migrations.AddIndex(
+            model_name="transactionitem",
+            index=django.contrib.postgres.indexes.GinIndex(
+                fields=["order_id", "status"], name="payment_tra_order_i_e783c4_gin"
+            ),
+        ),
+    ]
