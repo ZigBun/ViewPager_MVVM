@@ -1456,3 +1456,182 @@ def create_vouchers():
             voucher=voucher,
             channel=channel,
             defaults={"discount_value": 5, "currency": channel.currency_code},
+        )
+    if created:
+        yield "Voucher #%d" % voucher.id
+    else:
+        yield "Value voucher already exists"
+
+
+def create_gift_cards(how_many=5):
+    product = Product.objects.filter(name="Gift card 100").first()
+    if not product:
+        return
+    product_pk = product.pk
+    tag, _ = GiftCardTag.objects.get_or_create(name="issued-gift-cards")
+    for i in range(how_many):
+        staff_user = User.objects.filter(is_staff=True).order_by("?").first()
+        gift_card, created = GiftCard.objects.get_or_create(
+            code=f"Gift_card_{i+1}",
+            defaults={
+                "created_by": staff_user,
+                "initial_balance": Money(50, DEFAULT_CURRENCY),
+                "current_balance": Money(50, DEFAULT_CURRENCY),
+            },
+        )
+        gift_card.tags.add(tag)
+        gift_card_events.gift_card_issued_event(gift_card, staff_user, None)
+        if created:
+            yield "Gift card #%d" % gift_card.id
+        else:
+            yield "Gift card already exists"
+
+        user = User.objects.filter(is_superuser=False).order_by("?").first()
+        gift_card, created = GiftCard.objects.get_or_create(
+            code=f"Gift_card_1{i+1}",
+            defaults={
+                "created_by": user,
+                "product_id": product_pk,
+                "initial_balance": Money(20, DEFAULT_CURRENCY),
+                "current_balance": Money(20, DEFAULT_CURRENCY),
+            },
+        )
+        order = Order.objects.order_by("?").first()
+        if not order:
+            raise Exception("No orders found")
+        gift_card_events.gift_cards_bought_event([gift_card], order, user, None)
+        if created:
+            yield "Gift card #%d" % gift_card.id
+        else:
+            yield "Gift card already exists"
+
+
+def add_address_to_admin(email):
+    address = create_address()
+    user = User.objects.get(email=email)
+    manager = get_plugins_manager()
+    store_user_address(user, address, AddressType.BILLING, manager)
+    store_user_address(user, address, AddressType.SHIPPING, manager)
+
+
+def create_page_type():
+    types = get_sample_data()
+
+    data = types["page.pagetype"]
+
+    for page_type_data in data:
+        pk = page_type_data.pop("pk")
+        defaults = dict(page_type_data["fields"])
+        page_type, _ = PageType.objects.update_or_create(pk=pk, defaults=defaults)
+        yield f"Page type {page_type.slug} created"
+
+
+def create_pages():
+    types = get_sample_data()
+
+    data_pages = types["page.page"]
+
+    for page_data in data_pages:
+        pk = page_data["pk"]
+        defaults = dict(page_data["fields"])
+        defaults["page_type_id"] = defaults.pop("page_type")
+        page, _ = Page.objects.update_or_create(pk=pk, defaults=defaults)
+        yield f"Page {page.slug} created"
+
+
+def create_menus():
+    types = get_sample_data()
+
+    menu_data = types["menu.menu"]
+    menu_item_data = types["menu.menuitem"]
+    for menu in menu_data:
+        pk = menu["pk"]
+        defaults = menu["fields"]
+        menu, _ = Menu.objects.update_or_create(pk=pk, defaults=defaults)
+        yield f"Menu {menu.name} created"
+    for menu_item in menu_item_data:
+        pk = menu_item["pk"]
+        defaults = dict(menu_item["fields"])
+        defaults["category_id"] = defaults.pop("category")
+        defaults["collection_id"] = defaults.pop("collection")
+        defaults["menu_id"] = defaults.pop("menu")
+        defaults["page_id"] = defaults.pop("page")
+        defaults.pop("parent")
+        menu_item, _ = MenuItem.objects.update_or_create(pk=pk, defaults=defaults)
+        yield f"MenuItem {menu_item.name} created"
+    for menu_item in menu_item_data:
+        pk = menu_item["pk"]
+        defaults = dict(menu_item["fields"])
+        MenuItem.objects.filter(pk=pk).update(parent_id=defaults["parent"])
+
+
+def get_product_list_images_dir(placeholder_dir):
+    product_list_images_dir = os.path.join(placeholder_dir, PRODUCTS_LIST_DIR)
+    return product_list_images_dir
+
+
+def get_image(image_dir, image_name):
+    img_path = os.path.join(image_dir, image_name)
+    return File(open(img_path, "rb"), name=image_name)
+
+
+def prepare_checkout_info():
+    channel = Channel.objects.get(slug=settings.DEFAULT_CHANNEL_SLUG)
+    checkout = Checkout.objects.create(currency=channel.currency_code, channel=channel)
+    checkout.set_country(channel.default_country, commit=True)
+    checkout_info = fetch_checkout_info(checkout, [], [], get_plugins_manager())
+    return checkout_info
+
+
+def create_checkout_with_preorders():
+    checkout_info = prepare_checkout_info()
+    for product_variant in ProductVariant.objects.all()[:2]:
+        product_variant.is_preorder = True
+        product_variant.preorder_global_threshold = 10
+        product_variant.preorder_end_date = timezone.now() + datetime.timedelta(days=10)
+        product_variant.save(
+            update_fields=[
+                "is_preorder",
+                "preorder_global_threshold",
+                "preorder_end_date",
+                "updated_at",
+            ]
+        )
+        add_variant_to_checkout(checkout_info, product_variant, 2)
+    yield (
+        "Created checkout with two preorders. Checkout token: "
+        f"{checkout_info.checkout.token}"
+    )
+
+
+def create_checkout_with_custom_prices():
+    checkout_info = prepare_checkout_info()
+    for product_variant in ProductVariant.objects.all()[:2]:
+        add_variant_to_checkout(
+            checkout_info, product_variant, 2, price_override=Decimal("20.0")
+        )
+    yield (
+        "Created checkout with two lines and custom prices. "
+        f"Checkout token: {checkout_info.checkout.token}."
+    )
+
+
+def create_checkout_with_same_variant_in_multiple_lines():
+    checkout_info = prepare_checkout_info()
+    for product_variant in ProductVariant.objects.all()[:2]:
+        add_variant_to_checkout(checkout_info, product_variant, 2)
+        add_variant_to_checkout(checkout_info, product_variant, 2, force_new_line=True)
+
+    yield (
+        "Created checkout with four lines and same variant in multiple lines "
+        f"Checkout token: {checkout_info.checkout.token}."
+    )
+
+
+def create_tax_classes():
+    names = ["Groceries", "Books"]
+    tax_classes = []
+    for name in names:
+        tax_classes.append(TaxClass(name=name))
+    TaxClass.objects.bulk_create(tax_classes)
+    yield f"Created tax classes: {names}"
