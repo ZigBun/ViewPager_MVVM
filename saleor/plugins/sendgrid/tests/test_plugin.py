@@ -177,4 +177,9 @@ def test_notify(mocked_event_map, sendgrid_email_plugin):
 def test_save_plugin_configuration_missing_api_key(
     sendgrid_email_plugin,
 ):
-    plugin = sendgrid_email_pl
+    plugin = sendgrid_email_plugin(active=False)
+    configuration = PluginConfiguration.objects.get()
+
+    data_to_save = {"active": True, "configuration": []}
+    with pytest.raises(ValidationError):
+        plugin.save_plugin_configuration(configuration, data_to_save)
