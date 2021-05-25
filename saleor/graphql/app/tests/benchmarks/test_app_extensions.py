@@ -122,4 +122,28 @@ def test_app_extensions_with_filter(
             ),
             AppExtension(
                 app=app,
-                
+                label="Create product with App2",
+                url="https://www.example.com/app-product",
+                mount=AppExtensionMount.PRODUCT_DETAILS_MORE_ACTIONS,
+            ),
+            AppExtension(
+                app=app,
+                label="Create product with App3",
+                url="https://www.example.com/app-product",
+                mount=AppExtensionMount.PRODUCT_OVERVIEW_CREATE,
+            ),
+        ]
+    )
+    app_extensions[0].permissions.add(permission_manage_products)
+    variables = {"filter": filter}
+
+    # when
+    response = staff_api_client.post_graphql(
+        query,
+        variables,
+        permissions=[permission_manage_products],
+        check_no_permissions=False,
+    )
+
+    # then
+    get_graphql_content(response)
