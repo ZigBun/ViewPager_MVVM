@@ -3435,3 +3435,706 @@ def test_query_public_meta_for_warehouse_as_staff(
     warehouse.store_value_in_metadata({PUBLIC_KEY: PUBLIC_VALUE})
     warehouse.save(update_fields=["metadata"])
     variables = {"id": graphene.Node.to_global_id("Warehouse", warehouse.pk)}
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_WAREHOUSE_PUBLIC_META,
+        variables,
+        [permission_manage_products],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["warehouse"]["metadata"][0]
+    assert metadata["key"] == PUBLIC_KEY
+    assert metadata["value"] == PUBLIC_VALUE
+
+
+def test_query_public_meta_for_warehouse_as_app(
+    app_api_client, warehouse, permission_manage_products
+):
+    # given
+    warehouse.store_value_in_metadata({PUBLIC_KEY: PUBLIC_VALUE})
+    warehouse.save(update_fields=["metadata"])
+    variables = {"id": graphene.Node.to_global_id("Warehouse", warehouse.pk)}
+
+    # when
+    response = app_api_client.post_graphql(
+        QUERY_WAREHOUSE_PUBLIC_META,
+        variables,
+        [permission_manage_products],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["warehouse"]["metadata"][0]
+    assert metadata["key"] == PUBLIC_KEY
+    assert metadata["value"] == PUBLIC_VALUE
+
+
+QUERY_WAREHOUSE_PRIVATE_META = """
+    query warehouseMeta($id: ID!){
+        warehouse(id: $id){
+            privateMetadata{
+                key
+                value
+            }
+        }
+    }
+"""
+
+
+def test_query_private_meta_for_warehouse_as_anonymous_user(api_client, warehouse):
+    # given
+    variables = {
+        "id": graphene.Node.to_global_id("Warehouse", warehouse.pk),
+    }
+
+    # when
+    response = api_client.post_graphql(QUERY_WAREHOUSE_PRIVATE_META, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_private_meta_for_warehouse_as_customer(user_api_client, warehouse):
+    # given
+    variables = {
+        "id": graphene.Node.to_global_id("Warehouse", warehouse.pk),
+    }
+
+    # when
+    response = user_api_client.post_graphql(QUERY_WAREHOUSE_PUBLIC_META, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_private_meta_for_warehouse_as_staff(
+    staff_api_client, warehouse, permission_manage_products
+):
+    # given
+    warehouse.store_value_in_private_metadata({PRIVATE_KEY: PRIVATE_VALUE})
+    warehouse.save(update_fields=["private_metadata"])
+    variables = {"id": graphene.Node.to_global_id("Warehouse", warehouse.pk)}
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_WAREHOUSE_PRIVATE_META,
+        variables,
+        [permission_manage_products],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["warehouse"]["privateMetadata"][0]
+    assert metadata["key"] == PRIVATE_KEY
+    assert metadata["value"] == PRIVATE_VALUE
+
+
+def test_query_private_meta_for_warehouse_as_app(
+    app_api_client, warehouse, permission_manage_products
+):
+    # given
+    warehouse.store_value_in_private_metadata({PRIVATE_KEY: PRIVATE_VALUE})
+    warehouse.save(update_fields=["private_metadata"])
+    variables = {
+        "id": graphene.Node.to_global_id("Warehouse", warehouse.pk),
+    }
+
+    # when
+    response = app_api_client.post_graphql(
+        QUERY_WAREHOUSE_PRIVATE_META,
+        variables,
+        [permission_manage_products],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["warehouse"]["privateMetadata"][0]
+    assert metadata["key"] == PRIVATE_KEY
+    assert metadata["value"] == PRIVATE_VALUE
+
+
+QUERY_VOUCHER_PUBLIC_META = """
+    query voucherMeta($id: ID!){
+         voucher(id: $id){
+            metadata{
+                key
+                value
+            }
+        }
+    }
+"""
+
+
+def test_query_public_meta_for_voucher_as_anonymous_user(api_client, voucher):
+    # given
+    voucher.store_value_in_metadata({PUBLIC_KEY: PUBLIC_VALUE})
+    voucher.save(update_fields=["metadata"])
+    variables = {
+        "id": graphene.Node.to_global_id("Voucher", voucher.pk),
+    }
+
+    # when
+    response = api_client.post_graphql(QUERY_VOUCHER_PUBLIC_META, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_public_meta_for_voucher_as_customer(user_api_client, voucher):
+    # given
+    voucher.store_value_in_metadata({PUBLIC_KEY: PUBLIC_VALUE})
+    voucher.save(update_fields=["metadata"])
+    variables = {
+        "id": graphene.Node.to_global_id("Voucher", voucher.pk),
+    }
+
+    # when
+    response = user_api_client.post_graphql(QUERY_VOUCHER_PUBLIC_META, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_public_meta_for_voucher_as_staff(
+    staff_api_client, voucher, permission_manage_discounts
+):
+    # given
+    voucher.store_value_in_metadata({PUBLIC_KEY: PUBLIC_VALUE})
+    voucher.save(update_fields=["metadata"])
+    variables = {"id": graphene.Node.to_global_id("Voucher", voucher.pk)}
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_VOUCHER_PUBLIC_META,
+        variables,
+        [permission_manage_discounts],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["voucher"]["metadata"][0]
+    assert metadata["key"] == PUBLIC_KEY
+    assert metadata["value"] == PUBLIC_VALUE
+
+
+def test_query_public_meta_for_voucher_as_app(
+    app_api_client, voucher, permission_manage_discounts
+):
+    # given
+    voucher.store_value_in_metadata({PUBLIC_KEY: PUBLIC_VALUE})
+    voucher.save(update_fields=["metadata"])
+    variables = {"id": graphene.Node.to_global_id("Voucher", voucher.pk)}
+
+    # when
+    response = app_api_client.post_graphql(
+        QUERY_VOUCHER_PUBLIC_META,
+        variables,
+        [permission_manage_discounts],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["voucher"]["metadata"][0]
+    assert metadata["key"] == PUBLIC_KEY
+    assert metadata["value"] == PUBLIC_VALUE
+
+
+QUERY_VOUCHER_PRIVATE_META = """
+    query voucherMeta($id: ID!){
+        voucher(id: $id){
+            privateMetadata{
+                key
+                value
+            }
+        }
+    }
+"""
+
+
+def test_query_private_meta_for_voucher_as_anonymous_user(api_client, voucher):
+    # given
+    variables = {
+        "id": graphene.Node.to_global_id("Voucher", voucher.pk),
+    }
+
+    # when
+    response = api_client.post_graphql(QUERY_VOUCHER_PRIVATE_META, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_private_meta_for_voucher_as_customer(user_api_client, voucher):
+    # given
+    variables = {
+        "id": graphene.Node.to_global_id("Voucher", voucher.pk),
+    }
+
+    # when
+    response = user_api_client.post_graphql(QUERY_VOUCHER_PRIVATE_META, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_private_meta_for_voucher_as_staff(
+    staff_api_client, voucher, permission_manage_discounts
+):
+    # given
+    voucher.store_value_in_private_metadata({PRIVATE_KEY: PRIVATE_VALUE})
+    voucher.save(update_fields=["private_metadata"])
+    variables = {"id": graphene.Node.to_global_id("Voucher", voucher.pk)}
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_VOUCHER_PRIVATE_META,
+        variables,
+        [permission_manage_discounts],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["voucher"]["privateMetadata"][0]
+    assert metadata["key"] == PRIVATE_KEY
+    assert metadata["value"] == PRIVATE_VALUE
+
+
+def test_query_private_meta_for_voucher_as_app(
+    app_api_client, voucher, permission_manage_discounts
+):
+    # given
+    voucher.store_value_in_private_metadata({PRIVATE_KEY: PRIVATE_VALUE})
+    voucher.save(update_fields=["private_metadata"])
+    variables = {
+        "id": graphene.Node.to_global_id("Voucher", voucher.pk),
+    }
+
+    # when
+    response = app_api_client.post_graphql(
+        QUERY_VOUCHER_PRIVATE_META,
+        variables,
+        [permission_manage_discounts],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["voucher"]["privateMetadata"][0]
+    assert metadata["key"] == PRIVATE_KEY
+    assert metadata["value"] == PRIVATE_VALUE
+
+
+QUERY_SALE_PUBLIC_META = """
+    query saleMeta($id: ID!){
+         sale(id: $id){
+            metadata{
+                key
+                value
+            }
+        }
+    }
+"""
+
+
+def test_query_public_meta_for_sale_as_anonymous_user(api_client, sale):
+    # given
+    sale.store_value_in_metadata({PUBLIC_KEY: PUBLIC_VALUE})
+    sale.save(update_fields=["metadata"])
+    variables = {
+        "id": graphene.Node.to_global_id("Sale", sale.pk),
+    }
+
+    # when
+    response = api_client.post_graphql(QUERY_SALE_PUBLIC_META, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_public_meta_for_sale_as_customer(user_api_client, sale):
+    # given
+    sale.store_value_in_metadata({PUBLIC_KEY: PUBLIC_VALUE})
+    sale.save(update_fields=["metadata"])
+    variables = {
+        "id": graphene.Node.to_global_id("Sale", sale.pk),
+    }
+
+    # when
+    response = user_api_client.post_graphql(QUERY_SALE_PUBLIC_META, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_public_meta_for_sale_as_staff(
+    staff_api_client, sale, permission_manage_discounts
+):
+    # given
+    sale.store_value_in_metadata({PUBLIC_KEY: PUBLIC_VALUE})
+    sale.save(update_fields=["metadata"])
+    variables = {"id": graphene.Node.to_global_id("Sale", sale.pk)}
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_SALE_PUBLIC_META,
+        variables,
+        [permission_manage_discounts],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["sale"]["metadata"][0]
+    assert metadata["key"] == PUBLIC_KEY
+    assert metadata["value"] == PUBLIC_VALUE
+
+
+def test_query_public_meta_for_sale_as_app(
+    app_api_client, sale, permission_manage_discounts
+):
+    # given
+    sale.store_value_in_metadata({PUBLIC_KEY: PUBLIC_VALUE})
+    sale.save(update_fields=["metadata"])
+    variables = {"id": graphene.Node.to_global_id("Sale", sale.pk)}
+
+    # when
+    response = app_api_client.post_graphql(
+        QUERY_SALE_PUBLIC_META,
+        variables,
+        [permission_manage_discounts],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["sale"]["metadata"][0]
+    assert metadata["key"] == PUBLIC_KEY
+    assert metadata["value"] == PUBLIC_VALUE
+
+
+QUERY_SALE_PRIVATE_META = """
+    query saleMeta($id: ID!){
+        sale(id: $id){
+            privateMetadata{
+                key
+                value
+            }
+        }
+    }
+"""
+
+
+def test_query_private_meta_for_sale_as_anonymous_user(api_client, sale):
+    # given
+    variables = {
+        "id": graphene.Node.to_global_id("Sale", sale.pk),
+    }
+
+    # when
+    response = api_client.post_graphql(QUERY_SALE_PRIVATE_META, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_private_meta_for_sale_as_customer(user_api_client, sale):
+    # given
+    variables = {
+        "id": graphene.Node.to_global_id("Sale", sale.pk),
+    }
+
+    # when
+    response = user_api_client.post_graphql(QUERY_SALE_PRIVATE_META, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_private_meta_for_sale_as_staff(
+    staff_api_client, sale, permission_manage_discounts
+):
+    # given
+    sale.store_value_in_private_metadata({PRIVATE_KEY: PRIVATE_VALUE})
+    sale.save(update_fields=["private_metadata"])
+    variables = {"id": graphene.Node.to_global_id("Sale", sale.pk)}
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_SALE_PRIVATE_META,
+        variables,
+        [permission_manage_discounts],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["sale"]["privateMetadata"][0]
+    assert metadata["key"] == PRIVATE_KEY
+    assert metadata["value"] == PRIVATE_VALUE
+
+
+def test_query_private_meta_for_sale_as_app(
+    app_api_client, sale, permission_manage_discounts
+):
+    # given
+    sale.store_value_in_private_metadata({PRIVATE_KEY: PRIVATE_VALUE})
+    sale.save(update_fields=["private_metadata"])
+    variables = {
+        "id": graphene.Node.to_global_id("Sale", sale.pk),
+    }
+
+    # when
+    response = app_api_client.post_graphql(
+        QUERY_SALE_PRIVATE_META,
+        variables,
+        [permission_manage_discounts],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["sale"]["privateMetadata"][0]
+    assert metadata["key"] == PRIVATE_KEY
+    assert metadata["value"] == PRIVATE_VALUE
+
+
+QUERY_GIFT_CARD_PRIVATE_META = """
+    query giftCardMeta($id: ID!){
+        giftCard(id: $id){
+            privateMetadata{
+                key
+                value
+            }
+        }
+    }
+"""
+
+
+def test_query_private_meta_for_gift_card_as_anonymous_user(api_client, gift_card):
+    # given
+    variables = {
+        "id": graphene.Node.to_global_id("GiftCard", gift_card.pk),
+    }
+
+    # when
+    response = api_client.post_graphql(QUERY_GIFT_CARD_PRIVATE_META, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_private_meta_for_gift_card_as_customer(user_api_client, gift_card):
+    # given
+    variables = {
+        "id": graphene.Node.to_global_id("GiftCard", gift_card.pk),
+    }
+
+    # when
+    response = user_api_client.post_graphql(QUERY_GIFT_CARD_PRIVATE_META, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_private_meta_for_gift_card_as_staff(
+    staff_api_client, gift_card, permission_manage_gift_card
+):
+    # given
+    gift_card.store_value_in_private_metadata({PRIVATE_KEY: PRIVATE_VALUE})
+    gift_card.save(update_fields=["private_metadata"])
+    variables = {"id": graphene.Node.to_global_id("GiftCard", gift_card.pk)}
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_GIFT_CARD_PRIVATE_META,
+        variables,
+        [permission_manage_gift_card],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["giftCard"]["privateMetadata"][0]
+    assert metadata["key"] == PRIVATE_KEY
+    assert metadata["value"] == PRIVATE_VALUE
+
+
+def test_query_private_meta_for_gift_card_as_app(
+    app_api_client, gift_card, permission_manage_gift_card
+):
+    # given
+    gift_card.store_value_in_private_metadata({PRIVATE_KEY: PRIVATE_VALUE})
+    gift_card.save(update_fields=["private_metadata"])
+    variables = {
+        "id": graphene.Node.to_global_id("GiftCard", gift_card.pk),
+    }
+
+    # when
+    response = app_api_client.post_graphql(
+        QUERY_GIFT_CARD_PRIVATE_META,
+        variables,
+        [permission_manage_gift_card],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    metadata = content["data"]["giftCard"]["privateMetadata"][0]
+    assert metadata["key"] == PRIVATE_KEY
+    assert metadata["value"] == PRIVATE_VALUE
+
+
+QUERY_PRODUCT_MEDIA_METADATA = """
+    query productMediaById(
+        $mediaId: ID!,
+        $productId: ID!,
+        $channel: String,
+    ) {
+        product(id: $productId, channel: $channel) {
+            mediaById(id: $mediaId) {
+                metadata {
+                    key
+                    value
+                }
+                privateMetadata {
+                    key
+                    value
+                }
+            }
+        }
+    }
+"""
+
+
+def test_query_metadata_for_product_media_as_staff(
+    staff_api_client, product_with_image, channel_USD, permission_manage_products
+):
+    # given
+    query = QUERY_PRODUCT_MEDIA_METADATA
+    media = product_with_image.media.first()
+
+    metadata = {"label": "image-name"}
+    private_metadata = {"private-label": "private-name"}
+    media.store_value_in_metadata(metadata)
+    media.store_value_in_private_metadata(private_metadata)
+    media.save(update_fields=["metadata", "private_metadata"])
+
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "mediaId": graphene.Node.to_global_id("ProductMedia", media.pk),
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["product"]["mediaById"]
+    assert data["metadata"][0]["key"] in metadata.keys()
+    assert data["metadata"][0]["value"] in metadata.values()
+    assert data["privateMetadata"][0]["key"] in private_metadata.keys()
+    assert data["privateMetadata"][0]["value"] in private_metadata.values()
+
+
+def test_query_metadata_for_product_media_as_app(
+    app_api_client, product_with_image, channel_USD, permission_manage_products
+):
+    # given
+    query = QUERY_PRODUCT_MEDIA_METADATA
+    media = product_with_image.media.first()
+
+    metadata = {"label": "image-name"}
+    private_metadata = {"private-label": "private-name"}
+    media.store_value_in_metadata(metadata)
+    media.store_value_in_private_metadata(private_metadata)
+    media.save(update_fields=["metadata", "private_metadata"])
+
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "mediaId": graphene.Node.to_global_id("ProductMedia", media.pk),
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = app_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["product"]["mediaById"]
+    assert data["metadata"][0]["key"] in metadata.keys()
+    assert data["metadata"][0]["value"] in metadata.values()
+    assert data["privateMetadata"][0]["key"] in private_metadata.keys()
+    assert data["privateMetadata"][0]["value"] in private_metadata.values()
+
+
+def test_query_metadata_for_product_media_as_anonymous_user(
+    api_client, product_with_image, channel_USD
+):
+    # given
+    query = QUERY_PRODUCT_MEDIA_METADATA
+    media = product_with_image.media.first()
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "mediaId": graphene.Node.to_global_id("ProductMedia", media.pk),
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = api_client.post_graphql(query, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_metadata_for_product_media_as_customer_user(
+    user_api_client, product_with_image, channel_USD
+):
+    # given
+    query = QUERY_PRODUCT_MEDIA_METADATA
+    media = product_with_image.media.first()
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "mediaId": graphene.Node.to_global_id("ProductMedia", media.pk),
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = user_api_client.post_graphql(query, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_metadata_for_product_media_as_staff_missing_permissions(
+    staff_api_client, product_with_image, channel_USD
+):
+    # given
+    query = QUERY_PRODUCT_MEDIA_METADATA
+    media = product_with_image.media.first()
+
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "mediaId": graphene.Node.to_global_id("ProductMedia", media.pk),
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(query, variables)
+
+    # then
+    assert_no_permission(response)
