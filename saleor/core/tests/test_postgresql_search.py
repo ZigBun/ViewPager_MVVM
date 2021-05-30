@@ -129,4 +129,12 @@ def test_flat_concat_drop_exceeding_count_silently_truncate():
     """
 
     class LimitedFlatConcat(FlatConcat):
-        max_expressio
+        max_expression_count = 2
+        silent_drop_expression = True
+
+    # Should not raise an exception and shouldn't truncate
+    concat = LimitedFlatConcat(Value("1"), Value("2"))
+    assert concat.source_expressions == [Value("1"), Value("2")]
+
+    concat = LimitedFlatConcat(Value("a"), Value("b"), Value("c"))
+    assert concat.source_expressions == [Value("a"), Value("b")]
