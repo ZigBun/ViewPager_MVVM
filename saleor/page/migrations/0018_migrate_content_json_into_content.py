@@ -37,4 +37,22 @@ class Migration(migrations.Migration):
             model_name="page",
             name="content",
             field=saleor.core.db.fields.SanitizedJSONField(
-       
+                blank=True,
+                default=dict,
+                sanitizer=saleor.core.utils.editorjs.clean_editor_js,
+            ),
+        ),
+        migrations.AlterField(
+            model_name="pagetranslation",
+            name="content",
+            field=saleor.core.db.fields.SanitizedJSONField(
+                blank=True,
+                default=dict,
+                sanitizer=saleor.core.utils.editorjs.clean_editor_js,
+            ),
+        ),
+        migrations.RunPython(
+            migrate_content_json_into_content_field,
+            migrations.RunPython.noop,
+        ),
+    ]
