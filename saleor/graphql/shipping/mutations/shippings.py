@@ -173,4 +173,179 @@ class ShippingZoneMixin:
         if add_channels := cleaned_input.get("add_channels"):
             add_channel_ids = {channel.id for channel in add_channels}
 
-     
+        ChannelWarehouse = channel_models.Channel.warehouses.through  # type: ignore[attr-defined] # raw access to the through model # noqa: E501
+        channel_warehouses = ChannelWarehouse.objects.filter(
+            warehouse_id__in=warehouse_ids
+        )
+
+        # any warehouse from the list cannot be assigned when:
+        # 1) where there are no channels assigned to any warehouse
+        # 2) any channel is will be not assigned to the shipping zone
+        if not channel_warehouses or (not shipping_zone.id and not add_channel_ids):
+            invalid_warehouse_ids = warehouse_ids
+
+        warehouse_to_channel_mapping = defaultdict(set)
+        for warehouse_id, channel_id in channel_warehouses.values_list(
+            "warehouse_id", "channel_id"
+        ):
+            warehouse_to_channel_mapping[warehouse_id].add(channel_id)
+
+        # if the shipping zone does not exist yet, all zone channels will be channels
+        # provided in `add_channels` field
+        shipping_zone_channel_ids = (
+            add_channel_ids
+            if not shipping_zone.id
+            else cls._get_shipping_zone_channel_ids(
+                shipping_zone, remove_channel_ids, add_channel_ids
+            )
+        )
+
+        invalid_warehouse_ids = cls._find_invalid_warehouses(
+            warehouse_to_channel_mapping, warehouse_ids, shipping_zone_channel_ids
+        )
+
+        if invalid_warehouse_ids:
+            invalid_warehouses = {
+                graphene.Node.to_global_id("Warehouse", pk)
+                for pk in invalid_warehouse_ids
+            }
+            raise ValidationError(
+                {
+                    "add_warehouses": ValidationError(
+                        "Only warehouses that have common channel with shipping zone "
+                        "can be assigned.",
+                        code=ShippingErrorCode.INVALID.value,
+                        params={
+                            "warehouses": invalid_warehouses,
+                        },
+                    )
+                }
+            )
+
+    @staticmethod
+    def _get_shipping_zone_channel_ids(
+        shipping_zone, remove_channel_ids, add_channel_ids
+    ):
+        # get shipping zone channels
+        ShippingZoneChannel = models.ShippingZone.channels.through
+        shipping_zone_channel_ids = set(
+            ShippingZoneChannel.objects.filter(shippingzone_id=shipping_zone.id)
+            .exclude(channel_id__in=remove_channel_ids)
+            .values_list("channel_id", flat=True)
+        )
+        # shipping zone channels set need to be updated with channels
+        # that will be removed and added to shipping zone
+        return shipping_zone_channel_ids | add_channel_ids
+
+    @staticmethod
+    def _find_invalid_warehouses(
+        warehouse_to_channel_mapping, warehouse_ids, zone_channel_ids
+    ):
+        invalid_warehouse_ids = []
+        for warehouse_id in warehouse_ids:
+            warehouse_channels = warehouse_to_channel_mapping.get(warehouse_id)
+            # warehouse cannot be added if it hasn't got any channel assigned
+            # or if it does not have common channel with shipping zone
+            if not warehouse_channels or not warehouse_channels.intersection(
+                zone_channel_ids
+            ):
+                invalid_warehouse_ids.append(warehouse_id)
+        return invalid_warehouse_ids
+
+    @classmethod
+    def clean_default(cls, instance, data):
+        default = data.get("default")
+        if default:
+            if default_shipping_zone_exists(instance.pk):
+                raise ValidationError(
+                    {
+                        "default": ValidationError(
+                            "Default shipping zone already exists.",
+                            code=ShippingErrorCode.ALREADY_EXISTS.value,
+                        )
+                    }
+                )
+            else:
+                countries = get_countries_without_shipping_zone()
+                data["countries"].extend([country for country in countries])
+        else:
+            data["default"] = False
+        return data
+
+    @classmethod
+    def _save_m2m(cls, info: ResolveInfo, instance, cleaned_data):
+        with traced_atomic_transaction():
+            super()._save_m2m(info, instance, cleaned_data)  # type: ignore[misc] # mixin # noqa: E501
+
+            add_warehouses = cleaned_data.get("add_warehouses")
+            if add_warehouses:
+                instance.warehouses.add(*add_warehouses)
+
+            remove_warehouses = cleaned_data.get("remove_warehouses")
+            if remove_warehouses:
+                instance.warehouses.remove(*remove_warehouses)
+
+            add_channels = cleaned_data.get("add_channels")
+            if add_channels:
+                instance.channels.add(*add_channels)
+
+            remove_channels = cleaned_data.get("remove_channels")
+            if remove_channels:
+                instance.channels.remove(*remove_channels)
+                shipping_channel_listings = (
+                    models.ShippingMethodChannelListing.objects.filter(
+                        shipping_method__shipping_zone=instance,
+                        channel__in=remove_channels,
+                    )
+                )
+                shipping_method_ids = list(
+                    shipping_channel_listings.values_list(
+                        "shipping_method_id", flat=True
+                    )
+                )
+                shipping_channel_listings.delete()
+                channel_ids = [channel.id for channel in remove_channels]
+                cls.delete_invalid_shipping_zone_to_warehouse_relation(instance)
+                drop_invalid_shipping_methods_relations_for_given_channels.delay(
+                    shipping_method_ids, channel_ids
+                )
+
+    @classmethod
+    def delete_invalid_shipping_zone_to_warehouse_relation(cls, shipping_zone):
+        """Drop zone-warehouse relations that becomes invalid after channels deletion.
+
+        Remove all shipping zone to warehouse relations that will not have common
+        channel after removing given channels from the shipping zone.
+        """
+        WarehouseShippingZone = models.ShippingZone.warehouses.through  # type: ignore[attr-defined] # raw access to the through model # noqa: E501
+        ChannelWarehouse = channel_models.Channel.warehouses.through  # type: ignore[attr-defined] # raw access to the through model # noqa: E501
+        ShippingZoneChannel = models.ShippingZone.channels.through
+
+        warehouse_shipping_zones = WarehouseShippingZone.objects.filter(
+            shippingzone_id=shipping_zone.id
+        )
+
+        channel_warehouses = ChannelWarehouse.objects.filter(
+            Exists(
+                warehouse_shipping_zones.filter(warehouse_id=OuterRef("warehouse_id"))
+            )
+        )
+
+        warehouse_to_channel_mapping = defaultdict(set)
+        for warehouse_id, channel_id in channel_warehouses.values_list(
+            "warehouse_id", "channel_id"
+        ):
+            warehouse_to_channel_mapping[warehouse_id].add(channel_id)
+
+        shipping_zone_channel_ids = set(
+            ShippingZoneChannel.objects.filter(
+                shippingzone_id=shipping_zone.id
+            ).values_list("channel_id", flat=True)
+        )
+
+        shipping_zone_warehouses_to_delete = []
+        for id, warehouse_id in warehouse_shipping_zones.values_list(
+            "id", "warehouse_id"
+        ):
+            warehouse_channels = warehouse_to_channel_mapping.get(warehouse_id, set())
+            # if there is no common
