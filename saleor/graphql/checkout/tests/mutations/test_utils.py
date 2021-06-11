@@ -140,4 +140,42 @@ def test_group_on_update_when_line_id_as_parameter_provided():
             custom_price_to_update=True,
         ),
         CheckoutLineData(
-            variant_id=Non
+            variant_id=None,
+            line_id="qwe",
+            quantity=1,
+            quantity_to_update=True,
+            custom_price=10,
+            custom_price_to_update=True,
+        ),
+    ]
+
+    assert expected == group_lines_input_data_on_update(lines_data)
+
+
+def test_group_on_update_when_one_line_and_mixed_parameters_provided(
+    checkout_with_item,
+):
+    line = checkout_with_item.lines.first()
+    variant_id = graphene.Node.to_global_id("ProductVariant", line.variant_id)
+    line_id = graphene.Node.to_global_id("CheckoutLine", line.id)
+
+    existing_checkout_lines, _ = fetch_checkout_lines(checkout_with_item)
+
+    lines_data = [
+        {"quantity": 6, "variant_id": variant_id, "price": 1.22},
+        {"quantity": 1, "line_id": line_id, "price": 10},
+    ]
+
+    expected = [
+        CheckoutLineData(
+            variant_id=str(line.variant_id),
+            line_id=str(line.id),
+            quantity=7,
+            quantity_to_update=True,
+            custom_price=10,
+            custom_price_to_update=True,
+        )
+    ]
+    assert expected == group_lines_input_data_on_update(
+        lines_data, existing_checkout_lines
+    )
