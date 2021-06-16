@@ -348,4 +348,221 @@ class ShippingZoneMixin:
             "id", "warehouse_id"
         ):
             warehouse_channels = warehouse_to_channel_mapping.get(warehouse_id, set())
-            # if there is no common
+            # if there is no common channels between shipping zone and warehouse
+            # the relation should be deleted
+            if not warehouse_channels or not warehouse_channels.intersection(
+                shipping_zone_channel_ids
+            ):
+                shipping_zone_warehouses_to_delete.append(id)
+
+        WarehouseShippingZone.objects.filter(
+            id__in=shipping_zone_warehouses_to_delete
+        ).delete()
+
+
+class ShippingZoneCreate(ShippingZoneMixin, ModelMutation):
+    class Arguments:
+        input = ShippingZoneCreateInput(
+            description="Fields required to create a shipping zone.", required=True
+        )
+
+    class Meta:
+        description = "Creates a new shipping zone."
+        model = models.ShippingZone
+        object_type = ShippingZone
+        permissions = (ShippingPermissions.MANAGE_SHIPPING,)
+        error_type_class = ShippingError
+        error_type_field = "shipping_errors"
+
+    @classmethod
+    def post_save_action(cls, info: ResolveInfo, instance, _cleaned_input):
+        manager = get_plugin_manager_promise(info.context).get()
+        cls.call_event(manager.shipping_zone_created, instance)
+
+    @classmethod
+    def success_response(cls, instance):
+        instance = ChannelContext(node=instance, channel_slug=None)
+        response = super().success_response(instance)
+
+        return response
+
+
+class ShippingZoneUpdate(ShippingZoneMixin, ModelMutation):
+    class Arguments:
+        id = graphene.ID(description="ID of a shipping zone to update.", required=True)
+        input = ShippingZoneUpdateInput(
+            description="Fields required to update a shipping zone.", required=True
+        )
+
+    class Meta:
+        description = "Updates a new shipping zone."
+        model = models.ShippingZone
+        object_type = ShippingZone
+        permissions = (ShippingPermissions.MANAGE_SHIPPING,)
+        error_type_class = ShippingError
+        error_type_field = "shipping_errors"
+
+    @classmethod
+    def post_save_action(cls, info: ResolveInfo, instance, _cleaned_input):
+        manager = get_plugin_manager_promise(info.context).get()
+        cls.call_event(manager.shipping_zone_updated, instance)
+
+    @classmethod
+    def success_response(cls, instance):
+        instance = ChannelContext(node=instance, channel_slug=None)
+        response = super().success_response(instance)
+
+        return response
+
+
+class ShippingZoneDelete(ModelDeleteMutation):
+    class Arguments:
+        id = graphene.ID(required=True, description="ID of a shipping zone to delete.")
+
+    class Meta:
+        description = "Deletes a shipping zone."
+        model = models.ShippingZone
+        object_type = ShippingZone
+        permissions = (ShippingPermissions.MANAGE_SHIPPING,)
+        error_type_class = ShippingError
+        error_type_field = "shipping_errors"
+
+    @classmethod
+    def post_save_action(cls, info: ResolveInfo, instance, _cleaned_input):
+        manager = get_plugin_manager_promise(info.context).get()
+        cls.call_event(manager.shipping_zone_deleted, instance)
+
+    @classmethod
+    def success_response(cls, instance):
+        instance = ChannelContext(node=instance, channel_slug=None)
+        response = super().success_response(instance)
+
+        return response
+
+
+class ShippingMethodTypeMixin:
+    @classmethod
+    def get_type_for_model(cls):
+        return shipping_types.ShippingMethodType
+
+    @classmethod
+    def get_instance(cls, info: ResolveInfo, **data):
+        object_id = data.get("id")
+        if object_id:
+            instance = cls.get_node_or_error(  # type: ignore[attr-defined] # mixin
+                info, object_id, qs=models.ShippingMethod.objects
+            )
+        else:
+            instance = cls._meta.model()  # type: ignore[attr-defined] # mixin
+        return instance
+
+
+class ShippingPriceMixin:
+    @classmethod
+    def get_type_for_model(cls):
+        return ShippingMethodType
+
+    @classmethod
+    def clean_input(cls, info: ResolveInfo, instance, data, **kwargs):
+        cleaned_input = super().clean_input(  # type: ignore[misc] # mixin
+            info, instance, data, **kwargs
+        )
+        errors: Dict[str, ValidationError] = {}
+        cls.clean_weight(cleaned_input, errors)
+        if (
+            "minimum_delivery_days" in cleaned_input
+            or "maximum_delivery_days" in cleaned_input
+        ):
+            cls.clean_delivery_time(instance, cleaned_input, errors)
+        if errors:
+            raise ValidationError(errors)
+
+        if cleaned_input.get("delete_postal_code_rules"):
+            _, postal_code_rules_db_ids = resolve_global_ids_to_primary_keys(
+                data["delete_postal_code_rules"], ShippingMethodPostalCodeRule
+            )
+            cleaned_input["delete_postal_code_rules"] = postal_code_rules_db_ids
+        if cleaned_input.get("add_postal_code_rules") and not cleaned_input.get(
+            "inclusion_type"
+        ):
+            raise ValidationError(
+                {
+                    "inclusion_type": ValidationError(
+                        "This field is required.",
+                        code=ShippingErrorCode.REQUIRED.value,
+                    )
+                }
+            )
+        return cleaned_input
+
+    @classmethod
+    def clean_weight(cls, cleaned_input, errors):
+        min_weight = cleaned_input.get("minimum_order_weight")
+        max_weight = cleaned_input.get("maximum_order_weight")
+
+        if min_weight and min_weight.value < 0:
+            errors["minimum_order_weight"] = ValidationError(
+                "Shipping can't have negative weight.",
+                code=ShippingErrorCode.INVALID.value,
+            )
+        if max_weight and max_weight.value < 0:
+            errors["maximum_order_weight"] = ValidationError(
+                "Shipping can't have negative weight.",
+                code=ShippingErrorCode.INVALID.value,
+            )
+
+        if errors:
+            return
+
+        if (
+            min_weight is not None
+            and max_weight is not None
+            and max_weight <= min_weight
+        ):
+            raise ValidationError(
+                {
+                    "maximum_order_weight": ValidationError(
+                        (
+                            "Maximum order weight should be larger than the "
+                            "minimum order weight."
+                        ),
+                        code=ShippingErrorCode.MAX_LESS_THAN_MIN.value,
+                    )
+                }
+            )
+
+    @classmethod
+    def clean_delivery_time(cls, instance, cleaned_input, errors):
+        """Validate delivery days.
+
+        - check if minimum_delivery_days is not higher than maximum_delivery_days
+        - check if minimum_delivery_days and maximum_delivery_days are positive values
+        """
+        min_delivery_days = (
+            cleaned_input.get("minimum_delivery_days") or instance.minimum_delivery_days
+        )
+        max_delivery_days = (
+            cleaned_input.get("maximum_delivery_days") or instance.maximum_delivery_days
+        )
+
+        if not min_delivery_days and not max_delivery_days:
+            return
+
+        error_occurred = False
+        if min_delivery_days and min_delivery_days < 0:
+            errors["minimum_delivery_days"] = ValidationError(
+                "Minimum delivery days must be positive.",
+                code=ShippingErrorCode.INVALID.value,
+            )
+            error_occurred = True
+        if max_delivery_days and max_delivery_days < 0:
+            errors["maximum_delivery_days"] = ValidationError(
+                "Maximum delivery days must be positive.",
+                code=ShippingErrorCode.INVALID.value,
+            )
+            error_occurred = True
+
+        if error_occurred:
+            return
+
+       
