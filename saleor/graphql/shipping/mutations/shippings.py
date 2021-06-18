@@ -766,4 +766,69 @@ class ShippingPriceExcludeProducts(BaseMutation):
         cls, _root, info: ResolveInfo, /, *, id, input
     ):
         shipping_method = cls.get_node_or_error(
-       
+            info, id, qs=models.ShippingMethod.objects
+        )
+        product_ids = input.get("products", [])
+
+        product_db_ids = cls.get_global_ids_or_error(
+            product_ids, product_types.Product, field="products"
+        )
+
+        product_to_exclude = product_models.Product.objects.filter(
+            id__in=product_db_ids
+        )
+
+        current_excluded_products = shipping_method.excluded_products.all()
+        shipping_method.excluded_products.set(
+            (current_excluded_products | product_to_exclude).distinct()
+        )
+        manager = get_plugin_manager_promise(info.context).get()
+        cls.call_event(manager.shipping_price_updated, shipping_method)
+
+        return ShippingPriceExcludeProducts(
+            shipping_method=ChannelContext(node=shipping_method, channel_slug=None)
+        )
+
+
+class ShippingPriceRemoveProductFromExclude(BaseMutation):
+    shipping_method = graphene.Field(
+        ShippingMethodType,
+        description="A shipping method with new list of excluded products.",
+    )
+
+    class Arguments:
+        id = graphene.ID(required=True, description="ID of a shipping price.")
+        products = NonNullList(
+            graphene.ID,
+            required=True,
+            description="List of products which will be removed from excluded list.",
+        )
+
+    class Meta:
+        description = "Remove product from excluded list for shipping price."
+        permissions = (ShippingPermissions.MANAGE_SHIPPING,)
+        error_type_class = ShippingError
+        error_type_field = "shipping_errors"
+
+    @classmethod
+    def perform_mutation(  # type: ignore[override]
+        cls, _root, info: ResolveInfo, /, *, id: str, products: list
+    ):
+        shipping_method = cast(
+            models.ShippingMethod,
+            cls.get_node_or_error(info, id, qs=models.ShippingMethod.objects),
+        )
+
+        if products:
+            product_db_ids = cls.get_global_ids_or_error(
+                products, product_types.Product, field="products"
+            )
+            shipping_method.excluded_products.set(
+                shipping_method.excluded_products.exclude(id__in=product_db_ids)
+            )
+        manager = get_plugin_manager_promise(info.context).get()
+        cls.call_event(manager.shipping_price_updated, shipping_method)
+
+        return ShippingPriceExcludeProducts(
+            shipping_method=ChannelContext(node=shipping_method, channel_slug=None)
+        )
