@@ -297,4 +297,124 @@ class CheckoutInfoByCheckoutTokenLoader(DataLoader[str, CheckoutInfo]):
                         shipping_method = shipping_method_map.get(
                             checkout.shipping_method_id
                         )
-        
+                        collection_point = collection_points_map.get(
+                            checkout.collection_point_id
+                        )
+                        shipping_address = address_map.get(checkout.shipping_address_id)
+                        delivery_method_info = get_delivery_method_info(
+                            None, shipping_address
+                        )
+                        voucher = voucher_map.get(checkout.voucher_code)
+                        checkout_info = CheckoutInfo(
+                            checkout=checkout,
+                            user=user_map.get(checkout.user_id),
+                            channel=channel,
+                            billing_address=address_map.get(
+                                checkout.billing_address_id
+                            ),
+                            shipping_address=address_map.get(
+                                checkout.shipping_address_id
+                            ),
+                            delivery_method_info=delivery_method_info,
+                            tax_configuration=tax_configuration_by_channel_map[
+                                channel.id
+                            ],
+                            valid_pick_up_points=[],
+                            all_shipping_methods=[],
+                            voucher=voucher,
+                        )
+                        discounts = load_discounts(self.context)
+                        shipping_method_listings = [
+                            listing
+                            for channel_listings in listings_for_channels
+                            for listing in channel_listings
+                            if listing.channel_id == channel.id
+                        ]
+                        update_delivery_method_lists_for_checkout_info(
+                            checkout_info,
+                            shipping_method,
+                            collection_point,
+                            shipping_address,
+                            checkout_lines,
+                            discounts,
+                            manager,
+                            shipping_method_listings,
+                        )
+                        checkout_info_map[key] = checkout_info
+
+                    return [checkout_info_map[key] for key in keys]
+
+                return Promise.all(
+                    [
+                        addresses,
+                        users,
+                        shipping_methods,
+                        shipping_method_channel_listings,
+                        collection_points,
+                        vouchers,
+                        tax_configurations,
+                    ]
+                ).then(with_checkout_info)
+
+            return (
+                ChannelByIdLoader(self.context)
+                .load_many(channel_pks)
+                .then(with_channel)
+            )
+
+        checkouts = CheckoutByTokenLoader(self.context).load_many(keys)
+        checkout_line_infos = CheckoutLinesInfoByCheckoutTokenLoader(
+            self.context
+        ).load_many(keys)
+        manager = get_plugin_manager_promise(self.context)
+        return Promise.all([checkouts, checkout_line_infos, manager]).then(
+            with_checkout
+        )
+
+
+class CheckoutLineByIdLoader(DataLoader[str, CheckoutLine]):
+    context_key = "checkout_line_by_id"
+
+    def batch_load(self, keys):
+        checkout_lines = CheckoutLine.objects.using(
+            self.database_connection_name
+        ).in_bulk(keys)
+        return [checkout_lines.get(line_id) for line_id in keys]
+
+
+class CheckoutLinesByCheckoutTokenLoader(DataLoader[str, List[CheckoutLine]]):
+    context_key = "checkoutlines_by_checkout"
+
+    def batch_load(self, keys):
+        lines = CheckoutLine.objects.using(self.database_connection_name).filter(
+            checkout_id__in=keys
+        )
+        line_map = defaultdict(list)
+        for line in lines.iterator():
+            line_map[line.checkout_id].append(line)
+        return [line_map.get(checkout_id, []) for checkout_id in keys]
+
+
+class TransactionItemsByCheckoutIDLoader(DataLoader[str, List[TransactionItem]]):
+    context_key = "transaction_items_by_checkout_id"
+
+    def batch_load(self, keys):
+        transactions = (
+            TransactionItem.objects.using(self.database_connection_name)
+            .filter(checkout_id__in=keys)
+            .order_by("pk")
+        )
+        transactions_map = defaultdict(list)
+        for transaction in transactions:
+            transactions_map[transaction.checkout_id].append(transaction)
+        return [transactions_map[checkout_id] for checkout_id in keys]
+
+
+class CheckoutMetadataByCheckoutIdLoader(DataLoader[str, CheckoutMetadata]):
+    context_key = "checkout_metadata_by_checkout_id"
+
+    def batch_load(self, keys):
+        checkout_metadata = CheckoutMetadata.objects.using(
+            self.database_connection_name
+        ).in_bulk(keys, field_name="checkout_id")
+        return [checkout_metadata.get(checkout_id) for checkout_id in keys]
