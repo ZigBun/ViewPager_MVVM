@@ -331,4 +331,28 @@ def test_stock_quantity_is_sum_of_quantities_from_warehouses_that_support_countr
 
     variant = variant_with_many_stocks_different_shipping_zones
 
-    # Create another warehouse with a different shipping zone that supports P
+    # Create another warehouse with a different shipping zone that supports PL. As
+    # a result there should be two shipping zones and two warehouses that support PL.
+    stocks = variant.stocks.for_channel_and_country(channel_USD.slug, "PL")
+    warehouse = Warehouse.objects.create(
+        address=address.get_copy(),
+        name="WarehousePL",
+        slug="warehousePL",
+        email="warehousePL@example.com",
+    )
+    warehouse.shipping_zones.add(shipping_zone)
+    warehouse.channels.add(channel_USD)
+    Stock.objects.create(warehouse=warehouse, product_variant=variant, quantity=10)
+
+    stocks = variant.stocks.for_channel_and_country(channel_USD.slug, "PL")
+    sum_quantities = sum([stock.quantity for stock in stocks])
+
+    variables = {
+        "id": graphene.Node.to_global_id("ProductVariant", variant.pk),
+        "channel": channel_USD.slug,
+        "country": "PL",
+    }
+    response = api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+
+    assert content["data"]["productVariant"]["quantityAvailable"] == sum_quantities
