@@ -47,4 +47,14 @@ class Migration(migrations.Migration):
                     ("activated", "The gift card was activated."),
                     ("deactivated", "The gift card was deactivated."),
                     ("balance_reset", "The gift card balance was reset."),
-               
+                    ("expiry_date_updated", "The gift card expiry date was updated."),
+                    ("tag_updated", "The gift card tag was updated."),
+                    ("sent_to_customer", "The gift card was sent to the customer."),
+                    ("resent", "The gift card was resent to the customer."),
+                    ("note_added", "A note was added to the gift card."),
+                    ("used_in_order", "The gift card was used in order."),
+                ],
+                max_length=255,
+            ),
+        ),
+    ]
