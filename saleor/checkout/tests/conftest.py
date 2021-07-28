@@ -65,4 +65,11 @@ def priced_checkout_with_item(priced_checkout_factory, checkout_with_item):
 
 @pytest.fixture
 def priced_checkout_with_items(priced_checkout_factory, checkout_with_items):
-    return priced_checkou
+    return priced_checkout_factory(checkout_with_items)
+
+
+@pytest.fixture
+def priced_checkout_with_voucher_percentage(
+    priced_checkout_factory, checkout_with_voucher_percentage
+):
+    return priced_checkout_factory(checkout_with_voucher_percentage)
