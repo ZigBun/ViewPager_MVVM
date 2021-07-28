@@ -270,4 +270,34 @@ def test_reordering_concurrently(dummy_attribute, assert_num_queries):
     )
 
 
-def test_reordering_deleted_node_from_concurrent(dummy_attribute, assert_
+def test_reordering_deleted_node_from_concurrent(dummy_attribute, assert_num_queries):
+    """
+    Ensures if a node was deleted before locking, it just skip it instead of
+    raising an error.
+    """
+
+    qs = SortedModel.objects
+    attribute = dummy_attribute
+
+    entries = list(
+        qs.bulk_create(
+            [
+                SortedModel(attribute=attribute, slug="1", name="1", sort_order=0),
+                SortedModel(attribute=attribute, slug="2", name="2", sort_order=1),
+            ]
+        )
+    )
+
+    operations = {-1: +1, entries[0].pk: +1}
+
+    with assert_num_queries(2) as ctx:
+        perform_reordering(qs, operations)
+
+    assert ctx[1]["sql"] == (
+        'UPDATE "attribute_attributevalue" '
+        'SET "sort_order" = '
+        f'CAST(CASE WHEN ("attribute_attributevalue"."id" = {entries[0].pk}) '
+        f'THEN 1 WHEN ("attribute_attributevalue"."id" = {entries[1].pk}) '
+        "THEN 0 ELSE NULL END AS integer) "
+        f'WHERE "attribute_attributevalue"."id" IN ({entries[0].pk}, {entries[1].pk})'
+    )
