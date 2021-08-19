@@ -366,4 +366,115 @@ def test_generate_event_delivery_attempt_payload(event_attempt):
     payload = generate_event_delivery_attempt_payload(event_attempt, None, 1024)
 
     assert payload == EventDeliveryAttemptPayload(
-        id=graphen
+        id=graphene.Node.to_global_id("EventDeliveryAttempt", event_attempt.pk),
+        time=created_at,
+        duration=None,
+        status=EventDeliveryStatus.PENDING,
+        next_retry=None,
+        event_type=ObservabilityEventTypes.EVENT_DELIVERY_ATTEMPT,
+        request=EventDeliveryAttemptRequest(
+            headers=[],
+        ),
+        response=EventDeliveryAttemptResponse(
+            headers=[],
+            content_length=16,
+            status_code=None,
+            body=JsonTruncText("example_response", False),
+        ),
+        event_delivery=EventDelivery(
+            id=graphene.Node.to_global_id("EventDelivery", delivery.pk),
+            status=EventDeliveryStatus.PENDING,
+            event_type=WebhookEventAsyncType.ANY,
+            event_sync=False,
+            payload=EventDeliveryPayload(
+                content_length=32,
+                body=JsonTruncText(
+                    pretty_json(json.loads(delivery.payload.payload)), False
+                ),
+            ),
+        ),
+        webhook=Webhook(
+            id=graphene.Node.to_global_id("Webhook", webhook.pk),
+            name="Simple webhook",
+            target_url="http://www.example.com/test",
+            subscription_query=None,
+        ),
+        app=App(
+            id=graphene.Node.to_global_id("App", app.pk), name="Sample app objects"
+        ),
+    )
+
+
+def test_generate_event_delivery_attempt_payload_raises_truncation_error(event_attempt):
+    too_small_bytes_limit = 10
+    with pytest.raises(TruncationError):
+        generate_event_delivery_attempt_payload(
+            event_attempt, None, too_small_bytes_limit
+        )
+
+
+def test_generate_event_delivery_attempt_payload_raises_error_when_no_delivery(
+    event_attempt,
+):
+    event_attempt.delivery = None
+    with pytest.raises(ValueError):
+        generate_event_delivery_attempt_payload(event_attempt, None, 1024)
+
+
+def test_generate_event_delivery_attempt_payload_raises_error_when_no_payload(
+    event_attempt,
+):
+    event_attempt.delivery.payload = None
+    with pytest.raises(ValueError):
+        generate_event_delivery_attempt_payload(event_attempt, None, 1024)
+
+
+def test_generate_event_delivery_attempt_payload_with_next_retry_date(
+    event_attempt,
+):
+    next_retry_date = datetime(1914, 6, 28, 10, 50, tzinfo=timezone.utc)
+    payload = generate_event_delivery_attempt_payload(
+        event_attempt, next_retry_date, 1024
+    )
+
+    assert payload["next_retry"] == next_retry_date
+
+
+def test_generate_event_delivery_attempt_payload_with_non_empty_headers(event_attempt):
+    headers = {"Content-Length": "19", "Content-Type": "application/json"}
+    headers_list = [("Content-Length", "19"), ("Content-Type", "application/json")]
+    event_attempt.request_headers = json.dumps(headers)
+    event_attempt.response_headers = json.dumps(headers)
+
+    payload = generate_event_delivery_attempt_payload(event_attempt, None, 1024)
+
+    assert payload["request"]["headers"] == headers_list
+    assert payload["response"]["headers"] == headers_list
+
+
+@patch(
+    "saleor.webhook.observability.payloads.SENSITIVE_GQL_FIELDS", {"Product": {"name"}}
+)
+def test_generate_event_delivery_attempt_payload_with_subscription_query(
+    webhook,
+    event_attempt,
+):
+    query = "subscription { event { ...on ProductUpdated { product { name } } } }"
+    webhook.subscription_query = query
+
+    payload = generate_event_delivery_attempt_payload(event_attempt, None, 1024)
+
+    assert payload["webhook"]["subscription_query"].text == query
+    assert payload["event_delivery"]["payload"]["body"].text == pretty_json(MASK)
+
+
+def test_generate_event_delivery_attempt_payload_target_url_obfuscated(
+    webhook, event_attempt
+):
+    webhook.target_url = "http://user:password@example.com/webhooks"
+
+    payload = generate_event_delivery_attempt_payload(event_attempt, None, 1024)
+
+    assert (
+        payload["webhook"]["target_url"] == f"http://user:{MASK}@example.com/webhooks"
+    )
