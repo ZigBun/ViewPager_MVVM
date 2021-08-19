@@ -57,4 +57,14 @@ def resolve_shipping_methods_for_checkout(info, checkout, manager):
         discounts,
         manager,
         shipping_channel_listings,
-        fetch_delivery_methods=Fal
+        fetch_delivery_methods=False,
+    )
+    all_shipping_methods = get_all_shipping_methods_list(
+        checkout_info,
+        checkout.shipping_address,
+        lines,
+        discounts,
+        shipping_channel_listings,
+        manager,
+    )
+    return all_shipping_methods
