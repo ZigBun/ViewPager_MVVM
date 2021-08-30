@@ -19,4 +19,10 @@ class Migration(migrations.Migration):
                     ("view_group", "Can view groups"),
                     ("edit_group", "Can edit groups"),
                     ("view_staff", "Can view staff"),
-                    ("edit_staff", "Can ed
+                    ("edit_staff", "Can edit staff"),
+                ),
+                "verbose_name": "user",
+                "verbose_name_plural": "users",
+            },
+        )
+    ]

@@ -1,0 +1,35 @@
+interactions:
+- request:
+    body: <transaction><amount>100.0</amount><customer_id>810066863</customer_id><options><submit_for_settlement
+      type="boolean">true</submit_for_settlement></options><order_id type="integer">1</order_id><billing><first_name>John</first_name><last_name>Doe</last_name><company>Mirumee
+      Software</company><postal_code>53-601</postal_code><street_address>T&#281;czowa
+      7</street_address><extended_address></extended_address><locality>WROC&#321;AW</locality><region></region><country_code_alpha2>PL</country_code_alpha2></billing><risk_data><customer_ip></customer_ip></risk_data><customer><email>test@example.com</email></customer><type>sale</type></transaction>
+    headers:
+      Accept:
+      - application/xml
+      Accept-Encoding:
+      - gzip
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '647'
+      Content-type:
+      - application/xml
+      User-Agent:
+      - Braintree Python 3.49.0
+      X-ApiVersion:
+      - '5'
+    method: POST
+    uri: https://api.sandbox.braintreegateway.com/merchants/9m6qhfxsqzm3cgzw/transactions
+  response:
+    body:
+      string: !!binary |
+        H4sIAA2PE10AA8RY23LbNhB9z1dolJm80SQlWZETmWla124ydZxJnYv84gEJUIRNAgwA6uKv74I3
+        kSIoqzPt9E3cPVgAe8NZzd9tkniwIkJSzs6H7okzHBAWcEzZ8nz49fbSmg3feS/mSiAmUaAA5b0Y
+        DOYUe2cr4YfpTzm34UPLpEIqk57M/IQqRfB9yMW9JErFJCFMze0SoLFqmxJPopjM7fynlgWZELD3
+        1qKSW3AE4v3+9cvc7oo1GCU8Y8pzHefEceZ2+ak1CRFBhJiyUBBooQXHS6jIEkIkD9UaCdjUBMrv
+        kPmWQTdgND4fKpGRoV1sgqQi4igoFxiQYN+d2/Xv/L6CIHCThdRA++B8iOFT0YQMvZHjnlnO1BpN
+        b93TN6PZG3d8B56oF+TrsxT/s/W7BaW/peJwA/1RhHQG7pxOZ9NxFVMQh1RIZTGUkP2bgTJG/bqA
+        JyliW4OGJIjGniJS/UI2KEljcgLguV3IC8ya+JIqk9004swkD9HGIF3G3Eexdvli/O0JX52pux8f
+        w5uL39fXF4vRzcXiaW7vMNotdtMvc5/GMdRC7SPTxrWHvI88YnO7Idhzk3fBIfl2ny1PeddFlg7+
+        qtO00hQ4qQQhkGs
