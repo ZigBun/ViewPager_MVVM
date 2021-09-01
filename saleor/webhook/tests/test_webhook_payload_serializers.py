@@ -31,4 +31,4 @@ def test_python_serializer_extra_model_fields_incorrect_fields(
     serializer._current = {"test_item": "test_value"}
     result = serializer.get_dump_object(annotated_variant)
     assert result["type"] == "ProductVariant"
-    assert 
+    assert result["test_item"] == "test_value"
