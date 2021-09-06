@@ -62,4 +62,8 @@ class Migration(migrations.Migration):
             create_unique_slug_for_products, migrations.RunPython.noop
         ),
         migrations.AlterField(
-      
+            model_name="product",
+            name="slug",
+            field=models.SlugField(max_length=255, unique=True),
+        ),
+    ]
