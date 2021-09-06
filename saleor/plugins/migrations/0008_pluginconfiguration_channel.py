@@ -78,4 +78,19 @@ class Migration(migrations.Migration):
             field=models.CharField(max_length=128),
         ),
         migrations.AddField(
-            model_name="plugin
+            model_name="pluginconfiguration",
+            name="channel",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="channel.channel",
+            ),
+        ),
+        migrations.AlterUniqueTogether(
+            name="pluginconfiguration",
+            unique_together={("identifier", "channel")},
+        ),
+        migrations.RunPython(move_company_address_to_avatax_configuration),
+        migrations.RunPython(populate_plugin_configurations_for_channels),
+    ]

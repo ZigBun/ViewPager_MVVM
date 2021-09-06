@@ -1,0 +1,10 @@
+interactions:
+- request:
+    body: '{"createTransactionModel": {"companyCode": "DEFAULT", "type": "SalesInvoice",
+      "lines": [{"quantity": 3, "amount": "36.900", "taxCode": "O9999999", "taxIncluded":
+      true, "itemCode": "SKU_A", "discounted": false, "description": "Test product"}],
+      "code": "28a4e4d7-49f1-4fab-80a0-2cac6234e56f", "date": "2023-02-16", "customerCode":
+      0, "discount": null, "addresses": {"shipFrom": {"line1": "Teczowa 7", "line2":
+      "", "city": "Wroclaw", "region": "", "country": "PL", "postalCode": "53-601"},
+      "shipTo": {"line1": "T\u0119czowa 7", "line2": "", "city": "WROC\u0141AW", "region":
+      "", 
