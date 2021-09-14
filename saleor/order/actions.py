@@ -296,4 +296,237 @@ def order_awaits_fulfillment_approval(
     call_event(manager.order_updated, order)
 
 
-def order
+def order_authorized(
+    order: "Order",
+    user: Optional[User],
+    app: Optional["App"],
+    amount: "Decimal",
+    payment: "Payment",
+    manager: "PluginsManager",
+):
+    events.payment_authorized_event(
+        order=order, user=user, app=app, amount=amount, payment=payment
+    )
+    call_event(manager.order_updated, order)
+
+
+def order_captured(
+    order_info: "OrderInfo",
+    user: Optional[User],
+    app: Optional["App"],
+    amount: "Decimal",
+    payment: "Payment",
+    manager: "PluginsManager",
+    site_settings: Optional["SiteSettings"] = None,
+):
+    order = order_info.order
+    events.payment_captured_event(
+        order=order, user=user, app=app, amount=amount, payment=payment
+    )
+    call_event(manager.order_updated, order)
+    if order.is_fully_paid():
+        handle_fully_paid_order(manager, order_info, user, app, site_settings)
+
+
+def fulfillment_tracking_updated(
+    fulfillment: Fulfillment,
+    user: User,
+    app: Optional["App"],
+    tracking_number: str,
+    manager: "PluginsManager",
+):
+    events.fulfillment_tracking_updated_event(
+        order=fulfillment.order,
+        user=user,
+        app=app,
+        tracking_number=tracking_number,
+        fulfillment=fulfillment,
+    )
+    call_event(manager.tracking_number_updated, fulfillment)
+    call_event(manager.order_updated, fulfillment.order)
+
+
+def cancel_fulfillment(
+    fulfillment: Fulfillment,
+    user: User,
+    app: Optional["App"],
+    warehouse: Optional["Warehouse"],
+    manager: "PluginsManager",
+):
+    """Cancel fulfillment.
+
+    Return products to corresponding stocks if warehouse was defined.
+    """
+    with traced_atomic_transaction():
+        fulfillment = Fulfillment.objects.select_for_update().get(pk=fulfillment.pk)
+        events.fulfillment_canceled_event(
+            order=fulfillment.order, user=user, app=app, fulfillment=fulfillment
+        )
+        if warehouse:
+            restock_fulfillment_lines(fulfillment, warehouse)
+            events.fulfillment_restocked_items_event(
+                order=fulfillment.order,
+                user=user,
+                app=app,
+                fulfillment=fulfillment,
+                warehouse_pk=warehouse.pk,
+            )
+        fulfillment.status = FulfillmentStatus.CANCELED
+        fulfillment.save(update_fields=["status"])
+        update_order_status(fulfillment.order)
+        call_event(manager.fulfillment_canceled, fulfillment)
+        call_event(manager.order_updated, fulfillment.order)
+    return fulfillment
+
+
+def cancel_waiting_fulfillment(
+    fulfillment: Fulfillment,
+    user: User,
+    app: Optional["App"],
+    manager: "PluginsManager",
+):
+    """Cancel fulfillment which is in waiting for approval state."""
+    fulfillment = Fulfillment.objects.get(pk=fulfillment.pk)
+    # transaction ensures sending webhooks after order line is updated and events are
+    # successfully created
+    with traced_atomic_transaction():
+        events.fulfillment_canceled_event(
+            order=fulfillment.order, user=user, app=app, fulfillment=None
+        )
+
+        order_lines = []
+        for line in fulfillment:
+            order_line = line.order_line
+            order_line.quantity_fulfilled -= line.quantity
+            order_lines.append(order_line)
+        OrderLine.objects.bulk_update(order_lines, ["quantity_fulfilled"])
+
+        fulfillment.delete()
+        update_order_status(fulfillment.order)
+        call_event(manager.fulfillment_canceled, fulfillment)
+        call_event(manager.order_updated, fulfillment.order)
+
+
+def approve_fulfillment(
+    fulfillment: Fulfillment,
+    user: User,
+    app: Optional["App"],
+    manager: "PluginsManager",
+    settings: "SiteSettings",
+    notify_customer=True,
+    allow_stock_to_be_exceeded: bool = False,
+):
+    from ..giftcard.utils import gift_cards_create
+
+    with traced_atomic_transaction():
+        fulfillment.status = FulfillmentStatus.FULFILLED
+        fulfillment.save()
+        order = fulfillment.order
+        if notify_customer:
+            send_fulfillment_confirmation_to_customer(
+                fulfillment.order, fulfillment, user, app, manager
+            )
+        events.fulfillment_fulfilled_items_event(
+            order=order,
+            user=user,
+            app=app,
+            fulfillment_lines=list(fulfillment.lines.all()),
+        )
+        lines_to_fulfill = []
+        gift_card_lines_info = []
+        insufficient_stocks = []
+        for fulfillment_line in fulfillment.lines.all().prefetch_related(
+            "order_line__variant"
+        ):
+            order_line = fulfillment_line.order_line
+            variant = fulfillment_line.order_line.variant
+
+            stock = fulfillment_line.stock
+
+            if stock is None:
+                warehouse_pk = None
+                if not allow_stock_to_be_exceeded:
+                    error_data = InsufficientStockData(
+                        variant=variant,
+                        order_line=order_line,
+                        warehouse_pk=warehouse_pk,
+                        available_quantity=0,
+                    )
+                    insufficient_stocks.append(error_data)
+            else:
+                warehouse_pk = stock.warehouse_id
+
+            lines_to_fulfill.append(
+                OrderLineInfo(
+                    line=order_line,
+                    quantity=fulfillment_line.quantity,
+                    variant=variant,
+                    warehouse_pk=warehouse_pk,
+                )
+            )
+            if order_line.is_gift_card:
+                gift_card_lines_info.append(
+                    GiftCardLineData(
+                        quantity=fulfillment_line.quantity,
+                        order_line=order_line,
+                        variant=variant,
+                        fulfillment_line=fulfillment_line,
+                    )
+                )
+
+        if insufficient_stocks:
+            raise InsufficientStock(insufficient_stocks)
+
+        _decrease_stocks(lines_to_fulfill, manager, allow_stock_to_be_exceeded)
+        order.refresh_from_db()
+        update_order_status(order)
+
+        call_event(manager.order_updated, order)
+        call_event(manager.fulfillment_approved, fulfillment)
+        if order.status == OrderStatus.FULFILLED:
+            call_event(manager.order_fulfilled, order)
+
+        if gift_card_lines_info:
+            gift_cards_create(
+                order,
+                gift_card_lines_info,
+                settings,
+                user,
+                app,
+                manager,
+            )
+
+    return fulfillment
+
+
+def mark_order_as_paid(
+    order: "Order",
+    request_user: User,
+    app: Optional["App"],
+    manager: "PluginsManager",
+    external_reference: Optional[str] = None,
+):
+    """Mark order as paid.
+
+    Allows to create a payment for an order without actually performing any
+    payment by the gateway.
+    """
+    # transaction ensures that webhooks are triggered when payments and transactions are
+    # properly created
+    with traced_atomic_transaction():
+        payment = create_payment(
+            gateway=CustomPaymentChoices.MANUAL,
+            payment_token="",
+            currency=order.total.gross.currency,
+            email=order.user_email,
+            total=order.total.gross.amount,
+            order=order,
+            external_reference=external_reference,
+        )
+        payment.charge_status = ChargeStatus.FULLY_CHARGED
+        payment.captured_amount = order.total.gross.amount
+        payment.save(update_fields=["captured_amount", "charge_status", "modified_at"])
+
+        Transaction.objects.create(
+            payment=payment,
+            action_required=Fal
