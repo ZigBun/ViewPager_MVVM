@@ -529,4 +529,216 @@ def mark_order_as_paid(
 
         Transaction.objects.create(
             payment=payment,
-            action_required=Fal
+            action_required=False,
+            kind=TransactionKind.EXTERNAL,
+            token=external_reference or "",
+            is_success=True,
+            amount=order.total.gross.amount,
+            currency=order.total.gross.currency,
+            gateway_response={},
+        )
+        events.order_manually_marked_as_paid_event(
+            order=order,
+            user=request_user,
+            app=app,
+            transaction_reference=external_reference,
+        )
+
+        call_event(manager.order_fully_paid, order)
+        call_event(manager.order_updated, order)
+
+        update_order_charge_data(
+            order,
+        )
+        update_order_authorize_data(
+            order,
+        )
+
+
+def clean_mark_order_as_paid(order: "Order"):
+    """Check if an order can be marked as paid."""
+    if order.payments.exists():
+        raise PaymentError(
+            "Orders with payments can not be manually marked as paid.",
+        )
+
+
+def _decrease_stocks(order_lines_info, manager, allow_stock_to_be_exceeded=False):
+    lines_to_decrease_stock = get_order_lines_with_track_inventory(order_lines_info)
+    if lines_to_decrease_stock:
+        decrease_stock(
+            lines_to_decrease_stock,
+            manager,
+            allow_stock_to_be_exceeded=allow_stock_to_be_exceeded,
+        )
+
+
+def _increase_order_line_quantity(order_lines_info):
+    order_lines = []
+    for line_info in order_lines_info:
+        line = line_info.line
+        line.quantity_fulfilled += line_info.quantity
+        order_lines.append(line)
+
+    OrderLine.objects.bulk_update(order_lines, ["quantity_fulfilled"])
+
+
+def fulfill_order_lines(
+    order_lines_info: Iterable["OrderLineInfo"],
+    manager: "PluginsManager",
+    allow_stock_to_be_exceeded: bool = False,
+):
+    """Fulfill order line with given quantity."""
+    # transaction ensures that there is a consistency between quantities in order line
+    # and stocks
+    with traced_atomic_transaction():
+        _decrease_stocks(order_lines_info, manager, allow_stock_to_be_exceeded)
+        _increase_order_line_quantity(order_lines_info)
+
+
+def automatically_fulfill_digital_lines(
+    order_info: "OrderInfo", manager: "PluginsManager"
+):
+    """Fulfill all digital lines which have enabled automatic fulfillment setting.
+
+    Send confirmation email afterward.
+    """
+    order = order_info.order
+    digital_lines_data = [
+        line_data
+        for line_data in order_info.lines_data
+        if not line_data.line.is_shipping_required and line_data.digital_content
+    ]
+    # transaction ensures fulfillment consistency
+    with traced_atomic_transaction():
+        if not digital_lines_data:
+            return
+        fulfillment, _ = Fulfillment.objects.get_or_create(order=order)
+
+        fulfillments = []
+        lines_info = []
+        for line_data in digital_lines_data:
+            if not order_line_needs_automatic_fulfillment(line_data):
+                continue
+            digital_content = line_data.digital_content
+            line = line_data.line
+            if digital_content:
+                digital_content.urls.create(line=line)
+            quantity = line_data.quantity
+            fulfillments.append(
+                FulfillmentLine(
+                    fulfillment=fulfillment, order_line=line, quantity=quantity
+                )
+            )
+            allocation = line.allocations.first()
+            if allocation:
+                line_data.warehouse_pk = allocation.stock.warehouse.pk
+            else:
+                # allocation is not created when track inventory for given product
+                # is turned off so it doesn't matter which warehouse we'll use
+                if line_data.variant:
+                    stock = line_data.variant.stocks.first()
+                    if stock:
+                        line_data.warehouse_pk = stock.warehouse.pk
+
+            lines_info.append(line_data)
+
+        FulfillmentLine.objects.bulk_create(fulfillments)
+        fulfill_order_lines(lines_info, manager)
+
+        send_fulfillment_confirmation_to_customer(
+            order, fulfillment, user=order.user, app=None, manager=manager
+        )
+        update_order_status(order)
+
+
+def _create_fulfillment_lines(
+    fulfillment: Fulfillment,
+    warehouse_pk: UUID,
+    lines_data: List[OrderFulfillmentLineInfo],
+    channel_slug: str,
+    gift_card_lines_info: List[GiftCardLineData],
+    manager: "PluginsManager",
+    decrease_stock: bool = True,
+    allow_stock_to_be_exceeded: bool = False,
+) -> List[FulfillmentLine]:
+    """Modify stocks and allocations. Return list of unsaved FulfillmentLines.
+
+    Args:
+        fulfillment (Fulfillment): Fulfillment to create lines
+        warehouse_pk (str): Warehouse to fulfill order.
+        lines_data (List[Dict]): List with information from which system
+            create FulfillmentLines. Example:
+                [
+                    {
+                        "order_line": (OrderLine),
+                        "quantity": (int),
+                    },
+                    ...
+                ]
+        channel_slug (str): Channel for which fulfillment lines should be created.
+        gift_card_lines_info (List): List with information required
+            to create gift cards.
+        manager (PluginsManager): Plugin manager from given context
+        decrease_stock (Bool): Stocks will get decreased if this is True.
+        allow_stock_to_be_exceeded (bool): If `True` then stock quantity could exceed.
+            Default value is set to `False`.
+
+    Return:
+        List[FulfillmentLine]: Unsaved fulfillmet lines created for this fulfillment
+            based on information form `lines`
+
+    Raise:
+        InsufficientStock: If system hasn't containt enough item in stock for any line.
+
+    """
+    lines = [line_data["order_line"] for line_data in lines_data]
+    variants = [line.variant for line in lines if line.variant]
+    stocks = (
+        Stock.objects.for_channel_and_country(channel_slug)
+        .filter(warehouse_id=warehouse_pk, product_variant__in=variants)
+        .select_related("product_variant")
+    )
+
+    variant_to_stock: Dict[int, List[Stock]] = defaultdict(list)
+    for stock in stocks:
+        variant_to_stock[stock.product_variant_id].append(stock)
+
+    insufficient_stocks = []
+    fulfillment_lines = []
+    lines_info = []
+    for line in lines_data:
+        quantity = line["quantity"]
+        order_line = line["order_line"]
+        if quantity > 0:
+            variant = order_line.variant
+            stock = None
+            if variant:
+                line_stocks = variant_to_stock.get(variant.id)
+                stock = line_stocks[0] if line_stocks else None
+
+            # If there is no stock but allow_stock_to_be_exceeded == True
+            # we proceed with fulfilling the order, treat as error otherwise
+            if stock is None and not allow_stock_to_be_exceeded:
+                error_data = InsufficientStockData(
+                    variant=variant,
+                    order_line=order_line,
+                    warehouse_pk=warehouse_pk,
+                    available_quantity=0,
+                )
+                insufficient_stocks.append(error_data)
+                continue
+
+            is_digital = order_line.is_digital
+            lines_info.append(
+                OrderLineInfo(
+                    line=order_line,
+                    is_digital=is_digital,
+                    quantity=quantity,
+                    variant=variant,
+                    warehouse_pk=warehouse_pk,
+                )
+            )
+            if variant and is_digital:
+                variant.digital_content.urls.create(line=order_line)
+            fulfillment_l
