@@ -950,4 +950,192 @@ def _move_order_lines_to_target_fulfillment(
             try:
                 deallocate_stock(lines_to_dellocate, manager)
             except AllocationError as e:
-                lines = [str(line.pk) for line in e.ord
+                lines = [str(line.pk) for line in e.order_lines]
+                logger.warning(
+                    "Unable to deallocate stock for lines.", extra={"lines": lines}
+                )
+
+        created_fulfillment_lines = FulfillmentLine.objects.bulk_create(
+            fulfillment_lines_to_create
+        )
+        OrderLine.objects.bulk_update(order_lines_to_update, ["quantity_fulfilled"])
+    return created_fulfillment_lines
+
+
+def _move_fulfillment_lines_to_target_fulfillment(
+    fulfillment_lines_to_move: List[FulfillmentLineData],
+    lines_in_target_fulfillment: List[FulfillmentLine],
+    target_fulfillment: Fulfillment,
+):
+    """Move fulfillment lines with given quantity to the target fulfillment."""
+    fulfillment_lines_to_create: List[FulfillmentLine] = []
+    fulfillment_lines_to_update: List[FulfillmentLine] = []
+    empty_fulfillment_lines_to_delete: List[FulfillmentLine] = []
+
+    # transaction ensures consistency in fulfillment lines data
+    with traced_atomic_transaction():
+        for fulfillment_line_data in fulfillment_lines_to_move:
+            fulfillment_line = fulfillment_line_data.line
+            quantity_to_move = fulfillment_line_data.quantity
+
+            moved_line, fulfillment_line_existed = _get_fulfillment_line(
+                target_fulfillment=target_fulfillment,
+                lines_in_target_fulfillment=lines_in_target_fulfillment,
+                order_line_id=fulfillment_line.order_line_id,
+                stock_id=fulfillment_line.stock_id,
+            )
+
+            # calculate the quantity fulfilled/unfulfilled/to move
+            fulfilled_to_move = min(fulfillment_line.quantity, quantity_to_move)
+            quantity_to_move -= fulfilled_to_move
+            moved_line.quantity += fulfilled_to_move
+            fulfillment_line.quantity -= fulfilled_to_move
+
+            if fulfillment_line.quantity == 0:
+                # the fulfillment line without any items will be deleted
+                empty_fulfillment_lines_to_delete.append(fulfillment_line)
+            else:
+                # update with new quantity value
+                fulfillment_lines_to_update.append(fulfillment_line)
+
+            if moved_line.quantity > 0 and not fulfillment_line_existed:
+                # If this is new type of (order_line, stock) then we create new
+                # fulfillment line
+                fulfillment_lines_to_create.append(moved_line)
+            elif fulfillment_line_existed:
+                # if target fulfillment already have the same line, we  just update the
+                # quantity
+                fulfillment_lines_to_update.append(moved_line)
+
+        # update the fulfillment lines with new values
+        FulfillmentLine.objects.bulk_update(fulfillment_lines_to_update, ["quantity"])
+        FulfillmentLine.objects.bulk_create(fulfillment_lines_to_create)
+
+        # Remove the empty fulfillment lines
+        FulfillmentLine.objects.filter(
+            id__in=[f.id for f in empty_fulfillment_lines_to_delete]
+        ).delete()
+
+
+def __get_shipping_refund_amount(
+    refund_shipping_costs: bool,
+    refund_amount: Optional[Decimal],
+    shipping_price: Decimal,
+) -> Optional[Decimal]:
+    # We set shipping refund amount only when refund amount is calculated by Saleor
+    shipping_refund_amount = None
+    if refund_shipping_costs and refund_amount is None:
+        shipping_refund_amount = shipping_price
+    return shipping_refund_amount
+
+
+def create_refund_fulfillment(
+    user: Optional[User],
+    app: Optional["App"],
+    order,
+    payment,
+    transactions: List[TransactionItem],
+    order_lines_to_refund: List[OrderLineInfo],
+    fulfillment_lines_to_refund: List[FulfillmentLineData],
+    manager: "PluginsManager",
+    amount=None,
+    refund_shipping_costs=False,
+):
+    """Proceed with all steps required for refunding products.
+
+    Calculate refunds for products based on the order's lines and fulfillment
+    lines.  The logic takes the list of order lines, fulfillment lines, and their
+    quantities which is used to create the refund fulfillment. The stock for
+    unfulfilled lines will be deallocated.
+    """
+
+    shipping_refund_amount = __get_shipping_refund_amount(
+        refund_shipping_costs, amount, order.shipping_price_gross_amount
+    )
+
+    with transaction_with_commit_on_errors():
+        total_refund_amount = _process_refund(
+            user=user,
+            app=app,
+            order=order,
+            payment=payment,
+            transactions=transactions,
+            order_lines_to_refund=order_lines_to_refund,
+            fulfillment_lines_to_refund=fulfillment_lines_to_refund,
+            amount=amount,
+            refund_shipping_costs=refund_shipping_costs,
+            manager=manager,
+        )
+        refunded_fulfillment = Fulfillment.objects.create(
+            status=FulfillmentStatus.REFUNDED,
+            order=order,
+            total_refund_amount=total_refund_amount,
+            shipping_refund_amount=shipping_refund_amount,
+        )
+        created_fulfillment_lines = _move_order_lines_to_target_fulfillment(
+            order_lines_to_move=order_lines_to_refund,
+            target_fulfillment=refunded_fulfillment,
+            manager=manager,
+        )
+
+        _move_fulfillment_lines_to_target_fulfillment(
+            fulfillment_lines_to_move=fulfillment_lines_to_refund,
+            lines_in_target_fulfillment=created_fulfillment_lines,
+            target_fulfillment=refunded_fulfillment,
+        )
+
+        # Delete fulfillments without lines after lines are moved.
+        Fulfillment.objects.filter(
+            order=order,
+            lines=None,
+            status__in=[
+                FulfillmentStatus.FULFILLED,
+                FulfillmentStatus.WAITING_FOR_APPROVAL,
+            ],
+        ).delete()
+        call_event(manager.order_updated, order)
+
+    return refunded_fulfillment
+
+
+def _populate_replace_order_fields(original_order: "Order"):
+    replace_order = Order()
+    replace_order.status = OrderStatus.DRAFT
+    replace_order.user_id = original_order.user_id
+    replace_order.language_code = original_order.language_code
+    replace_order.user_email = original_order.user_email
+    replace_order.currency = original_order.currency
+    replace_order.channel = original_order.channel
+    replace_order.display_gross_prices = original_order.display_gross_prices
+    replace_order.redirect_url = original_order.redirect_url
+    replace_order.original = original_order
+    replace_order.origin = OrderOrigin.REISSUE
+    replace_order.metadata = original_order.metadata
+    replace_order.private_metadata = original_order.private_metadata
+
+    if original_order.billing_address:
+        original_order.billing_address.pk = None
+        replace_order.billing_address = original_order.billing_address
+        replace_order.billing_address.save()
+    if original_order.shipping_address:
+        original_order.shipping_address.pk = None
+        replace_order.shipping_address = original_order.shipping_address
+        replace_order.shipping_address.save()
+    replace_order.save()
+    original_order.refresh_from_db()
+    return replace_order
+
+
+def create_replace_order(
+    user: Optional[User],
+    app: Optional["App"],
+    original_order: "Order",
+    order_lines_to_replace: List[OrderLineInfo],
+    fulfillment_lines_to_replace: List[FulfillmentLineData],
+) -> "Order":
+    """Create draft order with lines to replace."""
+
+    replace_order = _populate_replace_order_fields(original_order)
+    order_line_to_create: Dict[OrderLineIDType, OrderLine] = dict()
+    # transaction is needed to ensure data consistency for order lines
+    with traced_atomic_tra
