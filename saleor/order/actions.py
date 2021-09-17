@@ -741,4 +741,213 @@ def _create_fulfillment_lines(
             )
             if variant and is_digital:
                 variant.digital_content.urls.create(line=order_line)
-            fulfillment_l
+            fulfillment_line = FulfillmentLine(
+                order_line=order_line,
+                fulfillment=fulfillment,
+                quantity=quantity,
+                stock=stock,
+            )
+            fulfillment_lines.append(fulfillment_line)
+            if order_line.is_gift_card:
+                gift_card_lines_info.append(
+                    GiftCardLineData(
+                        quantity=quantity,
+                        order_line=order_line,
+                        variant=variant,
+                        fulfillment_line=fulfillment_line,
+                    )
+                )
+
+    if insufficient_stocks:
+        raise InsufficientStock(insufficient_stocks)
+
+    if lines_info:
+        if decrease_stock:
+            _decrease_stocks(lines_info, manager, allow_stock_to_be_exceeded)
+        _increase_order_line_quantity(lines_info)
+
+    return fulfillment_lines
+
+
+def create_fulfillments(
+    user: Optional[User],
+    app: Optional["App"],
+    order: "Order",
+    fulfillment_lines_for_warehouses: Dict[UUID, List[OrderFulfillmentLineInfo]],
+    manager: "PluginsManager",
+    site_settings: "SiteSettings",
+    notify_customer: bool = True,
+    approved: bool = True,
+    allow_stock_to_be_exceeded: bool = False,
+    tracking_number: str = "",
+) -> List[Fulfillment]:
+    """Fulfill order.
+
+    Function create fulfillments with lines.
+    Next updates Order based on created fulfillments.
+
+    Args:
+        user (User): User who trigger this action.
+        app (App): App that trigger the action.
+        order (Order): Order to fulfill
+        fulfillment_lines_for_warehouses (Dict): Dict with information from which
+            system create fulfillments. Example:
+                {
+                    (Warehouse.pk): [
+                        {
+                            "order_line": (OrderLine),
+                            "quantity": (int),
+                        },
+                        ...
+                    ]
+                }
+        manager (PluginsManager): Base manager for handling plugins logic.
+        notify_customer (bool): If `True` system send email about
+            fulfillments to customer.
+        site_settings (SiteSettings): Site settings used for creating gift cards.
+        approved (Boolean): fulfillments will have status fulfilled if it's True,
+            otherwise waiting_for_approval.
+        allow_stock_to_be_exceeded (bool): If `True` then stock quantity could exceed.
+            Default value is set to `False`.
+        tracking_number (str): Optional fulfillment tracking number.
+
+    Return:
+        List[Fulfillment]: Fulfillmet with lines created for this order
+            based on information form `fulfillment_lines_for_warehouses`
+
+
+    Raise:
+        InsufficientStock: If system hasn't containt enough item in stock for any line.
+
+    """
+    fulfillments: List[Fulfillment] = []
+    fulfillment_lines: List[FulfillmentLine] = []
+    gift_card_lines_info: List[GiftCardLineData] = []
+    status = (
+        FulfillmentStatus.FULFILLED
+        if approved
+        else FulfillmentStatus.WAITING_FOR_APPROVAL
+    )
+    with traced_atomic_transaction():
+        for warehouse_pk in fulfillment_lines_for_warehouses:
+            fulfillment = Fulfillment.objects.create(
+                order=order, status=status, tracking_number=tracking_number
+            )
+            fulfillments.append(fulfillment)
+            fulfillment_lines.extend(
+                _create_fulfillment_lines(
+                    fulfillment,
+                    warehouse_pk,
+                    fulfillment_lines_for_warehouses[warehouse_pk],
+                    order.channel.slug,
+                    gift_card_lines_info,
+                    manager,
+                    decrease_stock=approved,
+                    allow_stock_to_be_exceeded=allow_stock_to_be_exceeded,
+                )
+            )
+            if tracking_number:
+                call_event(manager.tracking_number_updated, fulfillment)
+
+        FulfillmentLine.objects.bulk_create(fulfillment_lines)
+        order.refresh_from_db()
+        post_creation_func = (
+            order_fulfilled if approved else order_awaits_fulfillment_approval
+        )
+        transaction.on_commit(
+            lambda: post_creation_func(
+                fulfillments,
+                user,
+                app,
+                fulfillment_lines,
+                manager,
+                gift_card_lines_info,
+                site_settings,
+                notify_customer,
+            )
+        )
+
+    return fulfillments
+
+
+def _get_fulfillment_line_if_exists(
+    fulfillment_lines: List[FulfillmentLine], order_line_id, stock_id=None
+):
+    for line in fulfillment_lines:
+        if line.order_line_id == order_line_id and line.stock_id == stock_id:
+            return line
+    return None
+
+
+def _get_fulfillment_line(
+    target_fulfillment: Fulfillment,
+    lines_in_target_fulfillment: List[FulfillmentLine],
+    order_line_id: OrderLineIDType,
+    stock_id: Optional[int] = None,
+) -> Tuple[FulfillmentLine, bool]:
+    """Get fulfillment line if extists or create new fulfillment line object."""
+    # Check if line for order_line_id and stock_id does not exist in DB.
+    moved_line = _get_fulfillment_line_if_exists(
+        lines_in_target_fulfillment,
+        order_line_id,
+        stock_id,
+    )
+    fulfillment_line_existed = True
+    if not moved_line:
+        # Create new not saved FulfillmentLine object and assign it to target
+        # fulfillment
+        fulfillment_line_existed = False
+        moved_line = FulfillmentLine(
+            fulfillment=target_fulfillment,
+            order_line_id=order_line_id,
+            stock_id=stock_id,
+            quantity=0,
+        )
+    return moved_line, fulfillment_line_existed
+
+
+def _move_order_lines_to_target_fulfillment(
+    order_lines_to_move: List[OrderLineInfo],
+    target_fulfillment: Fulfillment,
+    manager: "PluginsManager",
+) -> List[FulfillmentLine]:
+    """Move order lines with given quantity to the target fulfillment."""
+    fulfillment_lines_to_create: List[FulfillmentLine] = []
+    order_lines_to_update: List[OrderLine] = []
+
+    lines_to_dellocate: List[OrderLineInfo] = []
+    # transaction ensures consistent data in order lines and fulfillment lines
+    with traced_atomic_transaction():
+        for line_data in order_lines_to_move:
+            line_to_move = line_data.line
+            quantity_to_move = line_data.quantity
+
+            # calculate the quantity fulfilled/unfulfilled to move
+            unfulfilled_to_move = min(
+                line_to_move.quantity_unfulfilled, quantity_to_move
+            )
+            line_to_move.quantity_fulfilled += unfulfilled_to_move
+
+            fulfillment_line = FulfillmentLine(
+                fulfillment=target_fulfillment,
+                order_line_id=line_to_move.id,
+                stock_id=None,
+                quantity=unfulfilled_to_move,
+            )
+
+            # update current lines with new value of quantity
+            order_lines_to_update.append(line_to_move)
+
+            fulfillment_lines_to_create.append(fulfillment_line)
+
+            line_allocations_exists = line_to_move.allocations.exists()
+            if line_allocations_exists:
+                lines_to_dellocate.append(
+                    OrderLineInfo(line=line_to_move, quantity=unfulfilled_to_move)
+                )
+
+        if lines_to_dellocate:
+            try:
+                deallocate_stock(lines_to_dellocate, manager)
+            except AllocationError as e:
+                lines = [str(line.pk) for line in e.ord
