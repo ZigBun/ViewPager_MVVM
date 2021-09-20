@@ -1324,4 +1324,203 @@ def create_return_fulfillment(
             )
         )
 
-    return return_fulfi
+    return return_fulfillment
+
+
+def process_replace(
+    user: Optional[User],
+    app: Optional["App"],
+    order: "Order",
+    order_lines: List[OrderLineInfo],
+    fulfillment_lines: List[FulfillmentLineData],
+    manager: "PluginsManager",
+) -> Tuple[Fulfillment, Optional["Order"]]:
+    """Create replace fulfillment and new draft order.
+
+    Move all requested lines to fulfillment with status replaced. Based on original
+    order create the draft order with all user details, and requested lines.
+    """
+    # transaction ensures consistency in fulfillments and orders
+    with traced_atomic_transaction():
+        replace_fulfillment = _move_lines_to_replace_fulfillment(
+            order_lines_to_replace=order_lines,
+            fulfillment_lines_to_replace=fulfillment_lines,
+            order=order,
+            manager=manager,
+        )
+        new_order = create_replace_order(
+            user=user,
+            app=app,
+            original_order=order,
+            order_lines_to_replace=order_lines,
+            fulfillment_lines_to_replace=fulfillment_lines,
+        )
+        fulfillment_replaced_event(
+            order=order,
+            user=user,
+            app=app,
+            replaced_lines=list(new_order.lines.all()),
+        )
+        order_replacement_created(
+            original_order=order,
+            replace_order=new_order,
+            user=user,
+            app=app,
+        )
+
+    return replace_fulfillment, new_order
+
+
+def create_fulfillments_for_returned_products(
+    user: Optional[User],
+    app: Optional["App"],
+    order: "Order",
+    payment: Optional[Payment],
+    transactions: Optional[List[TransactionItem]],
+    order_lines: List[OrderLineInfo],
+    fulfillment_lines: List[FulfillmentLineData],
+    manager: "PluginsManager",
+    refund: bool = False,
+    amount: Optional[Decimal] = None,
+    refund_shipping_costs=False,
+) -> Tuple[Fulfillment, Optional[Fulfillment], Optional[Order]]:
+    """Process the request for replacing or returning the products.
+
+    Process the refund when the refund is set to True. The amount of refund will be
+    calculated for all lines with statuses different from refunded.  The lines which
+    are set to replace will not be included in the refund amount.
+
+    If the amount is provided, the refund will be used for this amount.
+
+    If refund_shipping_costs is True, the calculated refund amount will include
+    shipping costs.
+
+    All lines with replace set to True will be used to create a new draft order, with
+    the same order details as the original order.  These lines will be moved to
+    fulfillment with status replaced. The events with relation to new order will be
+    created.
+
+    All lines with replace set to False will be moved to fulfillment with status
+    returned/refunded_and_returned - depends on refund flag and current line status.
+    If the fulfillment line has refunded status it will be moved to
+    returned_and_refunded
+    """
+    return_order_lines = [data for data in order_lines if not data.replace]
+    return_fulfillment_lines = [data for data in fulfillment_lines if not data.replace]
+
+    shipping_refund_amount = __get_shipping_refund_amount(
+        refund_shipping_costs, amount, order.shipping_price_gross_amount
+    )
+    total_refund_amount = None
+    with traced_atomic_transaction():
+        if refund and (payment or transactions):
+            total_refund_amount = _process_refund(
+                user=user,
+                app=app,
+                order=order,
+                payment=payment,
+                transactions=transactions,
+                order_lines_to_refund=return_order_lines,
+                fulfillment_lines_to_refund=return_fulfillment_lines,
+                amount=amount,
+                refund_shipping_costs=refund_shipping_costs,
+                manager=manager,
+            )
+
+        replace_order_lines = [data for data in order_lines if data.replace]
+        replace_fulfillment_lines = [data for data in fulfillment_lines if data.replace]
+
+        replace_fulfillment, new_order = None, None
+        if replace_order_lines or replace_fulfillment_lines:
+            replace_fulfillment, new_order = process_replace(
+                user=user,
+                app=app,
+                order=order,
+                order_lines=replace_order_lines,
+                fulfillment_lines=replace_fulfillment_lines,
+                manager=manager,
+            )
+        return_fulfillment = create_return_fulfillment(
+            user=user,
+            app=app,
+            order=order,
+            order_lines=return_order_lines,
+            fulfillment_lines=return_fulfillment_lines,
+            total_refund_amount=total_refund_amount,
+            shipping_refund_amount=shipping_refund_amount,
+            manager=manager,
+        )
+        Fulfillment.objects.filter(
+            order=order,
+            lines=None,
+            status__in=[
+                FulfillmentStatus.FULFILLED,
+                FulfillmentStatus.WAITING_FOR_APPROVAL,
+            ],
+        ).delete()
+
+        call_event(manager.order_updated, order)
+    return return_fulfillment, replace_fulfillment, new_order
+
+
+def _calculate_refund_amount(
+    return_order_lines: List[OrderLineInfo],
+    return_fulfillment_lines: List[FulfillmentLineData],
+    lines_to_refund: Dict[OrderLineIDType, Tuple[QuantityType, OrderLine]],
+) -> Decimal:
+    refund_amount = Decimal(0)
+    for line_data in return_order_lines:
+        refund_amount += line_data.quantity * line_data.line.unit_price_gross_amount
+        lines_to_refund[line_data.line.id] = (line_data.quantity, line_data.line)
+
+    if not return_fulfillment_lines:
+        return refund_amount
+
+    order_lines_with_fulfillment = OrderLine.objects.in_bulk(
+        [line_data.line.order_line_id for line_data in return_fulfillment_lines]
+    )
+    for line_data in return_fulfillment_lines:
+        # skip lines which were already refunded
+        if line_data.line.fulfillment.status == FulfillmentStatus.REFUNDED:
+            continue
+        order_line = order_lines_with_fulfillment[line_data.line.order_line_id]
+        refund_amount += line_data.quantity * order_line.unit_price_gross_amount
+
+        data_from_all_refunded_lines = lines_to_refund.get(order_line.id)
+        if data_from_all_refunded_lines:
+            quantity, line = data_from_all_refunded_lines
+            quantity += line_data.quantity
+            lines_to_refund[order_line.id] = (quantity, line)
+        else:
+            lines_to_refund[order_line.id] = (line_data.quantity, order_line)
+    return refund_amount
+
+
+@transaction_with_commit_on_errors()
+def _process_refund(
+    user: Optional[User],
+    app: Optional["App"],
+    order: "Order",
+    payment: Optional[Payment],
+    transactions: Optional[List[TransactionItem]],
+    order_lines_to_refund: List[OrderLineInfo],
+    fulfillment_lines_to_refund: List[FulfillmentLineData],
+    amount: Optional[Decimal],
+    refund_shipping_costs: bool,
+    manager: "PluginsManager",
+):
+    lines_to_refund: Dict[OrderLineIDType, Tuple[QuantityType, OrderLine]] = dict()
+    refund_data = RefundData(
+        order_lines_to_refund=order_lines_to_refund,
+        fulfillment_lines_to_refund=fulfillment_lines_to_refund,
+        refund_shipping_costs=refund_shipping_costs,
+        refund_amount_is_automatically_calculated=amount is None,
+    )
+    if amount is None:
+        amount = _calculate_refund_amount(
+            order_lines_to_refund, fulfillment_lines_to_refund, lines_to_refund
+        )
+        # we take into consideration the shipping costs only when amount is not
+        # provided.
+        if refund_shipping_costs:
+            amount += order.ship
