@@ -1523,4 +1523,55 @@ def _process_refund(
         # we take into consideration the shipping costs only when amount is not
         # provided.
         if refund_shipping_costs:
-            amount += order.ship
+            amount += order.shipping_price_gross_amount
+    if amount:
+        if transactions:
+            # With current mutation's inputs, we are able to process only single
+            # transaction. This can be changed when we will provide an interface
+            # to provide list of transactions.
+            transaction_item = transactions[-1]
+            amount = min(transaction_item.charged_value, amount)
+            request_refund_action(
+                transaction_item,
+                manager,
+                refund_value=amount,
+                channel_slug=order.channel.slug,
+                user=user,
+                app=app,
+            )
+        elif payment:
+            amount = min(payment.captured_amount, amount)
+            gateway.refund(
+                payment,
+                manager,
+                amount=amount,
+                channel_slug=order.channel.slug,
+                refund_data=refund_data,
+            )
+
+            transaction.on_commit(
+                lambda: events.payment_refunded_event(
+                    order=order,
+                    user=user,
+                    app=app,
+                    amount=amount,  # type: ignore
+                    payment=payment,  # type: ignore
+                )
+            )
+            transaction.on_commit(
+                lambda: send_order_refunded_confirmation(
+                    order, user, app, amount, payment.currency, manager  # type: ignore
+                )
+            )
+
+    transaction.on_commit(
+        lambda: fulfillment_refunded_event(
+            order=order,
+            user=user,
+            app=app,
+            refunded_lines=list(lines_to_refund.values()),
+            amount=amount,  # type: ignore
+            shipping_costs_included=refund_shipping_costs,
+        )
+    )
+    return amount
