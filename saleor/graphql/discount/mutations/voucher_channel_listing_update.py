@@ -119,4 +119,92 @@ class VoucherChannelListingUpdate(BaseChannelListingMutation):
                 ValidationError(
                     "Value is required for voucher.",
                     code=DiscountErrorCode.REQUIRED.value,
-                    params={"channels"
+                    params={"channels": channels_without_value},
+                )
+            )
+
+        channels_with_invalid_value_precision = error_dict[
+            "channels_with_invalid_value_precision"
+        ]
+        if channels_with_invalid_value_precision:
+            errors["discount_value"].append(
+                ValidationError(
+                    "Invalid amount precision.",
+                    code=DiscountErrorCode.INVALID.value,
+                    params={"channels": channels_with_invalid_value_precision},
+                )
+            )
+
+        channels_with_invalid_percentage_value = error_dict[
+            "channels_with_invalid_percentage_value"
+        ]
+        if channels_with_invalid_percentage_value:
+            errors["discount_value"].append(
+                ValidationError(
+                    "Invalid percentage value.",
+                    code=DiscountErrorCode.INVALID.value,
+                    params={"channels": channels_with_invalid_percentage_value},
+                )
+            )
+
+        channels_with_invalid_min_amount_spent_precision = error_dict[
+            "channels_with_invalid_min_amount_spent_precision"
+        ]
+        if channels_with_invalid_min_amount_spent_precision:
+            errors["min_amount_spent"].append(
+                ValidationError(
+                    "Invalid amount precision.",
+                    code=DiscountErrorCode.INVALID.value,
+                    params={
+                        "channels": channels_with_invalid_min_amount_spent_precision
+                    },
+                )
+            )
+        return cleaned_input
+
+    @classmethod
+    def add_channels(cls, voucher, add_channels):
+        for add_channel in add_channels:
+            channel = add_channel["channel"]
+            defaults = {"currency": channel.currency_code}
+            if "discount_value" in add_channel.keys():
+                defaults["discount_value"] = add_channel.get("discount_value")
+            if "min_amount_spent" in add_channel.keys():
+                defaults["min_spent_amount"] = add_channel.get("min_amount_spent", None)
+            models.VoucherChannelListing.objects.update_or_create(
+                voucher=voucher,
+                channel=channel,
+                defaults=defaults,
+            )
+
+    @classmethod
+    def remove_channels(cls, voucher, remove_channels):
+        voucher.channel_listings.filter(channel_id__in=remove_channels).delete()
+
+    @classmethod
+    def save(cls, voucher, cleaned_input):
+        with traced_atomic_transaction():
+            cls.add_channels(voucher, cleaned_input.get("add_channels", []))
+            cls.remove_channels(voucher, cleaned_input.get("remove_channels", []))
+
+    @classmethod
+    def perform_mutation(  # type: ignore[override]
+        cls, _root, info: ResolveInfo, /, *, id, input
+    ):
+        voucher = cls.get_node_or_error(info, id, only_type=Voucher, field="id")
+        errors: defaultdict[str, List[ValidationError]] = defaultdict(list)
+        cleaned_input = cls.clean_channels(
+            info, input, errors, DiscountErrorCode.DUPLICATED_INPUT_ITEM.value
+        )
+        cleaned_input = cls.clean_discount_values(cleaned_input, voucher, errors)
+
+        if errors:
+            raise ValidationError(errors)
+
+        cls.save(voucher, cleaned_input)
+        manager = get_plugin_manager_promise(info.context).get()
+        cls.call_event(manager.voucher_updated, voucher)
+
+        return VoucherChannelListingUpdate(
+            voucher=ChannelContext(node=voucher, channel_slug=None)
+        )
