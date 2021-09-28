@@ -118,4 +118,93 @@ def test_generate_sample_payload_order_removed_channel_listing_from_shipping(
     order_id = graphene.Node.to_global_id("Order", order.id)
 
     # when
-    pa
+    payload = generate_sample_payload(event_name)
+    order_payload = json.loads(generate_order_payload(order))
+    # then
+    assert order_id == payload[0]["id"]
+    assert order.user_email != payload[0]["user_email"]
+    assert order_payload[0]["shipping_method"] is None
+
+
+@pytest.mark.parametrize(
+    "event_name",
+    [
+        WebhookEventAsyncType.ORDER_CREATED,
+        WebhookEventAsyncType.ORDER_UPDATED,
+        WebhookEventAsyncType.ORDER_CANCELLED,
+        WebhookEventAsyncType.ORDER_FULFILLED,
+        WebhookEventAsyncType.ORDER_FULLY_PAID,
+        WebhookEventAsyncType.DRAFT_ORDER_CREATED,
+        WebhookEventAsyncType.DRAFT_ORDER_UPDATED,
+        WebhookEventAsyncType.DRAFT_ORDER_DELETED,
+        WebhookEventAsyncType.PRODUCT_CREATED,
+        WebhookEventAsyncType.PRODUCT_UPDATED,
+        "Non_existing_event",
+        None,
+        "",
+    ],
+)
+def test_generate_sample_payload_empty_response_(event_name):
+    assert generate_sample_payload(event_name) is None
+
+
+def test_generate_sample_customer_payload(customer_user):
+    payload = generate_sample_payload(WebhookEventAsyncType.CUSTOMER_CREATED)
+    assert payload
+    # Assert that the payload was generated from the fake user
+    assert payload[0]["email"] != customer_user.email
+
+
+@freeze_time("1914-06-28 10:50")
+def test_generate_sample_product_payload(variant):
+    payload = generate_sample_payload(WebhookEventAsyncType.PRODUCT_CREATED)
+    product = variant.product
+    product.refresh_from_db()
+    assert payload == json.loads(generate_product_payload(variant.product))
+
+
+def _remove_anonymized_checkout_data(checkout_data: dict) -> dict:
+    checkout_data = copy.deepcopy(checkout_data)
+    del checkout_data[0]["token"]
+    del checkout_data[0]["user"]
+    del checkout_data[0]["email"]
+    del checkout_data[0]["billing_address"]
+    del checkout_data[0]["shipping_address"]
+    del checkout_data[0]["metadata"]
+    del checkout_data[0]["private_metadata"]
+    return checkout_data
+
+
+@freeze_time("1914-06-28 10:50", ignore=["faker"])
+@pytest.mark.parametrize(
+    "user_checkouts", ["regular", "click_and_collect"], indirect=True
+)
+def test_generate_sample_checkout_payload(user_checkouts):
+    with mock.patch(
+        "saleor.webhook.payloads._get_sample_object", return_value=user_checkouts
+    ):
+        checkout = user_checkouts
+        payload = generate_sample_payload(WebhookEventAsyncType.CHECKOUT_UPDATED)
+        checkout_payload = json.loads(generate_checkout_payload(checkout))
+        # Check anonymized data differ
+        assert checkout.token != payload[0]["token"]
+        assert checkout.user.email != payload[0]["user"]["email"]
+        assert checkout.email != payload[0]["email"]
+        assert (
+            checkout.billing_address.street_address_1
+            != payload[0]["billing_address"]["street_address_1"]
+        )
+        assert (
+            checkout.shipping_address.street_address_1
+            != payload[0]["shipping_address"]["street_address_1"]
+        )
+        assert "note" not in payload[0]
+        assert checkout.metadata_storage.metadata != payload[0]["metadata"]
+        assert (
+            checkout.metadata_storage.private_metadata != payload[0]["private_metadata"]
+        )
+        # Remove anonymized data
+        payload = _remove_anonymized_checkout_data(payload)
+        checkout_payload = _remove_anonymized_checkout_data(checkout_payload)
+        # Compare the payloads
+        assert payload == checkout_payload
