@@ -349,4 +349,244 @@ class ProductVariantBulkError(Error):
     )
     channels = NonNullList(
         graphene.ID,
-        descriptio
+        description="List of channel IDs which causes the error." + ADDED_IN_312,
+        required=False,
+    )
+    channel_listings = NonNullList(
+        graphene.ID,
+        description="List of channel listings IDs which causes the error.",
+        required=False,
+    )
+
+
+class ShopError(Error):
+    code = ShopErrorCode(description="The error code.", required=True)
+
+
+class ShippingError(Error):
+    code = ShippingErrorCode(description="The error code.", required=True)
+    warehouses = NonNullList(
+        graphene.ID,
+        description="List of warehouse IDs which causes the error.",
+        required=False,
+    )
+    channels = NonNullList(
+        graphene.ID,
+        description="List of channels IDs which causes the error.",
+        required=False,
+    )
+
+
+class PageError(Error):
+    code = PageErrorCode(description="The error code.", required=True)
+    attributes = NonNullList(
+        graphene.ID,
+        description="List of attributes IDs which causes the error.",
+        required=False,
+    )
+    values = NonNullList(
+        graphene.ID,
+        description="List of attribute values IDs which causes the error.",
+        required=False,
+    )
+
+
+class PaymentError(Error):
+    code = PaymentErrorCode(description="The error code.", required=True)
+    variants = NonNullList(
+        graphene.ID,
+        description="List of variant IDs which causes the error.",
+        required=False,
+    )
+
+
+class TransactionCreateError(Error):
+    code = TransactionCreateErrorCode(description="The error code.", required=True)
+
+
+class TransactionUpdateError(Error):
+    code = TransactionUpdateErrorCode(description="The error code.", required=True)
+
+
+class TransactionRequestActionError(Error):
+    code = TransactionRequestActionErrorCode(
+        description="The error code.", required=True
+    )
+
+
+class GiftCardError(Error):
+    code = GiftCardErrorCode(description="The error code.", required=True)
+    tags = NonNullList(
+        graphene.String,
+        description="List of tag values that cause the error.",
+        required=False,
+    )
+
+
+class PluginError(Error):
+    code = PluginErrorCode(description="The error code.", required=True)
+
+
+class StockError(Error):
+    code = StockErrorCode(description="The error code.", required=True)
+
+
+class BulkStockError(ProductError):
+    index = graphene.Int(
+        description="Index of an input list item that caused the error."
+    )
+
+
+class StockBulkUpdateError(Error):
+    code = StockBulkUpdateErrorCode(description="The error code.", required=True)
+
+
+class UploadError(Error):
+    code = UploadErrorCode(description="The error code.", required=True)
+
+
+class WarehouseError(Error):
+    code = WarehouseErrorCode(description="The error code.", required=True)
+    shipping_zones = NonNullList(
+        graphene.ID,
+        description="List of shipping zones IDs which causes the error.",
+        required=False,
+    )
+
+
+class WebhookError(Error):
+    code = WebhookErrorCode(description="The error code.", required=True)
+
+
+class WebhookDryRunError(Error):
+    code = WebhookDryRunErrorCode(description="The error code.", required=True)
+
+
+class WebhookTriggerError(Error):
+    code = WebhookTriggerErrorCode(description="The error code.", required=True)
+
+
+class TranslationError(Error):
+    code = TranslationErrorCode(description="The error code.", required=True)
+
+
+class SeoInput(graphene.InputObjectType):
+    title = graphene.String(description="SEO title.")
+    description = graphene.String(description="SEO description.")
+
+
+class Weight(graphene.ObjectType):
+    unit = WeightUnitsEnum(description="Weight unit.", required=True)
+    value = graphene.Float(description="Weight value.", required=True)
+
+    class Meta:
+        description = "Represents weight value in a specific weight unit."
+
+
+class Image(graphene.ObjectType):
+    url = graphene.String(required=True, description="The URL of the image.")
+    alt = graphene.String(description="Alt text for an image.")
+
+    class Meta:
+        description = "Represents an image."
+
+    def resolve_url(root, _info: "ResolveInfo"):
+        if urlparse(root.url).netloc:
+            return root.url
+        return build_absolute_uri(root.url)
+
+
+class File(graphene.ObjectType):
+    url = graphene.String(required=True, description="The URL of the file.")
+    content_type = graphene.String(
+        required=False, description="Content type of the file."
+    )
+
+    @staticmethod
+    def resolve_url(root, _info: "ResolveInfo"):
+        # check if URL is absolute:
+        if urlparse(root.url).netloc:
+            return root.url
+        # unquote used for preventing double URL encoding
+        return build_absolute_uri(default_storage.url(unquote(root.url)))
+
+
+class PriceInput(graphene.InputObjectType):
+    currency = graphene.String(description="Currency code.", required=True)
+    amount = PositiveDecimal(description="Amount of money.", required=True)
+
+
+class PriceRangeInput(graphene.InputObjectType):
+    gte = graphene.Float(description="Price greater than or equal to.", required=False)
+    lte = graphene.Float(description="Price less than or equal to.", required=False)
+
+
+class DateRangeInput(graphene.InputObjectType):
+    gte = Date(description="Start date.", required=False)
+    lte = Date(description="End date.", required=False)
+
+
+class DateTimeRangeInput(graphene.InputObjectType):
+    gte = graphene.DateTime(description="Start date.", required=False)
+    lte = graphene.DateTime(description="End date.", required=False)
+
+
+class IntRangeInput(graphene.InputObjectType):
+    gte = graphene.Int(description="Value greater than or equal to.", required=False)
+    lte = graphene.Int(description="Value less than or equal to.", required=False)
+
+
+class TimePeriodInputType(graphene.InputObjectType):
+    amount = graphene.Int(description="The length of the period.", required=True)
+    type = TimePeriodTypeEnum(description="The type of the period.", required=True)
+
+
+class TaxType(graphene.ObjectType):
+    """Representation of tax types fetched from tax gateway."""
+
+    description = graphene.String(description="Description of the tax type.")
+    tax_code = graphene.String(
+        description="External tax code used to identify given tax group."
+    )
+
+
+class Job(graphene.Interface):
+    status = JobStatusEnum(description="Job status.", required=True)
+    created_at = graphene.DateTime(
+        description="Created date time of job in ISO 8601 format.", required=True
+    )
+    updated_at = graphene.DateTime(
+        description="Date time of job last update in ISO 8601 format.", required=True
+    )
+    message = graphene.String(description="Job message.")
+
+    @classmethod
+    @traced_resolver
+    def resolve_type(cls, instance, _info: "ResolveInfo"):
+        """Map a data object to a Graphene type."""
+        return None  # FIXME: why do we have this method?
+
+
+class TimePeriod(graphene.ObjectType):
+    amount = graphene.Int(description="The length of the period.", required=True)
+    type = TimePeriodTypeEnum(description="The type of the period.", required=True)
+
+
+class ThumbnailField(graphene.Field):
+    size = graphene.Int(
+        description=(
+            "Desired longest side the image in pixels. Defaults to 4096. "
+            "Images are never cropped. "
+            "Pass 0 to retrieve the original size (not recommended)."
+        ),
+    )
+    format = ThumbnailFormatEnum(
+        default_value="ORIGINAL",
+        description=(
+            "The format of the image. When not provided, format of the original "
+            "image will be used." + ADDED_IN_36 + PREVIEW_FEATURE
+        ),
+    )
+
+    def __init__(self, of_type=Image, *args, **kwargs):
+        kwargs["si
