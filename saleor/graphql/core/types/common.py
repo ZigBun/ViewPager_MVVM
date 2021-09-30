@@ -83,4 +83,270 @@ class CountryDisplay(graphene.ObjectType):
         VAT,
         description="Country tax.",
         deprecation_reason=(
-            f"{DEPRECATED_IN_3X_FIELD} Use `TaxClassC
+            f"{DEPRECATED_IN_3X_FIELD} Use `TaxClassCountryRate` type to manage tax "
+            "rates per country."
+        ),
+    )
+
+
+class LanguageDisplay(graphene.ObjectType):
+    code = LanguageCodeEnum(
+        description="ISO 639 representation of the language name.", required=True
+    )
+    language = graphene.String(description="Full name of the language.", required=True)
+
+
+class Permission(graphene.ObjectType):
+    code = PermissionEnum(description="Internal code for permission.", required=True)
+    name = graphene.String(
+        description="Describe action(s) allowed to do by permission.", required=True
+    )
+
+    class Meta:
+        description = "Represents a permission object in a friendly form."
+
+
+class Error(graphene.ObjectType):
+    field = graphene.String(
+        description=(
+            "Name of a field that caused the error. A value of `null` indicates that "
+            "the error isn't associated with a particular field."
+        ),
+        required=False,
+    )
+    message = graphene.String(description="The error message.")
+
+    class Meta:
+        description = "Represents an error in the input of a mutation."
+
+
+class AccountError(Error):
+    code = AccountErrorCode(description="The error code.", required=True)
+    address_type = AddressTypeEnum(
+        description="A type of address that causes the error.", required=False
+    )
+
+
+class AppError(Error):
+    code = AppErrorCode(description="The error code.", required=True)
+    permissions = NonNullList(
+        PermissionEnum,
+        description="List of permissions which causes the error.",
+        required=False,
+    )
+
+
+class AttributeError(Error):
+    code = AttributeErrorCode(description="The error code.", required=True)
+
+
+class StaffError(AccountError):
+    permissions = NonNullList(
+        PermissionEnum,
+        description="List of permissions which causes the error.",
+        required=False,
+    )
+    groups = NonNullList(
+        graphene.ID,
+        description="List of permission group IDs which cause the error.",
+        required=False,
+    )
+    users = NonNullList(
+        graphene.ID,
+        description="List of user IDs which causes the error.",
+        required=False,
+    )
+
+
+class ChannelError(Error):
+    code = ChannelErrorCode(description="The error code.", required=True)
+    shipping_zones = NonNullList(
+        graphene.ID,
+        description="List of shipping zone IDs which causes the error.",
+        required=False,
+    )
+    warehouses = NonNullList(
+        graphene.ID,
+        description="List of warehouses IDs which causes the error.",
+        required=False,
+    )
+
+
+class CheckoutError(Error):
+    code = CheckoutErrorCode(description="The error code.", required=True)
+    variants = NonNullList(
+        graphene.ID,
+        description="List of varint IDs which causes the error.",
+        required=False,
+    )
+    lines = NonNullList(
+        graphene.ID,
+        description="List of line Ids which cause the error.",
+        required=False,
+    )
+    address_type = AddressTypeEnum(
+        description="A type of address that causes the error.", required=False
+    )
+
+
+class ProductWithoutVariantError(Error):
+    products = NonNullList(
+        graphene.ID,
+        description="List of products IDs which causes the error.",
+    )
+
+
+class DiscountError(ProductWithoutVariantError):
+    code = DiscountErrorCode(description="The error code.", required=True)
+    channels = NonNullList(
+        graphene.ID,
+        description="List of channels IDs which causes the error.",
+        required=False,
+    )
+
+
+class ExportError(Error):
+    code = ExportErrorCode(description="The error code.", required=True)
+
+
+class ExternalNotificationError(Error):
+    code = ExternalNotificationTriggerErrorCode(
+        description="The error code.", required=True
+    )
+
+
+class MenuError(Error):
+    code = MenuErrorCode(description="The error code.", required=True)
+
+
+class OrderSettingsError(Error):
+    code = OrderSettingsErrorCode(description="The error code.", required=True)
+
+
+class GiftCardSettingsError(Error):
+    code = GiftCardSettingsErrorCode(description="The error code.", required=True)
+
+
+class MetadataError(Error):
+    code = MetadataErrorCode(description="The error code.", required=True)
+
+
+class OrderError(Error):
+    code = OrderErrorCode(description="The error code.", required=True)
+    warehouse = graphene.ID(
+        description="Warehouse ID which causes the error.",
+        required=False,
+    )
+    order_lines = NonNullList(
+        graphene.ID,
+        description="List of order line IDs that cause the error.",
+        required=False,
+    )
+    variants = NonNullList(
+        graphene.ID,
+        description="List of product variants that are associated with the error",
+        required=False,
+    )
+    address_type = AddressTypeEnum(
+        description="A type of address that causes the error.", required=False
+    )
+
+
+class InvoiceError(Error):
+    code = InvoiceErrorCode(description="The error code.", required=True)
+
+
+class PermissionGroupError(Error):
+    code = PermissionGroupErrorCode(description="The error code.", required=True)
+    permissions = NonNullList(
+        PermissionEnum,
+        description="List of permissions which causes the error.",
+        required=False,
+    )
+    users = NonNullList(
+        graphene.ID,
+        description="List of user IDs which causes the error.",
+        required=False,
+    )
+
+
+class ProductError(Error):
+    code = ProductErrorCode(description="The error code.", required=True)
+    attributes = NonNullList(
+        graphene.ID,
+        description="List of attributes IDs which causes the error.",
+        required=False,
+    )
+    values = NonNullList(
+        graphene.ID,
+        description="List of attribute values IDs which causes the error.",
+        required=False,
+    )
+
+
+class CollectionError(ProductWithoutVariantError):
+    code = CollectionErrorCode(description="The error code.", required=True)
+
+
+class ProductChannelListingError(ProductError):
+    channels = NonNullList(
+        graphene.ID,
+        description="List of channels IDs which causes the error.",
+        required=False,
+    )
+    variants = NonNullList(
+        graphene.ID,
+        description="List of variants IDs which causes the error.",
+        required=False,
+    )
+
+
+class CollectionChannelListingError(ProductError):
+    channels = NonNullList(
+        graphene.ID,
+        description="List of channels IDs which causes the error.",
+        required=False,
+    )
+
+
+class BulkProductError(ProductError):
+    index = graphene.Int(
+        description="Index of an input list item that caused the error."
+    )
+    warehouses = NonNullList(
+        graphene.ID,
+        description="List of warehouse IDs which causes the error.",
+        required=False,
+    )
+    channels = NonNullList(
+        graphene.ID,
+        description="List of channel IDs which causes the error.",
+        required=False,
+    )
+
+
+class ProductVariantBulkError(Error):
+    code = ProductVariantBulkErrorCode(description="The error code.", required=True)
+    attributes = NonNullList(
+        graphene.ID,
+        description="List of attributes IDs which causes the error.",
+        required=False,
+    )
+    values = NonNullList(
+        graphene.ID,
+        description="List of attribute values IDs which causes the error.",
+        required=False,
+    )
+    warehouses = NonNullList(
+        graphene.ID,
+        description="List of warehouse IDs which causes the error.",
+        required=False,
+    )
+    stocks = NonNullList(
+        graphene.ID,
+        description="List of stocks IDs which causes the error." + ADDED_IN_312,
+        required=False,
+    )
+    channels = NonNullList(
+        graphene.ID,
+        descriptio
