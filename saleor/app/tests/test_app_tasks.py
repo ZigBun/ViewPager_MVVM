@@ -71,3 +71,22 @@ def test_install_app_task_wrong_response_code(monkeypatch):
 
 
 def test_install_app_task_installation_error(monkeypatch, app_installation):
+    error_msg = "App installation error."
+    mock_install_app = Mock(side_effect=AppInstallationError(error_msg))
+    monkeypatch.setattr("saleor.app.tasks.install_app", mock_install_app)
+
+    install_app_task(app_installation.pk)
+
+    app_installation.refresh_from_db()
+    assert app_installation.status == JobStatus.FAILED
+    assert app_installation.message == error_msg
+
+
+def test_install_app_task_undefined_error(monkeypatch, app_installation):
+    mock_install_app = Mock(side_effect=Exception("Unknow"))
+
+    monkeypatch.setattr("saleor.app.tasks.install_app", mock_install_app)
+    install_app_task(app_installation.pk)
+    app_installation.refresh_from_db()
+    assert app_installation.status == JobStatus.FAILED
+    assert app_installation.message == "Unknown error. Contact with app support."
