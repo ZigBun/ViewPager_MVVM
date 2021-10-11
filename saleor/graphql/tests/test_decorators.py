@@ -53,4 +53,36 @@ def test_permission_required_with_limited_permissions(
 
 
 @pytest.mark.parametrize(
-    "permissions_required, user_permissions, access_grant
+    "permissions_required, user_permissions, access_granted",
+    [
+        ([AppPermission.MANAGE_APPS], ["manage_apps"], True),
+        (
+            [AppPermission.MANAGE_APPS],
+            ["manage_apps", "manage_orders", "manage_checkouts"],
+            True,
+        ),
+        (
+            [OrderPermissions.MANAGE_ORDERS, CheckoutPermissions.MANAGE_CHECKOUTS],
+            ["manage_orders"],
+            False,
+        ),
+        ([OrderPermissions.MANAGE_ORDERS], ["manage_apps"], False),
+        ([CheckoutPermissions.MANAGE_CHECKOUTS], [], False),
+    ],
+)
+def test_permission_required(
+    permissions_required,
+    user_permissions,
+    access_granted,
+    staff_user,
+    rf,
+):
+    staff_user.user_permissions.set(
+        Permission.objects.filter(codename__in=user_permissions)
+    )
+    request = rf.request()
+    request.user = staff_user
+    request.app = None
+    requestor = get_user_or_app_from_context(request)
+    has_perms = core_permission_required(requestor, permissions_required)
+    assert has_perms == access_granted
