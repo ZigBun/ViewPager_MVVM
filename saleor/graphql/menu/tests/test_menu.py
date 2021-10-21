@@ -446,4 +446,255 @@ def test_menu_items_collection_in_other_channel(
     assert not data["collection"]
     assert not data["category"]
     assert not data["page"]
-  
+    assert data["url"] is None
+
+
+@pytest.mark.parametrize(
+    "menu_item_filter, count",
+    [({"search": "MenuItem1"}, 1), ({"search": "MenuItem"}, 2)],
+)
+def test_menu_items_query_with_filter(
+    menu_item_filter, count, staff_api_client, permission_manage_menus
+):
+    query = """
+        query ($filter: MenuItemFilterInput) {
+            menuItems(first: 5, filter:$filter) {
+                totalCount
+                edges {
+                    node {
+                        id
+                        name
+                    }
+                }
+            }
+        }
+    """
+    menu = Menu.objects.create(name="Menu1", slug="Menu1")
+    MenuItem.objects.create(name="MenuItem1", menu=menu)
+    MenuItem.objects.create(name="MenuItem2", menu=menu)
+    variables = {"filter": menu_item_filter}
+    staff_api_client.user.user_permissions.add(permission_manage_menus)
+    response = staff_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    assert content["data"]["menuItems"]["totalCount"] == count
+
+
+QUERY_MENU_ITEMS_WITH_SORT = """
+    query ($sort_by: MenuItemSortingInput!) {
+        menuItems(first:5, sortBy: $sort_by) {
+            edges{
+                node{
+                    name
+                }
+            }
+        }
+    }
+"""
+
+
+@pytest.mark.parametrize(
+    "menu_item_sort, result_order",
+    [
+        ({"field": "NAME", "direction": "ASC"}, ["MenuItem1", "MenuItem2"]),
+        ({"field": "NAME", "direction": "DESC"}, ["MenuItem2", "MenuItem1"]),
+    ],
+)
+def test_query_menu_items_with_sort(
+    menu_item_sort, result_order, staff_api_client, permission_manage_menus
+):
+    menu = Menu.objects.create(name="Menu1", slug="Menu1")
+    MenuItem.objects.create(name="MenuItem1", menu=menu)
+    MenuItem.objects.create(name="MenuItem2", menu=menu)
+    variables = {"sort_by": menu_item_sort}
+    staff_api_client.user.user_permissions.add(permission_manage_menus)
+    response = staff_api_client.post_graphql(QUERY_MENU_ITEMS_WITH_SORT, variables)
+    content = get_graphql_content(response)
+    menu_items = content["data"]["menuItems"]["edges"]
+
+    for order, menu_item_name in enumerate(result_order):
+        assert menu_items[order]["node"]["name"] == menu_item_name
+
+
+QUERY_MENU_ITEM = """
+query menuitem($id: ID!) {
+    menuItem(id: $id) {
+        name
+        url
+        category {
+            id
+        }
+        page {
+            id
+        }
+    }
+}
+"""
+
+
+def test_menu_item_query_static_url(user_api_client, menu_item):
+    query = QUERY_MENU_ITEM
+    menu_item.url = "http://example.com"
+    menu_item.save()
+    variables = {"id": graphene.Node.to_global_id("MenuItem", menu_item.pk)}
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["menuItem"]
+    assert data["name"] == menu_item.name
+    assert data["url"] == menu_item.url
+    assert not data["category"]
+    assert not data["page"]
+
+
+def test_menu_item_query_staff_with_permission_gets_all_pages(
+    staff_api_client, permission_manage_pages, menu_item, page
+):
+    # given
+    staff_api_client.user.user_permissions.add(permission_manage_pages)
+    variables = {"id": graphene.Node.to_global_id("MenuItem", menu_item.pk)}
+
+    page.is_published = False
+    page.save(update_fields=["is_published"])
+
+    menu_item.page = page
+    menu_item.save(update_fields=["page"])
+
+    # when
+    response = staff_api_client.post_graphql(QUERY_MENU_ITEM, variables)
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["menuItem"]
+
+    assert data["name"] == menu_item.name
+    assert data["url"] == menu_item.url
+    assert data["page"]["id"] == graphene.Node.to_global_id("Page", page.id)
+
+
+def test_menu_item_query_staff_without_permission_gets_only_published_pages(
+    staff_api_client, permission_manage_pages, menu_item, page
+):
+    # given
+    variables = {"id": graphene.Node.to_global_id("MenuItem", menu_item.pk)}
+
+    page.is_published = False
+    page.save(update_fields=["is_published"])
+
+    menu_item.page = page
+    menu_item.save(update_fields=["page"])
+
+    # when
+    response = staff_api_client.post_graphql(QUERY_MENU_ITEM, variables)
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["menuItem"]
+
+    assert data["name"] == menu_item.name
+    assert data["url"] == menu_item.url
+    assert data["page"] is None
+
+
+CREATE_MENU_QUERY = """
+    mutation mc($name: String!, $collection: ID,
+            $category: ID, $page: ID, $url: String) {
+
+        menuCreate(input: {
+            name: $name,
+            items: [
+                {name: "Collection item", collection: $collection},
+                {name: "Page item", page: $page},
+                {name: "Category item", category: $category},
+                {name: "Url item", url: $url}]
+        }) {
+            menu {
+                name
+                slug
+                items {
+                    id
+                }
+            }
+        }
+    }
+    """
+
+
+def test_create_menu(
+    staff_api_client, published_collection, category, page, permission_manage_menus
+):
+    category_id = graphene.Node.to_global_id("Category", category.pk)
+    collection_id = graphene.Node.to_global_id("Collection", published_collection.pk)
+    page_id = graphene.Node.to_global_id("Page", page.pk)
+    url = "http://www.example.com"
+
+    variables = {
+        "name": "test-menu",
+        "collection": collection_id,
+        "category": category_id,
+        "page": page_id,
+        "url": url,
+    }
+    response = staff_api_client.post_graphql(
+        CREATE_MENU_QUERY, variables, permissions=[permission_manage_menus]
+    )
+    content = get_graphql_content(response)
+    assert content["data"]["menuCreate"]["menu"]["name"] == "test-menu"
+    assert content["data"]["menuCreate"]["menu"]["slug"] == "test-menu"
+
+
+@freeze_time("2022-05-12 12:00:00")
+@mock.patch("saleor.plugins.webhook.plugin.get_webhooks_for_event")
+@mock.patch("saleor.plugins.webhook.plugin.trigger_webhooks_async")
+def test_create_menu_trigger_webhook(
+    mocked_webhook_trigger,
+    mocked_get_webhooks_for_event,
+    any_webhook,
+    staff_api_client,
+    published_collection,
+    category,
+    page,
+    permission_manage_menus,
+    settings,
+):
+    # given
+    mocked_get_webhooks_for_event.return_value = [any_webhook]
+    settings.PLUGINS = ["saleor.plugins.webhook.plugin.WebhookPlugin"]
+
+    category_id = graphene.Node.to_global_id("Category", category.pk)
+    collection_id = graphene.Node.to_global_id("Collection", published_collection.pk)
+    page_id = graphene.Node.to_global_id("Page", page.pk)
+    url = "http://www.example.com"
+
+    variables = {
+        "name": "test-menu",
+        "collection": collection_id,
+        "category": category_id,
+        "page": page_id,
+        "url": url,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        CREATE_MENU_QUERY, variables, permissions=[permission_manage_menus]
+    )
+    content = get_graphql_content(response)
+    menu = Menu.objects.last()
+
+    # then
+    assert content["data"]["menuCreate"]["menu"]
+    mocked_webhook_trigger.assert_called_once_with(
+        json.dumps(
+            {
+                "id": graphene.Node.to_global_id("Menu", menu.id),
+                "slug": menu.slug,
+                "meta": generate_meta(
+                    requestor_data=generate_requestor(
+                        SimpleLazyObject(lambda: staff_api_client.user)
+                    )
+                ),
+            },
+            cls=CustomJsonEncoder,
+        ),
+        WebhookEventAsyncType.MENU_CREATED,
+        [any_webhook],
+        menu,
+        Si
