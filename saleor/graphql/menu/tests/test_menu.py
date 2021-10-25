@@ -1185,4 +1185,253 @@ def test_delete_menu_item_trigger_webhook(
             },
             cls=CustomJsonEncoder,
         ),
-        WebhookEventAsyn
+        WebhookEventAsyncType.MENU_ITEM_DELETED,
+        [any_webhook],
+        menu_item,
+        SimpleLazyObject(lambda: staff_api_client.user),
+    )
+
+
+def test_add_more_than_one_item(
+    staff_api_client, menu, menu_item, page, permission_manage_menus
+):
+    query = """
+    mutation updateMenuItem($id: ID!, $page: ID, $url: String) {
+        menuItemUpdate(id: $id,
+        input: {page: $page, url: $url}) {
+        errors {
+            field
+            message
+        }
+            menuItem {
+                url
+            }
+        }
+    }
+    """
+    url = "http://www.example.com"
+    menu_item_id = graphene.Node.to_global_id("MenuItem", menu_item.pk)
+    page_id = graphene.Node.to_global_id("Page", page.pk)
+    variables = {"id": menu_item_id, "page": page_id, "url": url}
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_menus]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["menuItemUpdate"]["errors"][0]
+    assert data["message"] == "More than one item provided."
+
+
+def test_assign_menu(
+    staff_api_client,
+    menu,
+    permission_manage_menus,
+    permission_manage_settings,
+    site_settings,
+):
+    query = """
+    mutation AssignMenu($menu: ID, $navigationType: NavigationType!) {
+        assignNavigation(menu: $menu, navigationType: $navigationType) {
+            errors {
+                field
+                message
+            }
+            menu {
+                name
+            }
+        }
+    }
+    """
+
+    # test mutations fails without proper permissions
+    menu_id = graphene.Node.to_global_id("Menu", menu.pk)
+    variables = {"menu": menu_id, "navigationType": NavigationType.MAIN.name}
+    response = staff_api_client.post_graphql(query, variables)
+    assert_no_permission(response)
+
+    staff_api_client.user.user_permissions.add(permission_manage_menus)
+    staff_api_client.user.user_permissions.add(permission_manage_settings)
+
+    # test assigning main menu
+    response = staff_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    assert content["data"]["assignNavigation"]["menu"]["name"] == menu.name
+    site_settings.refresh_from_db()
+    assert site_settings.top_menu.name == menu.name
+
+    # test assigning secondary menu
+    variables = {"menu": menu_id, "navigationType": NavigationType.SECONDARY.name}
+    response = staff_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    assert content["data"]["assignNavigation"]["menu"]["name"] == menu.name
+    site_settings.refresh_from_db()
+    assert site_settings.bottom_menu.name == menu.name
+
+    # test unasigning menu
+    variables = {"id": None, "navigationType": NavigationType.MAIN.name}
+    response = staff_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    assert not content["data"]["assignNavigation"]["menu"]
+    site_settings.refresh_from_db()
+    assert site_settings.top_menu is None
+
+
+QUERY_REORDER_MENU = """
+mutation menuItemMove($menu: ID!, $moves: [MenuItemMoveInput!]!) {
+  menuItemMove(menu: $menu, moves: $moves) {
+    errors {
+      field
+      message
+    }
+
+    menu {
+      id
+      items {
+        id
+        parent {
+          id
+        }
+        children {
+          id
+          parent {
+            id
+          }
+          children {
+            id
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+
+def test_menu_reorder(staff_api_client, permission_manage_menus, menu_item_list):
+    menu_item_list = list(menu_item_list)
+    menu_global_id = graphene.Node.to_global_id("Menu", menu_item_list[0].menu_id)
+
+    assert len(menu_item_list) == 3
+
+    items_global_ids = [
+        graphene.Node.to_global_id("MenuItem", item.pk) for item in menu_item_list
+    ]
+
+    moves_input = [
+        {"itemId": items_global_ids[0], "parentId": None, "sortOrder": 2},
+        {"itemId": items_global_ids[1], "parentId": None, "sortOrder": None},
+        {"itemId": items_global_ids[2], "parentId": None, "sortOrder": -2},
+    ]
+
+    expected_data = {
+        "id": menu_global_id,
+        "items": [
+            {"id": items_global_ids[2], "parent": None, "children": []},
+            {"id": items_global_ids[1], "parent": None, "children": []},
+            {"id": items_global_ids[0], "parent": None, "children": []},
+        ],
+    }
+
+    response = get_graphql_content(
+        staff_api_client.post_graphql(
+            QUERY_REORDER_MENU,
+            {"moves": moves_input, "menu": menu_global_id},
+            [permission_manage_menus],
+        )
+    )["data"]["menuItemMove"]
+
+    menu_data = response["menu"]
+    assert not response["errors"]
+    assert menu_data
+
+    # Ensure the order is right
+    assert menu_data == expected_data
+
+
+@mock.patch("saleor.plugins.webhook.plugin.get_webhooks_for_event")
+@mock.patch("saleor.plugins.webhook.plugin.trigger_webhooks_async")
+def test_menu_reorder_trigger_webhook(
+    mocked_webhook_trigger,
+    mocked_get_webhooks_for_event,
+    any_webhook,
+    staff_api_client,
+    permission_manage_menus,
+    menu_item_list,
+    settings,
+):
+    # given
+    mocked_get_webhooks_for_event.return_value = [any_webhook]
+    settings.PLUGINS = ["saleor.plugins.webhook.plugin.WebhookPlugin"]
+
+    menu_item_list = list(menu_item_list)
+    menu_global_id = graphene.Node.to_global_id("Menu", menu_item_list[0].menu_id)
+
+    assert len(menu_item_list) == 3
+
+    items_global_ids = [
+        graphene.Node.to_global_id("MenuItem", item.pk) for item in menu_item_list
+    ]
+
+    moves_input = [
+        {"itemId": items_global_ids[0], "parentId": None, "sortOrder": 2},
+        {"itemId": items_global_ids[1], "parentId": None, "sortOrder": None},
+        {"itemId": items_global_ids[2], "parentId": None, "sortOrder": -2},
+    ]
+
+    # when
+    response = get_graphql_content(
+        staff_api_client.post_graphql(
+            QUERY_REORDER_MENU,
+            {"moves": moves_input, "menu": menu_global_id},
+            [permission_manage_menus],
+        )
+    )["data"]["menuItemMove"]
+
+    assert response["menu"]
+    assert not response["errors"]
+    assert mocked_webhook_trigger.call_count == 2
+
+
+def test_menu_reorder_move_the_same_item_multiple_times(
+    staff_api_client, permission_manage_menus, menu_item_list
+):
+    menu_item_list = list(menu_item_list)
+    menu_global_id = graphene.Node.to_global_id("Menu", menu_item_list[0].menu_id)
+
+    assert len(menu_item_list) == 3
+
+    items_global_ids = [
+        graphene.Node.to_global_id("MenuItem", item.pk) for item in menu_item_list
+    ]
+
+    moves_input = [
+        {"itemId": items_global_ids[0], "parentId": None, "sortOrder": 1},
+        {"itemId": items_global_ids[2], "parentId": None, "sortOrder": -1},
+        {"itemId": items_global_ids[2], "parentId": None, "sortOrder": -1},
+    ]
+
+    expected_data = {
+        "id": menu_global_id,
+        "items": [
+            {"id": items_global_ids[2], "parent": None, "children": []},
+            {"id": items_global_ids[1], "parent": None, "children": []},
+            {"id": items_global_ids[0], "parent": None, "children": []},
+        ],
+    }
+
+    response = get_graphql_content(
+        staff_api_client.post_graphql(
+            QUERY_REORDER_MENU,
+            {"moves": moves_input, "menu": menu_global_id},
+            [permission_manage_menus],
+        )
+    )["data"]["menuItemMove"]
+
+    menu_data = response["menu"]
+    assert not response["errors"]
+    assert menu_data
+
+    # Ensure the order is right
+    assert menu_data == expected_data
+
+
+def test_menu_reorde
