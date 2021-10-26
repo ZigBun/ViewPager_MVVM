@@ -1681,4 +1681,196 @@ def test_menu_reorder_unassign_and_assign_parent(
                     {
                         "id": items_global_ids[1],
                         "parent": {"id": root_id},
-                  
+                        "children": [],
+                    },
+                ],
+            },
+        ],
+    }
+
+    response = get_graphql_content(
+        staff_api_client.post_graphql(
+            QUERY_REORDER_MENU,
+            {"moves": moves_input, "menu": menu_id},
+            [permission_manage_menus],
+        )
+    )["data"]["menuItemMove"]
+
+    menu_data = response["menu"]
+    assert not response["errors"]
+    assert menu_data
+
+    # Ensure the parent and sort orders were assigned correctly
+    assert menu_data == expected_data
+
+
+def test_menu_reorder_assign_parent_to_top_level(
+    staff_api_client, permission_manage_menus, menu_item_list
+):
+    """Set the parent of an item to None, to put it as to the root level."""
+
+    menu_item_list = list(menu_item_list)
+    menu_global_id = graphene.Node.to_global_id("Menu", menu_item_list[0].menu_id)
+
+    unchanged_item_global_id = graphene.Node.to_global_id(
+        "MenuItem", menu_item_list[2].pk
+    )
+
+    root_candidate = menu_item_list[0]
+    root_candidate_global_id = graphene.Node.to_global_id("MenuItem", root_candidate.pk)
+
+    # Give to the item menu a parent
+    previous_parent = menu_item_list[1]
+    previous_parent_global_id = graphene.Node.to_global_id(
+        "MenuItem", previous_parent.pk
+    )
+    root_candidate.move_to(previous_parent)
+    root_candidate.save()
+
+    assert root_candidate.parent
+
+    moves_input = [
+        {"itemId": root_candidate_global_id, "parentId": None, "sortOrder": None}
+    ]
+    expected_data = {
+        "id": menu_global_id,
+        "items": [
+            {"id": previous_parent_global_id, "parent": None, "children": []},
+            {"id": unchanged_item_global_id, "parent": None, "children": []},
+            {"id": root_candidate_global_id, "parent": None, "children": []},
+        ],
+    }
+
+    response = get_graphql_content(
+        staff_api_client.post_graphql(
+            QUERY_REORDER_MENU,
+            {"moves": moves_input, "menu": menu_global_id},
+            [permission_manage_menus],
+        )
+    )["data"]["menuItemMove"]
+
+    menu_data = response["menu"]
+    assert not response["errors"]
+    assert menu_data
+
+    # Ensure the the item was successfully placed at the root
+    # and is now at the bottom of the list (default)
+    assert menu_data == expected_data
+
+
+def test_menu_reorder_cannot_assign_to_ancestor(
+    staff_api_client, permission_manage_menus, menu_item_list
+):
+    menu_item_list = list(menu_item_list)
+    menu_id = graphene.Node.to_global_id("Menu", menu_item_list[0].menu_id)
+
+    root = menu_item_list[0]
+    root_node_id = graphene.Node.to_global_id("MenuItem", root.pk)
+
+    child = menu_item_list[2]
+    child_node_id = graphene.Node.to_global_id("MenuItem", child.pk)
+
+    # Give the child an ancestor
+    child.move_to(root)
+    child.save()
+
+    # Give the child an ancestor
+    child.move_to(root)
+    child.save()
+
+    assert not root.parent
+    assert child.parent
+
+    moves = [{"itemId": root_node_id, "parentId": child_node_id, "sortOrder": None}]
+
+    response = get_graphql_content(
+        staff_api_client.post_graphql(
+            QUERY_REORDER_MENU,
+            {"moves": moves, "menu": menu_id},
+            [permission_manage_menus],
+        )
+    )["data"]["menuItemMove"]
+
+    assert response["errors"] == [
+        {
+            "field": "parentId",
+            "message": "Cannot assign a node as child of " "one of its descendants.",
+        }
+    ]
+
+
+def test_menu_reorder_cannot_assign_to_itself(
+    staff_api_client, permission_manage_menus, menu_item
+):
+    menu_id = graphene.Node.to_global_id("Menu", menu_item.menu_id)
+    node_id = graphene.Node.to_global_id("MenuItem", menu_item.pk)
+    moves = [{"itemId": node_id, "parentId": node_id, "sortOrder": None}]
+
+    response = get_graphql_content(
+        staff_api_client.post_graphql(
+            QUERY_REORDER_MENU,
+            {"moves": moves, "menu": menu_id},
+            [permission_manage_menus],
+        )
+    )["data"]["menuItemMove"]
+
+    assert response["errors"] == [
+        {"field": "parentId", "message": "Cannot assign a node to itself."}
+    ]
+
+
+def test_menu_cannot_get_menu_item_not_from_same_menu(
+    staff_api_client, permission_manage_menus, menu_item
+):
+    """You shouldn't be able to edit menu items that are not from the menu
+    you are actually editing"""
+
+    menu_without_items = Menu.objects.create(
+        name="this menu has no items", slug="menu-no-items"
+    )
+
+    menu_id = graphene.Node.to_global_id("Menu", menu_without_items.id)
+    node_id = graphene.Node.to_global_id("MenuItem", menu_item.pk)
+    moves = [{"itemId": node_id}]
+
+    response = staff_api_client.post_graphql(
+        QUERY_REORDER_MENU, {"moves": moves, "menu": menu_id}, [permission_manage_menus]
+    )
+
+    assert json.loads(response.content)["data"] == {
+        "menuItemMove": {
+            "errors": [
+                {
+                    "field": "item",
+                    "message": f"Couldn't resolve to a node: {node_id}",
+                }
+            ],
+            "menu": None,
+        }
+    }
+
+
+def test_menu_cannot_pass_an_invalid_menu_item_node_type(
+    staff_api_client, staff_user, permission_manage_menus, menu_item
+):
+    """You shouldn't be able to pass a menu item node
+    that is not an actual MenuType."""
+
+    menu_without_items = Menu.objects.create(
+        name="this menu has no items", slug="menu-without-items"
+    )
+
+    menu_id = graphene.Node.to_global_id("Menu", menu_without_items.id)
+    node_id = graphene.Node.to_global_id("User", staff_user.pk)
+    moves = [{"itemId": node_id}]
+
+    response = staff_api_client.post_graphql(
+        QUERY_REORDER_MENU, {"moves": moves, "menu": menu_id}, [permission_manage_menus]
+    )
+
+    assert json.loads(response.content)["data"] == {
+        "menuItemMove": {
+            "errors": [{"field": "item", "message": "Must receive a MenuItem id."}],
+            "menu": None,
+        }
+    }
