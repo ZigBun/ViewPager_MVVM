@@ -59,3 +59,18 @@ def tax_order_webhook(tax_app):
     )
     webhook.events.create(event_type=WebhookEventSyncType.ORDER_CALCULATE_TAXES)
     return webhook
+
+
+@pytest.fixture
+def tax_app_with_webhooks(tax_app, tax_checkout_webhook, tax_order_webhook):
+    return tax_app
+
+
+@pytest.fixture
+def webhook_plugin(settings):
+    def factory():
+        settings.PLUGINS = ["saleor.plugins.webhook.plugin.WebhookPlugin"]
+        manager = get_plugins_manager()
+        return manager.global_plugins[0]
+
+    return factory
