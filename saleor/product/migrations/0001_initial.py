@@ -247,3 +247,95 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
+                    "attributes",
+                    models.TextField(default="{}", verbose_name="attributes"),
+                ),
+                (
+                    "product",
+                    models.ForeignKey(
+                        related_name="variants",
+                        to="product.Product",
+                        on_delete=django.db.models.deletion.CASCADE,
+                    ),
+                ),
+            ],
+        ),
+        migrations.CreateModel(
+            name="Stock",
+            fields=[
+                (
+                    "id",
+                    models.AutoField(
+                        verbose_name="ID",
+                        serialize=False,
+                        auto_created=True,
+                        primary_key=True,
+                    ),
+                ),
+                ("location", models.CharField(max_length=100, verbose_name="location")),
+                (
+                    "quantity",
+                    models.IntegerField(
+                        default=Decimal("1"),
+                        verbose_name="quantity",
+                        validators=[django.core.validators.MinValueValidator(0)],
+                    ),
+                ),
+                (
+                    "cost_price",
+                    models.DecimalField(
+                        decimal_places=2,
+                        max_digits=12,
+                        blank=True,
+                        null=True,
+                        verbose_name="cost price",
+                    ),
+                ),
+                (
+                    "variant",
+                    models.ForeignKey(
+                        related_name="stock",
+                        verbose_name="variant",
+                        to="product.ProductVariant",
+                        on_delete=django.db.models.deletion.CASCADE,
+                    ),
+                ),
+            ],
+        ),
+        migrations.AddField(
+            model_name="product",
+            name="attributes",
+            field=models.ManyToManyField(
+                related_name="products",
+                null=True,
+                to="product.ProductAttribute",
+                blank=True,
+            ),
+        ),
+        migrations.AddField(
+            model_name="product",
+            name="categories",
+            field=models.ManyToManyField(
+                related_name="products",
+                verbose_name="categories",
+                to="product.Category",
+            ),
+        ),
+        migrations.AddField(
+            model_name="fixedproductdiscount",
+            name="products",
+            field=models.ManyToManyField(to="product.Product", blank=True),
+        ),
+        migrations.AddField(
+            model_name="attributechoicevalue",
+            name="attribute",
+            field=models.ForeignKey(
+                related_name="values",
+                to="product.ProductAttribute",
+                on_delete=django.db.models.deletion.CASCADE,
+            ),
+        ),
+        migrations.AlterUniqueTogether(
+            name="stock", unique_together=set([("variant", "location")])
+        ),
+    ]
