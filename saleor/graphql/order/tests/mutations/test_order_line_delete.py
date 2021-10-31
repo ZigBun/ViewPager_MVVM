@@ -115,4 +115,60 @@ def test_order_line_remove(
     content = get_graphql_content(response)
     data = content["data"]["orderLineDelete"]
     assert OrderEvent.objects.count() == 1
-    assert OrderEvent.objects.last().type == order_events.Or
+    assert OrderEvent.objects.last().type == order_events.OrderEvents.REMOVED_PRODUCTS
+    assert data["orderLine"]["id"] == line_id
+    assert line not in order.lines.all()
+    assert_proper_webhook_called_once(
+        order, status, draft_order_updated_webhook_mock, order_updated_webhook_mock
+    )
+
+
+@patch("saleor.plugins.manager.PluginsManager.draft_order_updated")
+@patch("saleor.plugins.manager.PluginsManager.order_updated")
+def test_invalid_order_when_removing_lines(
+    order_update_webhook_mock,
+    draft_order_update_webhook_mock,
+    staff_api_client,
+    order_with_lines,
+    permission_manage_orders,
+):
+    query = ORDER_LINE_DELETE_MUTATION
+    order = order_with_lines
+    line = order.lines.first()
+    line_id = graphene.Node.to_global_id("OrderLine", line.id)
+    variables = {"id": line_id}
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_orders]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["orderLineDelete"]
+    assert data["errors"]
+    order_update_webhook_mock.assert_not_called()
+    draft_order_update_webhook_mock.assert_not_called()
+
+
+def test_draft_order_properly_recalculate_total_after_shipping_product_removed(
+    staff_api_client,
+    draft_order,
+    permission_manage_orders,
+):
+    order = draft_order
+    line = order.lines.get(product_sku="SKU_AA")
+    line.is_shipping_required = True
+    line.save()
+
+    query = ORDER_LINE_DELETE_MUTATION
+    line_2 = order.lines.get(product_sku="SKU_B")
+    line_2_id = graphene.Node.to_global_id("OrderLine", line_2.id)
+    variables = {"id": line_2_id}
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_orders]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["orderLineDelete"]
+
+    order.refresh_from_db()
+    assert data["order"]["total"]["net"]["amount"] == float(
+        line.total_price_net_amount
+    ) + float(order.shipping_price_net_amount)
