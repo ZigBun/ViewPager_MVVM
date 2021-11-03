@@ -444,4 +444,148 @@ class WebhookEventAsyncType:
         ORDER_FULFILLED: OrderPermissions.MANAGE_ORDERS,
         ORDER_METADATA_UPDATED: OrderPermissions.MANAGE_ORDERS,
         DRAFT_ORDER_CREATED: OrderPermissions.MANAGE_ORDERS,
-        DRAFT_ORDER_DELETE
+        DRAFT_ORDER_DELETED: OrderPermissions.MANAGE_ORDERS,
+        DRAFT_ORDER_UPDATED: OrderPermissions.MANAGE_ORDERS,
+        SALE_CREATED: DiscountPermissions.MANAGE_DISCOUNTS,
+        SALE_UPDATED: DiscountPermissions.MANAGE_DISCOUNTS,
+        SALE_DELETED: DiscountPermissions.MANAGE_DISCOUNTS,
+        SALE_TOGGLE: DiscountPermissions.MANAGE_DISCOUNTS,
+        INVOICE_REQUESTED: OrderPermissions.MANAGE_ORDERS,
+        INVOICE_DELETED: OrderPermissions.MANAGE_ORDERS,
+        INVOICE_SENT: OrderPermissions.MANAGE_ORDERS,
+        CUSTOMER_CREATED: AccountPermissions.MANAGE_USERS,
+        CUSTOMER_UPDATED: AccountPermissions.MANAGE_USERS,
+        CUSTOMER_DELETED: AccountPermissions.MANAGE_USERS,
+        CUSTOMER_METADATA_UPDATED: AccountPermissions.MANAGE_USERS,
+        COLLECTION_CREATED: ProductPermissions.MANAGE_PRODUCTS,
+        COLLECTION_UPDATED: ProductPermissions.MANAGE_PRODUCTS,
+        COLLECTION_DELETED: ProductPermissions.MANAGE_PRODUCTS,
+        COLLECTION_METADATA_UPDATED: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_CREATED: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_UPDATED: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_DELETED: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_METADATA_UPDATED: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_MEDIA_CREATED: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_MEDIA_UPDATED: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_MEDIA_DELETED: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_VARIANT_CREATED: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_VARIANT_UPDATED: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_VARIANT_DELETED: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_VARIANT_METADATA_UPDATED: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_VARIANT_BACK_IN_STOCK: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_VARIANT_OUT_OF_STOCK: ProductPermissions.MANAGE_PRODUCTS,
+        PRODUCT_VARIANT_STOCK_UPDATED: ProductPermissions.MANAGE_PRODUCTS,
+        CHECKOUT_CREATED: CheckoutPermissions.MANAGE_CHECKOUTS,
+        CHECKOUT_UPDATED: CheckoutPermissions.MANAGE_CHECKOUTS,
+        CHECKOUT_METADATA_UPDATED: CheckoutPermissions.MANAGE_CHECKOUTS,
+        FULFILLMENT_CREATED: OrderPermissions.MANAGE_ORDERS,
+        FULFILLMENT_CANCELED: OrderPermissions.MANAGE_ORDERS,
+        FULFILLMENT_APPROVED: OrderPermissions.MANAGE_ORDERS,
+        FULFILLMENT_METADATA_UPDATED: OrderPermissions.MANAGE_ORDERS,
+        NOTIFY_USER: AccountPermissions.MANAGE_USERS,
+        PAGE_CREATED: PagePermissions.MANAGE_PAGES,
+        PAGE_UPDATED: PagePermissions.MANAGE_PAGES,
+        PAGE_DELETED: PagePermissions.MANAGE_PAGES,
+        PAGE_TYPE_CREATED: PageTypePermissions.MANAGE_PAGE_TYPES_AND_ATTRIBUTES,
+        PAGE_TYPE_UPDATED: PageTypePermissions.MANAGE_PAGE_TYPES_AND_ATTRIBUTES,
+        PAGE_TYPE_DELETED: PageTypePermissions.MANAGE_PAGE_TYPES_AND_ATTRIBUTES,
+        PERMISSION_GROUP_CREATED: AccountPermissions.MANAGE_STAFF,
+        PERMISSION_GROUP_UPDATED: AccountPermissions.MANAGE_STAFF,
+        PERMISSION_GROUP_DELETED: AccountPermissions.MANAGE_STAFF,
+        SHIPPING_PRICE_CREATED: ShippingPermissions.MANAGE_SHIPPING,
+        SHIPPING_PRICE_UPDATED: ShippingPermissions.MANAGE_SHIPPING,
+        SHIPPING_PRICE_DELETED: ShippingPermissions.MANAGE_SHIPPING,
+        SHIPPING_ZONE_CREATED: ShippingPermissions.MANAGE_SHIPPING,
+        SHIPPING_ZONE_UPDATED: ShippingPermissions.MANAGE_SHIPPING,
+        SHIPPING_ZONE_DELETED: ShippingPermissions.MANAGE_SHIPPING,
+        SHIPPING_ZONE_METADATA_UPDATED: ShippingPermissions.MANAGE_SHIPPING,
+        STAFF_CREATED: AccountPermissions.MANAGE_STAFF,
+        STAFF_UPDATED: AccountPermissions.MANAGE_STAFF,
+        STAFF_DELETED: AccountPermissions.MANAGE_STAFF,
+        TRANSACTION_ACTION_REQUEST: PaymentPermissions.HANDLE_PAYMENTS,
+        TRANSACTION_ITEM_METADATA_UPDATED: PaymentPermissions.HANDLE_PAYMENTS,
+        TRANSLATION_CREATED: SitePermissions.MANAGE_TRANSLATIONS,
+        TRANSLATION_UPDATED: SitePermissions.MANAGE_TRANSLATIONS,
+        VOUCHER_CREATED: DiscountPermissions.MANAGE_DISCOUNTS,
+        VOUCHER_UPDATED: DiscountPermissions.MANAGE_DISCOUNTS,
+        VOUCHER_DELETED: DiscountPermissions.MANAGE_DISCOUNTS,
+        VOUCHER_METADATA_UPDATED: DiscountPermissions.MANAGE_DISCOUNTS,
+        WAREHOUSE_CREATED: ProductPermissions.MANAGE_PRODUCTS,
+        WAREHOUSE_UPDATED: ProductPermissions.MANAGE_PRODUCTS,
+        WAREHOUSE_DELETED: ProductPermissions.MANAGE_PRODUCTS,
+        WAREHOUSE_METADATA_UPDATED: ProductPermissions.MANAGE_PRODUCTS,
+        OBSERVABILITY: AppPermission.MANAGE_OBSERVABILITY,
+        THUMBNAIL_CREATED: ProductPermissions.MANAGE_PRODUCTS,
+    }
+
+
+class WebhookEventSyncType:
+    PAYMENT_LIST_GATEWAYS = "payment_list_gateways"
+    PAYMENT_AUTHORIZE = "payment_authorize"
+    PAYMENT_CAPTURE = "payment_capture"
+    PAYMENT_REFUND = "payment_refund"
+    PAYMENT_VOID = "payment_void"
+    PAYMENT_CONFIRM = "payment_confirm"
+    PAYMENT_PROCESS = "payment_process"
+
+    CHECKOUT_CALCULATE_TAXES = "checkout_calculate_taxes"
+    ORDER_CALCULATE_TAXES = "order_calculate_taxes"
+
+    SHIPPING_LIST_METHODS_FOR_CHECKOUT = "shipping_list_methods_for_checkout"
+    CHECKOUT_FILTER_SHIPPING_METHODS = "checkout_filter_shipping_methods"
+    ORDER_FILTER_SHIPPING_METHODS = "order_filter_shipping_methods"
+
+    DISPLAY_LABELS = {
+        PAYMENT_AUTHORIZE: "Authorize payment",
+        PAYMENT_CAPTURE: "Capture payment",
+        PAYMENT_CONFIRM: "Confirm payment",
+        PAYMENT_LIST_GATEWAYS: "List payment gateways",
+        PAYMENT_PROCESS: "Process payment",
+        PAYMENT_REFUND: "Refund payment",
+        PAYMENT_VOID: "Void payment",
+        CHECKOUT_CALCULATE_TAXES: "Checkout calculate taxes",
+        ORDER_CALCULATE_TAXES: "Order calculate taxes",
+        SHIPPING_LIST_METHODS_FOR_CHECKOUT: "Shipping list methods for checkout",
+        ORDER_FILTER_SHIPPING_METHODS: "Filter order shipping methods",
+        CHECKOUT_FILTER_SHIPPING_METHODS: "Filter checkout shipping methods",
+    }
+
+    CHOICES = [
+        (PAYMENT_AUTHORIZE, DISPLAY_LABELS[PAYMENT_AUTHORIZE]),
+        (PAYMENT_CAPTURE, DISPLAY_LABELS[PAYMENT_CAPTURE]),
+        (PAYMENT_CONFIRM, DISPLAY_LABELS[PAYMENT_CONFIRM]),
+        (PAYMENT_LIST_GATEWAYS, DISPLAY_LABELS[PAYMENT_LIST_GATEWAYS]),
+        (PAYMENT_PROCESS, DISPLAY_LABELS[PAYMENT_PROCESS]),
+        (PAYMENT_REFUND, DISPLAY_LABELS[PAYMENT_REFUND]),
+        (PAYMENT_VOID, DISPLAY_LABELS[PAYMENT_VOID]),
+        (CHECKOUT_CALCULATE_TAXES, DISPLAY_LABELS[CHECKOUT_CALCULATE_TAXES]),
+        (ORDER_CALCULATE_TAXES, DISPLAY_LABELS[ORDER_CALCULATE_TAXES]),
+        (
+            SHIPPING_LIST_METHODS_FOR_CHECKOUT,
+            DISPLAY_LABELS[SHIPPING_LIST_METHODS_FOR_CHECKOUT],
+        ),
+        (ORDER_FILTER_SHIPPING_METHODS, DISPLAY_LABELS[ORDER_FILTER_SHIPPING_METHODS]),
+        (
+            CHECKOUT_FILTER_SHIPPING_METHODS,
+            DISPLAY_LABELS[CHECKOUT_FILTER_SHIPPING_METHODS],
+        ),
+    ]
+
+    ALL = [event[0] for event in CHOICES]
+
+    PAYMENT_EVENTS = [
+        PAYMENT_AUTHORIZE,
+        PAYMENT_CAPTURE,
+        PAYMENT_CONFIRM,
+        PAYMENT_LIST_GATEWAYS,
+        PAYMENT_PROCESS,
+        PAYMENT_REFUND,
+        PAYMENT_VOID,
+    ]
+
+    PERMISSIONS = {
+        PAYMENT_AUTHORIZE: PaymentPermissions.HANDLE_PAYMENTS,
+        PAYMENT_CAPTURE: PaymentPermissions.HANDLE_PAYMENTS,
+        PAYMENT_CONFIRM: PaymentPermissions.HANDLE_PAYMENTS,
+        PAYMENT_LIST_GATEWAYS: PaymentPermissions.HANDLE_PAYMENTS,
+        PAYMENT_PROCESS: PaymentPe
