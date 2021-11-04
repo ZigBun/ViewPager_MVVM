@@ -588,4 +588,12 @@ class WebhookEventSyncType:
         PAYMENT_CAPTURE: PaymentPermissions.HANDLE_PAYMENTS,
         PAYMENT_CONFIRM: PaymentPermissions.HANDLE_PAYMENTS,
         PAYMENT_LIST_GATEWAYS: PaymentPermissions.HANDLE_PAYMENTS,
-        PAYMENT_PROCESS: PaymentPe
+        PAYMENT_PROCESS: PaymentPermissions.HANDLE_PAYMENTS,
+        PAYMENT_REFUND: PaymentPermissions.HANDLE_PAYMENTS,
+        PAYMENT_VOID: PaymentPermissions.HANDLE_PAYMENTS,
+        CHECKOUT_CALCULATE_TAXES: CheckoutPermissions.HANDLE_TAXES,
+        ORDER_CALCULATE_TAXES: CheckoutPermissions.HANDLE_TAXES,
+        SHIPPING_LIST_METHODS_FOR_CHECKOUT: ShippingPermissions.MANAGE_SHIPPING,
+        ORDER_FILTER_SHIPPING_METHODS: OrderPermissions.MANAGE_ORDERS,
+        CHECKOUT_FILTER_SHIPPING_METHODS: CheckoutPermissions.MANAGE_CHECKOUTS,
+    }
