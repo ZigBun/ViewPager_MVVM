@@ -5,4 +5,17 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("app", "0019_fix_constraint_names_i
+        ("app", "0019_fix_constraint_names_in_app_app_permisons"),
+    ]
+
+    operations = [
+        migrations.AddField(
+            model_name="app",
+            name="is_installed",
+            field=models.BooleanField(default=True),
+        ),
+        migrations.RunSQL(
+            "ALTER TABLE app_app ALTER COLUMN is_installed SET DEFAULT true;",
+            migrations.RunSQL.noop,
+        ),
+    ]
