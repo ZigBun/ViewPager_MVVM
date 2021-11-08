@@ -22,4 +22,25 @@ def configure_braintree():
             channel.slug,
             {
                 "active": True,
-   
+                "configuration": [
+                    {"name": "Public API key", "value": braintree_api_key},
+                    {"name": "Merchant ID", "value": braintree_merchant_id},
+                    {"name": "Secret API key", "value": braintree_secret},
+                    {"name": "Use sandbox", "value": True},
+                ],
+            },
+        )
+    return True
+
+
+class Command(PopulateDBCommand):
+    def handle(self, *args, **options):
+        super().handle(*args, **options)
+        is_configured = configure_braintree()
+        if is_configured:
+            self.stdout.write("Configured Braintree")
+        else:
+            self.stdout.write(
+                "Failed to configure Braintree. Check if proper environment variables "
+                "are set."
+            )
