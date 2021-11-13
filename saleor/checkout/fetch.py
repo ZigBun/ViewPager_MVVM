@@ -187,4 +187,215 @@ class CollectionPointInfo(DeliveryMethodBase):
 
     def is_valid_delivery_method(self) -> bool:
         return (
-            self.shipping_addres
+            self.shipping_address is not None
+            and self.shipping_address == self.delivery_method.address
+        )
+
+    def is_method_in_valid_methods(self, checkout_info) -> bool:
+        valid_delivery_methods = checkout_info.valid_delivery_methods
+        return bool(
+            valid_delivery_methods and self.delivery_method in valid_delivery_methods
+        )
+
+
+@singledispatch
+def get_delivery_method_info(
+    delivery_method: Optional[Union["ShippingMethodData", "Warehouse", Callable]],
+    address: Optional["Address"] = None,
+) -> DeliveryMethodBase:
+    if callable(delivery_method):
+        delivery_method = delivery_method()
+    if delivery_method is None:
+        return DeliveryMethodBase()
+    if isinstance(delivery_method, ShippingMethodData):
+        return ShippingMethodInfo(delivery_method, address)
+    if isinstance(delivery_method, Warehouse):
+        return CollectionPointInfo(delivery_method, delivery_method.address)
+
+    raise NotImplementedError()
+
+
+def fetch_checkout_lines(
+    checkout: "Checkout",
+    prefetch_variant_attributes=False,
+    skip_lines_with_unavailable_variants=True,
+) -> Tuple[Iterable[CheckoutLineInfo], Iterable[int]]:
+    """Fetch checkout lines as CheckoutLineInfo objects."""
+    from .utils import get_voucher_for_checkout
+
+    select_related_fields = ["variant__product__product_type__tax_class"]
+    prefetch_related_fields = [
+        "variant__product__collections",
+        "variant__product__channel_listings__channel",
+        "variant__product__product_type__tax_class__country_rates",
+        "variant__product__tax_class__country_rates",
+        "variant__channel_listings__channel",
+    ]
+    if prefetch_variant_attributes:
+        prefetch_related_fields.extend(
+            [
+                "variant__attributes__assignment__attribute",
+                "variant__attributes__values",
+            ]
+        )
+    lines = checkout.lines.select_related(*select_related_fields).prefetch_related(
+        *prefetch_related_fields
+    )
+    lines_info = []
+    unavailable_variant_pks = []
+    product_channel_listing_mapping: Dict[int, Optional["ProductChannelListing"]] = {}
+
+    for line in lines:
+        variant = line.variant
+        product = variant.product
+        product_type = product.product_type
+        collections = list(product.collections.all())
+
+        variant_channel_listing = _get_variant_channel_listing(
+            variant, checkout.channel_id
+        )
+
+        if not _is_variant_valid(
+            checkout, product, variant_channel_listing, product_channel_listing_mapping
+        ):
+            unavailable_variant_pks.append(variant.pk)
+            if not skip_lines_with_unavailable_variants:
+                lines_info.append(
+                    CheckoutLineInfo(
+                        line=line,
+                        variant=variant,
+                        channel_listing=variant_channel_listing,
+                        product=product,
+                        product_type=product_type,
+                        collections=collections,
+                        tax_class=product.tax_class or product_type.tax_class,
+                    )
+                )
+            continue
+
+        lines_info.append(
+            CheckoutLineInfo(
+                line=line,
+                variant=variant,
+                channel_listing=variant_channel_listing,
+                product=product,
+                product_type=product_type,
+                collections=collections,
+                tax_class=product.tax_class or product_type.tax_class,
+            )
+        )
+
+    if checkout.voucher_code and lines_info:
+        channel_slug = checkout.channel.slug
+        voucher = get_voucher_for_checkout(
+            checkout, channel_slug=channel_slug, with_prefetch=True
+        )
+        if not voucher:
+            # in case when voucher is expired, it will be null so no need to apply any
+            # discount from voucher
+            return lines_info, unavailable_variant_pks
+        if voucher.type == VoucherType.SPECIFIC_PRODUCT or voucher.apply_once_per_order:
+            discounts = fetch_active_discounts()
+            voucher_info = fetch_voucher_info(voucher)
+            apply_voucher_to_checkout_line(
+                voucher_info, checkout, lines_info, discounts
+            )
+    return lines_info, unavailable_variant_pks
+
+
+def _get_variant_channel_listing(variant: "ProductVariant", channel_id: int):
+    variant_channel_listing = None
+    for channel_listing in variant.channel_listings.all():
+        if channel_listing.channel_id == channel_id:
+            variant_channel_listing = channel_listing
+    return variant_channel_listing
+
+
+def _is_variant_valid(
+    checkout: "Checkout",
+    product: "Product",
+    variant_channel_listing: "ProductVariantChannelListing",
+    product_channel_listing_mapping: dict,
+):
+    if not variant_channel_listing or variant_channel_listing.price is None:
+        return False
+
+    product_channel_listing = _get_product_channel_listing(
+        product_channel_listing_mapping, checkout.channel_id, product
+    )
+
+    if (
+        not product_channel_listing
+        or product_channel_listing.is_available_for_purchase() is False
+        or not product_channel_listing.is_visible
+    ):
+        return False
+
+    return True
+
+
+def _get_product_channel_listing(
+    product_channel_listing_mapping: dict, channel_id: int, product: "Product"
+):
+    product_channel_listing = product_channel_listing_mapping.get(product.id)
+    if product.id not in product_channel_listing_mapping:
+        for channel_listing in product.channel_listings.all():
+            if channel_listing.channel_id == channel_id:
+                product_channel_listing = channel_listing
+        product_channel_listing_mapping[product.id] = product_channel_listing
+    return product_channel_listing
+
+
+def apply_voucher_to_checkout_line(
+    voucher_info: "VoucherInfo",
+    checkout: "Checkout",
+    lines_info: Iterable[CheckoutLineInfo],
+    discounts: Iterable["DiscountInfo"],
+):
+    """Attach voucher to valid checkout lines info.
+
+    Apply a voucher to checkout line info when the voucher has the type
+    SPECIFIC_PRODUCTS or is applied only to the cheapest item.
+    """
+    from .utils import get_discounted_lines
+
+    voucher = voucher_info.voucher
+    discounted_lines_by_voucher: List[CheckoutLineInfo] = []
+    lines_included_in_discount = lines_info
+    if voucher.type == VoucherType.SPECIFIC_PRODUCT:
+        discounted_lines_by_voucher.extend(
+            get_discounted_lines(lines_info, voucher_info)
+        )
+        lines_included_in_discount = discounted_lines_by_voucher
+    if voucher.apply_once_per_order:
+        cheapest_line = _get_the_cheapest_line(
+            checkout, lines_included_in_discount, discounts
+        )
+        if cheapest_line:
+            discounted_lines_by_voucher = [cheapest_line]
+    for line_info in lines_info:
+        if line_info in discounted_lines_by_voucher:
+            line_info.voucher = voucher
+
+
+def _get_the_cheapest_line(
+    checkout: "Checkout",
+    lines_info: Iterable[CheckoutLineInfo],
+    discounts: Iterable["DiscountInfo"],
+):
+    channel = checkout.channel
+
+    def variant_price(line_info):
+        return line_info.variant.get_price(
+            product=line_info.product,
+            collections=line_info.collections,
+            channel=channel,
+            channel_listing=line_info.channel_listing,
+            discounts=discounts,
+            price_override=line_info.line.price_override,
+        )
+
+    return min(lines_info, default=None, key=variant_price)
+
+
+def fetch_checkout_in
