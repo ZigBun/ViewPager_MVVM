@@ -398,4 +398,226 @@ def _get_the_cheapest_line(
     return min(lines_info, default=None, key=variant_price)
 
 
-def fetch_checkout_in
+def fetch_checkout_info(
+    checkout: "Checkout",
+    lines: Iterable[CheckoutLineInfo],
+    discounts: Iterable["DiscountInfo"],
+    manager: "PluginsManager",
+    shipping_channel_listings: Optional[
+        Iterable["ShippingMethodChannelListing"]
+    ] = None,
+    fetch_delivery_methods=True,
+) -> CheckoutInfo:
+    """Fetch checkout as CheckoutInfo object."""
+    from .utils import get_voucher_for_checkout
+
+    channel = checkout.channel
+    tax_configuration = channel.tax_configuration
+    shipping_address = checkout.shipping_address
+    if shipping_channel_listings is None:
+        shipping_channel_listings = channel.shipping_method_listings.all()
+    voucher = get_voucher_for_checkout(checkout, channel_slug=channel.slug)
+
+    delivery_method_info = get_delivery_method_info(None, shipping_address)
+    checkout_info = CheckoutInfo(
+        checkout=checkout,
+        user=checkout.user,
+        channel=channel,
+        billing_address=checkout.billing_address,
+        shipping_address=shipping_address,
+        delivery_method_info=delivery_method_info,
+        tax_configuration=tax_configuration,
+        all_shipping_methods=[],
+        valid_pick_up_points=[],
+        voucher=voucher,
+    )
+    if fetch_delivery_methods:
+        update_delivery_method_lists_for_checkout_info(
+            checkout_info,
+            checkout.shipping_method,
+            checkout.collection_point,
+            shipping_address,
+            lines,
+            discounts,
+            manager,
+            shipping_channel_listings,
+        )
+
+    return checkout_info
+
+
+def update_checkout_info_delivery_method_info(
+    checkout_info: CheckoutInfo,
+    shipping_method: Optional[ShippingMethod],
+    collection_point: Optional[Warehouse],
+    shipping_channel_listings: Iterable[ShippingMethodChannelListing],
+):
+    """Update delivery_method_attribute for CheckoutInfo.
+
+    The attribute is lazy-evaluated avoid external API calls unless accessed.
+    """
+    from ..plugins.webhook.shipping import convert_to_app_id_with_identifier
+    from .utils import get_external_shipping_id
+
+    delivery_method: Optional[Union[ShippingMethodData, Warehouse, Callable]] = None
+    checkout = checkout_info.checkout
+    if shipping_method:
+        # Find listing for the currently selected shipping method
+        shipping_channel_listing = None
+        for listing in shipping_channel_listings:
+            if listing.shipping_method_id == shipping_method.id:
+                shipping_channel_listing = listing
+                break
+
+        if shipping_channel_listing:
+            delivery_method = convert_to_shipping_method_data(
+                shipping_method, shipping_channel_listing
+            )
+
+    elif external_shipping_method_id := get_external_shipping_id(checkout):
+        # A local function is used to delay evaluation
+        # of the lazy `all_shipping_methods` attribute
+        def _resolve_external_method():
+            methods = {
+                method.id: method for method in checkout_info.all_shipping_methods
+            }
+            if method := methods.get(external_shipping_method_id):
+                return method
+            new_shipping_method_id = convert_to_app_id_with_identifier(
+                external_shipping_method_id
+            )
+            return methods.get(new_shipping_method_id)
+
+        delivery_method = _resolve_external_method
+
+    else:
+        delivery_method = collection_point
+
+    checkout_info.delivery_method_info = SimpleLazyObject(
+        lambda: get_delivery_method_info(
+            delivery_method,
+            checkout_info.shipping_address,
+        )
+    )  # type: ignore[assignment] # using SimpleLazyObject breaks protocol
+
+
+def update_checkout_info_shipping_address(
+    checkout_info: CheckoutInfo,
+    address: Optional["Address"],
+    lines: Iterable[CheckoutLineInfo],
+    discounts: Iterable["DiscountInfo"],
+    manager: "PluginsManager",
+    shipping_channel_listings: Iterable["ShippingMethodChannelListing"],
+):
+    checkout_info.shipping_address = address
+
+    update_delivery_method_lists_for_checkout_info(
+        checkout_info,
+        checkout_info.checkout.shipping_method,
+        checkout_info.checkout.collection_point,
+        address,
+        lines,
+        discounts,
+        manager,
+        shipping_channel_listings,
+    )
+
+
+def get_valid_internal_shipping_method_list_for_checkout_info(
+    checkout_info: "CheckoutInfo",
+    shipping_address: Optional["Address"],
+    lines: Iterable[CheckoutLineInfo],
+    discounts: Iterable["DiscountInfo"],
+    shipping_channel_listings: Iterable[ShippingMethodChannelListing],
+) -> List["ShippingMethodData"]:
+    from . import base_calculations
+    from .utils import get_valid_internal_shipping_methods_for_checkout
+
+    country_code = shipping_address.country.code if shipping_address else None
+
+    subtotal = base_calculations.base_checkout_subtotal(
+        lines,
+        checkout_info.channel,
+        checkout_info.checkout.currency,
+        discounts,
+    )
+
+    # if a voucher is applied to shipping, we don't want to subtract the discount amount
+    # as some methods based on shipping price may become unavailable,
+    # for example, method on which the discount was applied
+    is_shipping_voucher = (
+        checkout_info.voucher and checkout_info.voucher.type == VoucherType.SHIPPING
+    )
+    if not is_shipping_voucher:
+        subtotal -= checkout_info.checkout.discount
+
+    valid_shipping_methods = get_valid_internal_shipping_methods_for_checkout(
+        checkout_info,
+        lines,
+        subtotal,
+        shipping_channel_listings,
+        country_code=country_code,
+    )
+
+    return valid_shipping_methods
+
+
+def get_valid_external_shipping_method_list_for_checkout_info(
+    checkout_info: "CheckoutInfo",
+    shipping_address: Optional["Address"],
+    lines: Iterable[CheckoutLineInfo],
+    discounts: Iterable["DiscountInfo"],
+    manager: "PluginsManager",
+) -> List["ShippingMethodData"]:
+    return manager.list_shipping_methods_for_checkout(
+        checkout=checkout_info.checkout, channel_slug=checkout_info.channel.slug
+    )
+
+
+def get_all_shipping_methods_list(
+    checkout_info,
+    shipping_address,
+    lines,
+    discounts,
+    shipping_channel_listings,
+    manager,
+):
+    return list(
+        itertools.chain(
+            get_valid_internal_shipping_method_list_for_checkout_info(
+                checkout_info,
+                shipping_address,
+                lines,
+                discounts,
+                shipping_channel_listings,
+            ),
+            get_valid_external_shipping_method_list_for_checkout_info(
+                checkout_info, shipping_address, lines, discounts, manager
+            ),
+        )
+    )
+
+
+def update_delivery_method_lists_for_checkout_info(
+    checkout_info: "CheckoutInfo",
+    shipping_method: Optional["ShippingMethod"],
+    collection_point: Optional["Warehouse"],
+    shipping_address: Optional["Address"],
+    lines: Iterable[CheckoutLineInfo],
+    discounts: Iterable["DiscountInfo"],
+    manager: "PluginsManager",
+    shipping_channel_listings: Iterable[ShippingMethodChannelListing],
+):
+    """Update the list of shipping methods for checkout info.
+
+    Shipping methods excluded by Saleor's own business logic are not present
+    in the result list.
+
+    Availability of shipping methods according to plugins is indicated
+    by the `active` field.
+    """
+
+    def _resolve_all_shipping_methods():
+        # Fetch all shipping method from all sources, including sync webhooks
+        all_methods = get_all_shipping_methods_list(
+           
