@@ -620,4 +620,50 @@ def update_delivery_method_lists_for_checkout_info(
     def _resolve_all_shipping_methods():
         # Fetch all shipping method from all sources, including sync webhooks
         all_methods = get_all_shipping_methods_list(
-           
+            checkout_info,
+            shipping_address,
+            lines,
+            discounts,
+            shipping_channel_listings,
+            manager,
+        )
+        # Filter shipping methods using sync webhooks
+        excluded_methods = manager.excluded_shipping_methods_for_checkout(
+            checkout_info.checkout, all_methods
+        )
+        initialize_shipping_method_active_status(all_methods, excluded_methods)
+        return all_methods
+
+    checkout_info.all_shipping_methods = SimpleLazyObject(
+        _resolve_all_shipping_methods
+    )  # type: ignore[assignment] # using lazy object breaks protocol
+    checkout_info.valid_pick_up_points = SimpleLazyObject(
+        lambda: (get_valid_collection_points_for_checkout_info(lines, checkout_info))
+    )  # type: ignore[assignment] # using lazy object breaks protocol
+    update_checkout_info_delivery_method_info(
+        checkout_info,
+        shipping_method,
+        collection_point,
+        shipping_channel_listings,
+    )
+
+
+def get_valid_collection_points_for_checkout_info(
+    lines: Iterable[CheckoutLineInfo],
+    checkout_info: CheckoutInfo,
+):
+    from .utils import get_valid_collection_points_for_checkout
+
+    valid_collection_points = get_valid_collection_points_for_checkout(
+        lines, checkout_info.channel.id, quantity_check=False
+    )
+    return SimpleLazyObject(lambda: list(valid_collection_points))
+
+
+def update_checkout_info_delivery_method(
+    checkout_info: CheckoutInfo,
+    delivery_method: Optional[Union["ShippingMethodData", "Warehouse"]],
+):
+    checkout_info.delivery_method_info = get_delivery_method_info(
+        delivery_method, checkout_info.shipping_address
+    )
