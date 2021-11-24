@@ -295,4 +295,96 @@ def test_get_nodes_for_order_with_uuid_id(order_list):
     # given
     global_ids = [to_global_id("Order", order.pk) for order in order_list]
 
-    # Make sure function works even if duplicated id
+    # Make sure function works even if duplicated ids are provided
+    global_ids.append(to_global_id("Order", order_list[0].pk))
+
+    # when
+    orders = get_nodes(global_ids, Order)
+
+    # then
+    assert orders == order_list
+
+
+def test_get_nodes_for_order_with_int_id_and_use_old_id_set_to_false(order_list):
+    """Ensure that `get_nodes` does not return nodes, when old id is used
+    for orders with `use_old_id` flag set to False."""
+    # given
+    global_ids = [to_global_id("Order", order.number) for order in order_list]
+
+    # Make sure function works even if duplicated ids are provided
+    global_ids.append(to_global_id("Order", order_list[0].pk))
+
+    # when
+    with pytest.raises(AssertionError):
+        get_nodes(global_ids, Order)
+
+
+def test_get_nodes_for_order_with_uuid_and_int_id(order_list):
+    """Ensure that `get_nodes` returns correct nodes,
+    when old and new order id is provided."""
+    # given
+    order_models.Order.objects.update(use_old_id=True)
+    global_ids = [to_global_id("Order", order.pk) for order in order_list[:-1]]
+    global_ids.append(to_global_id("Order", order_list[-1].number))
+
+    # when
+    orders = get_nodes(global_ids, Order)
+
+    # then
+    assert orders == order_list
+
+
+def test_from_global_id_or_error(product):
+    invalid_id = "invalid"
+    message = f"Couldn't resolve id: {invalid_id}."
+
+    with pytest.raises(GraphQLError) as error:
+        from_global_id_or_error(invalid_id)
+
+    assert str(error.value) == message
+
+
+def test_from_global_id_or_error_wth_invalid_type(product):
+    product_id = graphene.Node.to_global_id("Product", product.id)
+    message = "Must receive a ProductVariant id."
+
+    with pytest.raises(GraphQLError) as error:
+        from_global_id_or_error(product_id, "ProductVariant", raise_error=True)
+
+    assert str(error.value) == message
+
+
+def test_from_global_id_or_error_wth_type(product):
+    expected_product_type = str(Product)
+    expected_product_id = graphene.Node.to_global_id(expected_product_type, product.id)
+
+    product_type, product_id = from_global_id_or_error(
+        expected_product_id, expected_product_type
+    )
+
+    assert product_id == str(product.id)
+    assert product_type == expected_product_type
+
+
+@mock.patch("saleor.graphql.order.schema.create_connection_slice")
+def test_query_allow_replica(
+    mocked_resolver, staff_api_client, order, permission_manage_orders
+):
+    # given
+    query = """
+        query {
+          orders(first: 5){
+            edges {
+              node {
+                id
+              }
+            }
+          }
+        }
+    """
+
+    # when
+    staff_api_client.post_graphql(query, permissions=[permission_manage_orders])
+
+    # then
+    assert mocked_resolver.call_args[0][1].context.allow_replica
