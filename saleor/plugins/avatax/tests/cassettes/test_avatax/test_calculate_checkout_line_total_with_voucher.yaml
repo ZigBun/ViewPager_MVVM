@@ -53,4 +53,22 @@ interactions:
       api-supported-versions:
       - '2.0'
       cache-control:
-      - private, no-cache
+      - private, no-cache, no-store
+      referrer-policy:
+      - same-origin
+      strict-transport-security:
+      - max-age=31536000; includeSubdomains
+      x-avalara-uid:
+      - 8d90e7c9-2253-4547-a815-d403d9835443
+      x-correlation-id:
+      - 8d90e7c9-2253-4547-a815-d403d9835443
+      x-frame-options:
+      - sameorigin
+      x-permitted-cross-domain-policies:
+      - none
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 201
+      message: Created
+version: 1
