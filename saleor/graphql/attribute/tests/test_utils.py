@@ -812,4 +812,270 @@ def test_validate_not_required_variant_selection_attributes_input_no_values_give
         input_data,
         attributes,
         is_page_attributes=False,
-       
+        creation=creation,
+    )
+
+    # then
+    assert not errors
+
+
+@pytest.mark.parametrize("creation", [True, False])
+def test_validate_attributes_input_too_many_values_given(
+    creation, weight_attribute, color_attribute, product_type
+):
+    # given
+    color_attribute.value_required = True
+    color_attribute.save(update_fields=["value_required"])
+
+    weight_attribute.value_required = True
+    weight_attribute.save(update_fields=["value_required"])
+
+    input_data = [
+        (
+            weight_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", weight_attribute.pk),
+                values=["abc", "efg"],
+                file_url=None,
+                content_type=None,
+                references=[],
+            ),
+        ),
+        (
+            color_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", color_attribute.pk),
+                values=["a", "b"],
+                file_url=None,
+                content_type=None,
+                references=[],
+            ),
+        ),
+    ]
+
+    attributes = product_type.variant_attributes.all()
+
+    # when
+    errors = validate_attributes_input(
+        input_data,
+        attributes,
+        is_page_attributes=False,
+        creation=creation,
+    )
+
+    # then
+    assert len(errors) == 1
+    error = errors[0]
+    assert error.code == ProductErrorCode.INVALID.value
+    assert set(error.params["attributes"]) == {
+        graphene.Node.to_global_id("Attribute", attr.pk)
+        for attr in [weight_attribute, color_attribute]
+    }
+
+
+@pytest.mark.parametrize("creation", [True, False])
+def test_validate_attributes_input_empty_values_given(
+    creation, weight_attribute, color_attribute, product_type
+):
+    # given
+    color_attribute.value_required = True
+    color_attribute.save(update_fields=["value_required", "input_type"])
+
+    weight_attribute.value_required = True
+    weight_attribute.save(update_fields=["value_required", "input_type"])
+
+    input_data = [
+        (
+            weight_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", weight_attribute.pk),
+                values=[None],
+                file_url=None,
+                content_type=None,
+                references=[],
+            ),
+        ),
+        (
+            color_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", color_attribute.pk),
+                values=["  "],
+                file_url=None,
+                content_type=None,
+                references=[],
+            ),
+        ),
+    ]
+
+    attributes = product_type.variant_attributes.all()
+
+    # when
+    errors = validate_attributes_input(
+        input_data, attributes, is_page_attributes=False, creation=creation
+    )
+
+    # then
+    assert len(errors) == 1
+    error = errors[0]
+    assert error.code == ProductErrorCode.REQUIRED.value
+    assert set(error.params["attributes"]) == {
+        graphene.Node.to_global_id("Attribute", attr.pk)
+        for attr in [weight_attribute, color_attribute]
+    }
+
+
+def test_validate_attributes_input_multiple_errors(
+    weight_attribute, color_attribute, product_type
+):
+    # given
+    color_attribute.value_required = True
+    color_attribute.save(update_fields=["value_required", "input_type"])
+
+    weight_attribute.value_required = True
+    weight_attribute.save(update_fields=["value_required", "input_type"])
+
+    input_data = [
+        (
+            weight_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", weight_attribute.pk),
+                values=[None],
+                file_url=None,
+                content_type=None,
+                references=[],
+            ),
+        ),
+        (
+            color_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", color_attribute.pk),
+                values=["a", "b"],
+                file_url=None,
+                content_type=None,
+                references=[],
+            ),
+        ),
+    ]
+
+    attributes = product_type.variant_attributes.all()
+
+    # when
+    errors = validate_attributes_input(
+        input_data, attributes, is_page_attributes=False, creation=True
+    )
+
+    # then
+    assert len(errors) == 2
+    assert {error.code for error in errors} == {
+        ProductErrorCode.INVALID.value,
+        ProductErrorCode.REQUIRED.value,
+    }
+    assert {attr for error in errors for attr in error.params["attributes"]} == {
+        graphene.Node.to_global_id("Attribute", attr.pk)
+        for attr in [weight_attribute, color_attribute]
+    }
+
+
+@pytest.mark.parametrize("creation", [True, False])
+def test_validate_attributes_with_file_input_type_for_product(
+    creation, weight_attribute, file_attribute, product_type
+):
+    # given
+    file_attribute.value_required = True
+    file_attribute.save(update_fields=["value_required"])
+
+    weight_attribute.value_required = True
+    weight_attribute.save(update_fields=["value_required"])
+
+    input_data = [
+        (
+            weight_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", weight_attribute.pk),
+                values=["a"],
+                file_url=None,
+                content_type=None,
+                references=[],
+            ),
+        ),
+        (
+            file_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", file_attribute.pk),
+                values=[],
+                file_url="test_file.jpeg",
+                content_type="image/jpeg",
+                references=[],
+            ),
+        ),
+    ]
+
+    # when
+    errors = validate_attributes_input(
+        input_data,
+        product_type.product_attributes.all(),
+        is_page_attributes=False,
+        creation=creation,
+    )
+
+    # then
+    assert not errors
+
+
+@pytest.mark.parametrize("creation", [True, False])
+def test_validate_attributes_with_file_input_type_for_product_no_file_given(
+    creation, weight_attribute, file_attribute, product_type
+):
+    # given
+    file_attribute.value_required = True
+    file_attribute.save(update_fields=["value_required"])
+
+    weight_attribute.value_required = True
+    weight_attribute.save(update_fields=["value_required"])
+
+    input_data = [
+        (
+            weight_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", weight_attribute.pk),
+                values=["a"],
+                file_url=None,
+                content_type=None,
+                references=[],
+            ),
+        ),
+        (
+            file_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", file_attribute.pk),
+                values=[],
+                file_url="",
+                content_type="image/jpeg",
+                references=[],
+            ),
+        ),
+    ]
+
+    # when
+    errors = validate_attributes_input(
+        input_data,
+        product_type.product_attributes.all(),
+        is_page_attributes=False,
+        creation=creation,
+    )
+
+    # then
+    assert len(errors) == 1
+    error = errors[0]
+    assert error.code == ProductErrorCode.REQUIRED.value
+    assert set(error.params["attributes"]) == {
+        graphene.Node.to_global_id("Attribute", file_attribute.pk)
+    }
+
+
+@pytest.mark.parametrize("creation", [True, False])
+def test_validate_not_required_attrs_with_file_input_type_for_product_no_file_given(
+    creation, weight_attribute, file_attribute, product_type
+):
+    # given
+    file_att
