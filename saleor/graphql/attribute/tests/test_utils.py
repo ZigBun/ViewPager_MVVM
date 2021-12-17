@@ -1352,3 +1352,248 @@ def test_validate_numeric_attributes_input_for_product_more_than_one_value_given
     error = errors[0]
     assert error.code == ProductErrorCode.INVALID.value
     assert set(error.params["attributes"]) == {
+        graphene.Node.to_global_id("Attribute", numeric_attribute.pk)
+    }
+
+
+@pytest.mark.parametrize("creation", [True, False])
+def test_validate_selectable_attributes_by_value(
+    creation, weight_attribute, color_attribute, product_type
+):
+    # given
+    color_attribute.input_type = AttributeInputType.DROPDOWN
+    color_attribute.value_required = True
+    color_attribute.save(update_fields=["value_required", "input_type"])
+
+    weight_attribute.input_type = AttributeInputType.MULTISELECT
+    weight_attribute.value_required = True
+    weight_attribute.save(update_fields=["value_required", "input_type"])
+
+    input_data = [
+        (
+            color_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", color_attribute.pk),
+                dropdown=AttrValuesForSelectableFieldInput(value="new color"),
+            ),
+        ),
+        (
+            weight_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", weight_attribute.pk),
+                multiselect=[
+                    AttrValuesForSelectableFieldInput(value="new weight 1"),
+                    AttrValuesForSelectableFieldInput(value="new weight 2"),
+                ],
+            ),
+        ),
+    ]
+
+    # when
+    errors = validate_attributes_input(
+        input_data,
+        product_type.product_attributes.all(),
+        is_page_attributes=False,
+        creation=creation,
+    )
+
+    # then
+    assert not errors
+
+
+@pytest.mark.parametrize("creation", [True, False])
+def test_validate_selectable_attributes_by_id(
+    creation, weight_attribute, color_attribute, product_type
+):
+    # given
+    color_attribute.input_type = AttributeInputType.DROPDOWN
+    color_attribute.value_required = True
+    color_attribute.save(update_fields=["value_required", "input_type"])
+
+    weight_attribute.input_type = AttributeInputType.MULTISELECT
+    weight_attribute.value_required = True
+    weight_attribute.save(update_fields=["value_required", "input_type"])
+
+    input_data = [
+        (
+            color_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", color_attribute.pk),
+                dropdown=AttrValuesForSelectableFieldInput(id="id"),
+            ),
+        ),
+        (
+            weight_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", weight_attribute.pk),
+                multiselect=[
+                    AttrValuesForSelectableFieldInput(id="id1"),
+                    AttrValuesForSelectableFieldInput(id="id2"),
+                ],
+            ),
+        ),
+    ]
+
+    # when
+    errors = validate_attributes_input(
+        input_data,
+        product_type.product_attributes.all(),
+        is_page_attributes=False,
+        creation=creation,
+    )
+
+    # then
+    assert not errors
+
+
+@pytest.mark.parametrize("creation", [True, False])
+def test_validate_selectable_attributes_pass_null_value(
+    creation, weight_attribute, color_attribute, product_type
+):
+    # given
+    color_attribute.input_type = AttributeInputType.DROPDOWN
+    color_attribute.save(update_fields=["input_type"])
+
+    weight_attribute.input_type = AttributeInputType.MULTISELECT
+    weight_attribute.save(update_fields=["input_type"])
+
+    input_data = [
+        (
+            color_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", color_attribute.pk),
+                dropdown=AttrValuesForSelectableFieldInput(value=None),
+            ),
+        ),
+        (
+            weight_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", weight_attribute.pk),
+                multiselect=[
+                    AttrValuesForSelectableFieldInput(value=None),
+                ],
+            ),
+        ),
+    ]
+
+    # when
+    errors = validate_attributes_input(
+        input_data,
+        product_type.product_attributes.all(),
+        is_page_attributes=False,
+        creation=creation,
+    )
+
+    # then
+    assert not errors
+
+
+@pytest.mark.parametrize("creation", [True, False])
+def test_validate_selectable_attribute_by_id_and_value(
+    creation, color_attribute, product_type
+):
+    # given
+    color_attribute.input_type = AttributeInputType.DROPDOWN
+    color_attribute.value_required = True
+    color_attribute.save(update_fields=["value_required", "input_type"])
+
+    input_data = [
+        (
+            color_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", color_attribute.pk),
+                dropdown=AttrValuesForSelectableFieldInput(id="id", value="new color"),
+            ),
+        ),
+    ]
+
+    # when
+    errors = validate_attributes_input(
+        input_data,
+        product_type.product_attributes.all(),
+        is_page_attributes=False,
+        creation=creation,
+    )
+
+    # then
+    assert len(errors) == 1
+    assert errors[0].code == ProductErrorCode.INVALID.value
+
+
+@pytest.mark.parametrize("creation", [True, False])
+def test_validate_multiselect_attribute_by_id_and_value(
+    creation, weight_attribute, product_type
+):
+    # given
+    weight_attribute.input_type = AttributeInputType.MULTISELECT
+    weight_attribute.value_required = True
+    weight_attribute.save(update_fields=["value_required", "input_type"])
+
+    input_data = [
+        (
+            weight_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", weight_attribute.pk),
+                multiselect=[
+                    AttrValuesForSelectableFieldInput(id="id"),
+                    AttrValuesForSelectableFieldInput(value="new weight"),
+                ],
+            ),
+        ),
+    ]
+
+    # when
+    errors = validate_attributes_input(
+        input_data,
+        product_type.product_attributes.all(),
+        is_page_attributes=False,
+        creation=creation,
+    )
+
+    # then
+    assert len(errors) == 1
+    assert errors[0].code == ProductErrorCode.INVALID.value
+
+
+@pytest.mark.parametrize("creation", [True, False])
+def test_validate_multiselect_attribute_duplicated_values(
+    creation, weight_attribute, product_type
+):
+    # given
+    weight_attribute.input_type = AttributeInputType.MULTISELECT
+    weight_attribute.value_required = True
+    weight_attribute.save(update_fields=["value_required", "input_type"])
+
+    input_data = [
+        (
+            weight_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id("Attribute", weight_attribute.pk),
+                multiselect=[
+                    AttrValuesForSelectableFieldInput(value="new weight"),
+                    AttrValuesForSelectableFieldInput(value="new weight"),
+                    AttrValuesForSelectableFieldInput(value="new weight 2"),
+                ],
+            ),
+        ),
+    ]
+
+    # when
+    errors = validate_attributes_input(
+        input_data,
+        product_type.product_attributes.all(),
+        is_page_attributes=False,
+        creation=creation,
+    )
+
+    # then
+    assert len(errors) == 1
+    assert errors[0].code == ProductErrorCode.DUPLICATED_INPUT_ITEM.value
+
+
+@pytest.mark.parametrize("creation", [True, False])
+def test_validate_multiselect_attribute_duplicated_ids(
+    creation, weight_attribute, product_type
+):
+    # given
+    weight_attribute.input_type = AttributeInputType
