@@ -1864,4 +1864,161 @@ def test_validate_rich_text_attributes_input_for_product_only_image_block(
     creation, rich_text_attribute, product_type
 ):
     # given
-    rich_text_a
+    rich_text_attribute.value_required = True
+    rich_text_attribute.save(update_fields=["value_required"])
+
+    input_data = [
+        (
+            rich_text_attribute,
+            AttrValuesInput(
+                global_id=graphene.Node.to_global_id(
+                    "Attribute", rich_text_attribute.pk
+                ),
+                values=["12.34"],
+                file_url=None,
+                content_type=None,
+                references=[],
+                rich_text={
+                    "time": 1670422589533,
+                    "blocks": [
+                        {
+                            "id": "6n7TFTMU8y",
+                            "type": "image",
+                            "data": {
+                                "file": {"url": "https://codex.so/public/codex2x.png"},
+                                "caption": "",
+                                "withBorder": False,
+                                "stretched": False,
+                                "withBackground": False,
+                            },
+                        }
+                    ],
+                },
+            ),
+        ),
+    ]
+
+    # when
+    errors = validate_attributes_input(
+        input_data,
+        product_type.product_attributes.all(),
+        is_page_attributes=False,
+        creation=creation,
+    )
+
+    # then
+    assert not errors
+
+
+def test_clean_file_url_in_attribute_assignment_mixin(site_settings):
+    # given
+    name = "Test.jpg"
+    domain = site_settings.site.domain
+    url = f"http://{domain}{settings.MEDIA_URL}{name}"
+
+    # when
+    result = AttributeAssignmentMixin._clean_file_url(url, ProductErrorCode)
+
+    # then
+    assert result == name
+
+
+@pytest.mark.parametrize(
+    "file_url",
+    [
+        "http://localhost:8000/media/Test.jpg",
+        "/media/Test.jpg",
+        "Test.jpg",
+        "/ab/cd.jpg",
+    ],
+)
+def test_clean_file_url_in_attribute_assignment_mixin_invalid_url(file_url):
+    # when & then
+    with pytest.raises(ValidationError):
+        AttributeAssignmentMixin._clean_file_url(file_url, ProductErrorCode)
+
+
+def test_prepare_attribute_values(color_attribute):
+    # given
+    existing_value = color_attribute.values.first()
+    attr_values_count = color_attribute.values.count()
+    new_value = existing_value.name.upper()
+    values = AttrValuesInput(
+        global_id=graphene.Node.to_global_id("Attribute", color_attribute.pk),
+        # we should get the new value only for the last element
+        values=[existing_value.name, existing_value.slug, new_value],
+        file_url=None,
+        content_type=None,
+        references=[],
+    )
+
+    # when
+    prepare_attribute_values(color_attribute, values.values)
+
+    # then
+    color_attribute.refresh_from_db()
+    assert color_attribute.values.count() == attr_values_count + 1
+    assert color_attribute.values.last().name == new_value
+
+
+def test_prepare_attribute_values_prefer_the_slug_match(color_attribute):
+    """Ensure that the value with slug match is returned as the first choice.
+
+    When the value with the matching slug is not found, the value with the matching
+    name is returned."""
+    # given
+    existing_value = color_attribute.values.first()
+    second_val = color_attribute.values.create(
+        name=existing_value.slug, slug=f"{existing_value.slug}-2"
+    )
+
+    attr_values_count = color_attribute.values.count()
+
+    values = AttrValuesInput(
+        global_id=graphene.Node.to_global_id("Attribute", color_attribute.pk),
+        # we should get the new value only for the last element
+        values=[existing_value.name, second_val.name, second_val.slug],
+        file_url=None,
+        content_type=None,
+        references=[],
+    )
+
+    # when
+    result = prepare_attribute_values(color_attribute, values.values)
+
+    # then
+    color_attribute.refresh_from_db()
+    assert color_attribute.values.count() == attr_values_count
+    assert result == [existing_value, existing_value, second_val]
+
+
+def test_prepare_attribute_values_that_gives_the_same_slug(color_attribute):
+    """Ensure that the unique slug for all values is created.
+
+    Ensure that when providing the two or more values that are giving the same slug
+    the integrity error is not raised."""
+    # given
+    existing_value = color_attribute.values.first()
+    attr_values_count = color_attribute.values.count()
+    new_value = "RED"
+    new_value_2 = "ReD"
+
+    values = AttrValuesInput(
+        global_id=graphene.Node.to_global_id("Attribute", color_attribute.pk),
+        # we should get the new value only for the last element
+        values=[existing_value.name, new_value, new_value_2],
+        file_url=None,
+        content_type=None,
+        references=[],
+    )
+
+    # when
+    result = prepare_attribute_values(color_attribute, values.values)
+
+    # then
+    color_attribute.refresh_from_db()
+    assert color_attribute.values.count() == attr_values_count + 2
+    assert len(result) == 3
+    assert result[0] == existing_value
+    assert result[1].name == new_value
+    assert result[2].name == new_value_2
