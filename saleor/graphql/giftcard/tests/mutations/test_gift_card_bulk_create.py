@@ -485,4 +485,39 @@ def test_create_gift_cards_invalid_expiry_date(
     # given
     initial_balance = 10
     currency = "USD"
-    tag = "gift-card
+    tag = "gift-card-tag"
+    is_active = False
+    variables = {
+        "input": {
+            "count": 2,
+            "balance": {
+                "amount": initial_balance,
+                "currency": currency,
+            },
+            "tags": [tag],
+            "isActive": is_active,
+            "expiryDate": date_value,
+        }
+    }
+
+    # when
+    response = app_api_client.post_graphql(
+        GIFT_CARD_BULK_CREATE_MUTATION,
+        variables,
+        permissions=[
+            permission_manage_gift_card,
+            permission_manage_users,
+            permission_manage_apps,
+        ],
+    )
+
+    # then
+    content = get_graphql_content(response)
+    errors = content["data"]["giftCardBulkCreate"]["errors"]
+    data = content["data"]["giftCardBulkCreate"]
+
+    assert not data["giftCards"]
+    assert data["count"] == 0
+    assert len(errors) == 1
+    assert errors[0]["field"] == "expiryDate"
+    assert errors[0]["code"] == GiftCardErrorCode.INVALID.name
