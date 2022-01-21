@@ -224,4 +224,228 @@ def test_voucher_channel_listing_create_many_channel(
         "id": voucher_id,
         "input": {
             "addChannels": [
- 
+                {
+                    "channelId": channel_id,
+                    "discountValue": discount_value,
+                    "minAmountSpent": min_amount_spent,
+                },
+                {
+                    "channelId": channel_pln_id,
+                    "discountValue": discount_value_pln,
+                    "minAmountSpent": min_amount_spent_pln,
+                },
+            ]
+        },
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        VOUCHER_CHANNEL_LISTING_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_discounts,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["voucherChannelListingUpdate"]["voucher"]
+    assert not content["data"]["voucherChannelListingUpdate"]["errors"]
+    channel_listing = data["channelListings"]
+    assert channel_listing[0]["channel"]["slug"] == channel_USD.slug
+    assert channel_listing[0]["discountValue"] == discount_value
+    assert channel_listing[0]["minSpent"]["amount"] == min_amount_spent
+    assert channel_listing[0]["currency"] == channel_USD.currency_code
+    assert channel_listing[1]["channel"]["slug"] == channel_PLN.slug
+    assert channel_listing[1]["discountValue"] == discount_value_pln
+    assert channel_listing[1]["minSpent"]["amount"] == min_amount_spent_pln
+    assert channel_listing[1]["currency"] == channel_PLN.currency_code
+
+
+def test_voucher_channel_listing_create_and_remove(
+    staff_api_client,
+    voucher,
+    permission_manage_discounts,
+    channel_USD,
+    channel_PLN,
+):
+    # given
+    voucher_id = graphene.Node.to_global_id("Voucher", voucher.pk)
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+    channel_pln_id = graphene.Node.to_global_id("Channel", channel_PLN.id)
+    discount_value_pln = 50.5
+    min_amount_spent_pln = 100.2
+    variables = {
+        "id": voucher_id,
+        "input": {
+            "addChannels": [
+                {
+                    "channelId": channel_pln_id,
+                    "discountValue": discount_value_pln,
+                    "minAmountSpent": min_amount_spent_pln,
+                }
+            ],
+            "removeChannels": [channel_id],
+        },
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        VOUCHER_CHANNEL_LISTING_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_discounts,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["voucherChannelListingUpdate"]["voucher"]
+    assert not content["data"]["voucherChannelListingUpdate"]["errors"]
+    channel_listing = data["channelListings"]
+    assert len(channel_listing) == 1
+    assert channel_listing[0]["channel"]["slug"] == channel_PLN.slug
+    assert channel_listing[0]["discountValue"] == discount_value_pln
+    assert channel_listing[0]["minSpent"]["amount"] == min_amount_spent_pln
+    assert channel_listing[0]["currency"] == channel_PLN.currency_code
+
+
+def test_voucher_channel_listing_update(
+    staff_api_client,
+    voucher,
+    permission_manage_discounts,
+    channel_USD,
+):
+    # given
+    voucher_id = graphene.Node.to_global_id("Voucher", voucher.pk)
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+    discount_value = 5.5
+    min_amount_spent = 100.2
+    assert not voucher.channel_listings.get().discount_value == discount_value
+    variables = {
+        "id": voucher_id,
+        "input": {
+            "addChannels": [
+                {
+                    "channelId": channel_id,
+                    "discountValue": discount_value,
+                    "minAmountSpent": min_amount_spent,
+                }
+            ]
+        },
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        VOUCHER_CHANNEL_LISTING_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_discounts,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["voucherChannelListingUpdate"]["voucher"]
+    assert not content["data"]["voucherChannelListingUpdate"]["errors"]
+    channel_listing = data["channelListings"]
+    assert len(channel_listing) == 1
+    assert channel_listing[0]["channel"]["slug"] == channel_USD.slug
+    assert channel_listing[0]["discountValue"] == discount_value
+    assert channel_listing[0]["minSpent"]["amount"] == min_amount_spent
+    assert channel_listing[0]["currency"] == channel_USD.currency_code
+
+
+def test_voucher_channel_listing_update_without_discount_value(
+    staff_api_client,
+    voucher,
+    permission_manage_discounts,
+    channel_USD,
+):
+    # given
+    voucher_id = graphene.Node.to_global_id("Voucher", voucher.pk)
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+    min_amount_spent = 100.2
+    variables = {
+        "id": voucher_id,
+        "input": {
+            "addChannels": [
+                {"channelId": channel_id, "minAmountSpent": min_amount_spent}
+            ]
+        },
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        VOUCHER_CHANNEL_LISTING_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_discounts,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["voucherChannelListingUpdate"]["voucher"]
+    assert not content["data"]["voucherChannelListingUpdate"]["errors"]
+    channel_listing = data["channelListings"]
+    assert len(channel_listing) == 1
+    assert channel_listing[0]["channel"]["slug"] == channel_USD.slug
+    assert channel_listing[0]["discountValue"] == 20
+    assert channel_listing[0]["minSpent"]["amount"] == min_amount_spent
+    assert channel_listing[0]["currency"] == channel_USD.currency_code
+
+
+def test_voucher_channel_listing_remove_channel(
+    staff_api_client,
+    voucher,
+    permission_manage_discounts,
+    channel_USD,
+):
+    # given
+    voucher_id = graphene.Node.to_global_id("Voucher", voucher.pk)
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+    variables = {
+        "id": voucher_id,
+        "input": {"removeChannels": [channel_id]},
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        VOUCHER_CHANNEL_LISTING_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_discounts,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["voucherChannelListingUpdate"]["voucher"]
+    assert not content["data"]["voucherChannelListingUpdate"]["errors"]
+    channel_listing = data["channelListings"]
+    assert len(channel_listing) == 0
+
+
+def test_voucher_channel_listing_update_with_null_as_discount_value(
+    staff_api_client,
+    voucher,
+    permission_manage_discounts,
+    channel_USD,
+):
+    # given
+    voucher_id = graphene.Node.to_global_id("Voucher", voucher.pk)
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+    variables = {
+        "id": voucher_id,
+        "input": {
+            "addChannels": [
+                {
+                    "channelId": channel_id,
+                    "discountValue": None,
+                    "minAmountSpent": 100.2,
+                }
+            ]
+        },
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        VOUCHER_CHANNEL_LISTING_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_discounts,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    errors = content["data"]
