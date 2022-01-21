@@ -691,4 +691,49 @@ def test_voucher_channel_listing_update_invalid_precision_discount_value(
         variables=variables,
         permissions=(permission_manage_discounts,),
     )
-    content = get_grap
+    content = get_graphql_content(response)
+
+    # then
+    errors = content["data"]["voucherChannelListingUpdate"]["errors"]
+    assert len(errors) == 1
+    assert errors[0]["field"] == "discountValue"
+    assert errors[0]["code"] == DiscountErrorCode.INVALID.name
+    assert errors[0]["channels"] == [channel_id]
+
+
+def test_voucher_channel_listing_update_invalid_precision_min_amount_spent(
+    staff_api_client,
+    voucher,
+    permission_manage_discounts,
+    channel_USD,
+):
+    # given
+    voucher_id = graphene.Node.to_global_id("Voucher", voucher.pk)
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+    variables = {
+        "id": voucher_id,
+        "input": {
+            "addChannels": [
+                {
+                    "channelId": channel_id,
+                    "discountValue": 5.55,
+                    "minAmountSpent": 100.2222,
+                }
+            ]
+        },
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        VOUCHER_CHANNEL_LISTING_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_discounts,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    errors = content["data"]["voucherChannelListingUpdate"]["errors"]
+    assert len(errors) == 1
+    assert errors[0]["field"] == "minAmountSpent"
+    assert errors[0]["code"] == DiscountErrorCode.INVALID.name
+    assert errors[0]["channels"] == [channel_id]
