@@ -713,4 +713,206 @@ def test_fulfillment_refund_products_fulfillment_lines_include_shipping_costs(
 
     assert not errors
     assert refund_fulfillment["status"] == FulfillmentStatus.REFUNDED.upper()
-    assert len(refund_fulfillment["l
+    assert len(refund_fulfillment["lines"]) == 1
+    assert refund_fulfillment["lines"][0]["orderLine"]["id"] == order_line_id
+    assert refund_fulfillment["lines"][0]["quantity"] == 2
+    amount = fulfillment_line_to_refund.order_line.unit_price_gross_amount * 2
+    amount += fulfilled_order.shipping_price_gross_amount
+    mocked_refund.assert_called_with(
+        payment_dummy,
+        ANY,
+        amount=amount,
+        channel_slug=fulfilled_order.channel.slug,
+        refund_data=RefundData(
+            fulfillment_lines_to_refund=[
+                FulfillmentLineData(line=fulfillment_line_to_refund, quantity=2)
+            ],
+            refund_shipping_costs=True,
+        ),
+    )
+
+
+@patch("saleor.order.actions.gateway.refund")
+def test_fulfillment_refund_products_order_lines_include_shipping_costs(
+    mocked_refund,
+    staff_api_client,
+    permission_manage_orders,
+    order_with_lines,
+    payment_dummy,
+):
+    payment_dummy.total = order_with_lines.total_gross_amount
+    payment_dummy.captured_amount = payment_dummy.total
+    payment_dummy.charge_status = ChargeStatus.FULLY_CHARGED
+    payment_dummy.save()
+    order_with_lines.payments.add(payment_dummy)
+    line_to_refund = order_with_lines.lines.first()
+    order_id = graphene.Node.to_global_id("Order", order_with_lines.pk)
+    line_id = graphene.Node.to_global_id("OrderLine", line_to_refund.pk)
+    variables = {
+        "order": order_id,
+        "input": {
+            "includeShippingCosts": True,
+            "orderLines": [{"orderLineId": line_id, "quantity": 2}],
+        },
+    }
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(ORDER_FULFILL_REFUND_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["orderFulfillmentRefundProducts"]
+    refund_fulfillment = data["fulfillment"]
+    errors = data["errors"]
+    assert not errors
+    assert refund_fulfillment["status"] == FulfillmentStatus.REFUNDED.upper()
+    assert len(refund_fulfillment["lines"]) == 1
+    assert refund_fulfillment["lines"][0]["orderLine"]["id"] == line_id
+    assert refund_fulfillment["lines"][0]["quantity"] == 2
+    amount = line_to_refund.unit_price_gross_amount * 2
+    amount += order_with_lines.shipping_price_gross_amount
+    mocked_refund.assert_called_with(
+        payment_dummy,
+        ANY,
+        amount=amount,
+        channel_slug=order_with_lines.channel.slug,
+        refund_data=RefundData(
+            order_lines_to_refund=[
+                OrderLineInfo(
+                    line=line_to_refund, quantity=2, variant=line_to_refund.variant
+                )
+            ],
+            refund_shipping_costs=True,
+        ),
+    )
+
+
+@patch("saleor.order.actions.gateway.refund")
+def test_fulfillment_refund_products_fulfillment_lines_custom_amount(
+    mocked_refund,
+    staff_api_client,
+    permission_manage_orders,
+    fulfilled_order,
+    payment_dummy,
+):
+    payment_dummy.total = fulfilled_order.total_gross_amount
+    payment_dummy.captured_amount = payment_dummy.total
+    payment_dummy.charge_status = ChargeStatus.FULLY_CHARGED
+    payment_dummy.save()
+    fulfilled_order.payments.add(payment_dummy)
+    amount_to_refund = Decimal("10.99")
+    fulfillment_line_to_refund = fulfilled_order.fulfillments.first().lines.first()
+    order_id = graphene.Node.to_global_id("Order", fulfilled_order.pk)
+    fulfillment_line_id = graphene.Node.to_global_id(
+        "FulfillmentLine", fulfillment_line_to_refund.pk
+    )
+    order_line_id = graphene.Node.to_global_id(
+        "OrderLine", fulfillment_line_to_refund.order_line.pk
+    )
+    variables = {
+        "order": order_id,
+        "input": {
+            "amountToRefund": amount_to_refund,
+            "fulfillmentLines": [
+                {"fulfillmentLineId": fulfillment_line_id, "quantity": 2}
+            ],
+        },
+    }
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(ORDER_FULFILL_REFUND_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["orderFulfillmentRefundProducts"]
+    refund_fulfillment = data["fulfillment"]
+    errors = data["errors"]
+
+    assert not errors
+    assert refund_fulfillment["status"] == FulfillmentStatus.REFUNDED.upper()
+    assert len(refund_fulfillment["lines"]) == 1
+    assert refund_fulfillment["lines"][0]["orderLine"]["id"] == order_line_id
+    assert refund_fulfillment["lines"][0]["quantity"] == 2
+    mocked_refund.assert_called_with(
+        payment_dummy,
+        ANY,
+        amount=amount_to_refund,
+        channel_slug=fulfilled_order.channel.slug,
+        refund_data=RefundData(
+            fulfillment_lines_to_refund=[
+                FulfillmentLineData(
+                    line=fulfillment_line_to_refund,
+                    quantity=2,
+                )
+            ],
+            refund_amount_is_automatically_calculated=False,
+        ),
+    )
+
+
+@patch("saleor.order.actions.gateway.refund")
+def test_fulfillment_refund_products_order_lines_custom_amount(
+    mocked_refund,
+    staff_api_client,
+    permission_manage_orders,
+    order_with_lines,
+    payment_dummy,
+):
+    payment_dummy.total = order_with_lines.total_gross_amount
+    payment_dummy.captured_amount = payment_dummy.total
+    payment_dummy.charge_status = ChargeStatus.FULLY_CHARGED
+    payment_dummy.save()
+    order_with_lines.payments.add(payment_dummy)
+    amount_to_refund = Decimal("10.99")
+    line_to_refund = order_with_lines.lines.first()
+    order_id = graphene.Node.to_global_id("Order", order_with_lines.pk)
+    line_id = graphene.Node.to_global_id("OrderLine", line_to_refund.pk)
+    variables = {
+        "order": order_id,
+        "input": {
+            "amountToRefund": amount_to_refund,
+            "orderLines": [{"orderLineId": line_id, "quantity": 2}],
+        },
+    }
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    response = staff_api_client.post_graphql(ORDER_FULFILL_REFUND_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["orderFulfillmentRefundProducts"]
+    refund_fulfillment = data["fulfillment"]
+    errors = data["errors"]
+    assert not errors
+    assert refund_fulfillment["status"] == FulfillmentStatus.REFUNDED.upper()
+    assert len(refund_fulfillment["lines"]) == 1
+    assert refund_fulfillment["lines"][0]["orderLine"]["id"] == line_id
+    assert refund_fulfillment["lines"][0]["quantity"] == 2
+    mocked_refund.assert_called_with(
+        payment_dummy,
+        ANY,
+        amount=amount_to_refund,
+        channel_slug=order_with_lines.channel.slug,
+        refund_data=RefundData(
+            order_lines_to_refund=[
+                OrderLineInfo(
+                    line=line_to_refund, quantity=2, variant=line_to_refund.variant
+                )
+            ],
+            refund_amount_is_automatically_calculated=False,
+        ),
+    )
+
+
+@patch("saleor.order.actions.gateway.refund")
+def test_fulfillment_refund_products_fulfillment_lines_and_order_lines(
+    mocked_refund,
+    warehouse,
+    variant,
+    channel_USD,
+    staff_api_client,
+    permission_manage_orders,
+    fulfilled_order,
+    payment_dummy,
+):
+    payment_dummy.total = fulfilled_order.total_gross_amount
+    payment_dummy.captured_amount = payment_dummy.total
+    payment_dummy.charge_status = ChargeStatus.FULLY_CHARGED
+    payment_dummy.save()
+    fulfilled_order.payments.add(payment_dummy)
+    stock = Stock.objects.create(
+        warehouse=warehouse, product_variant=variant, quantity=5
+    )
+    channel_listing = variant.channel_listings.get()
+  
