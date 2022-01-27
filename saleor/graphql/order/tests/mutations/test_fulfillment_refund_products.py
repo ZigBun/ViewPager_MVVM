@@ -915,4 +915,86 @@ def test_fulfillment_refund_products_fulfillment_lines_and_order_lines(
         warehouse=warehouse, product_variant=variant, quantity=5
     )
     channel_listing = variant.channel_listings.get()
-  
+    net = variant.get_price(variant.product, [], channel_USD, channel_listing)
+    gross = Money(amount=net.amount * Decimal(1.23), currency=net.currency)
+    variant.track_inventory = False
+    variant.save()
+    unit_price = TaxedMoney(net=net, gross=gross)
+    quantity = 5
+    order_line = fulfilled_order.lines.create(
+        product_name=str(variant.product),
+        variant_name=str(variant),
+        product_sku=variant.sku,
+        product_variant_id=variant.get_global_id(),
+        is_shipping_required=variant.is_shipping_required(),
+        is_gift_card=variant.is_gift_card(),
+        quantity=quantity,
+        quantity_fulfilled=2,
+        variant=variant,
+        unit_price=unit_price,
+        total_price=unit_price * quantity,
+        tax_rate=Decimal("0.23"),
+    )
+    fulfillment = fulfilled_order.fulfillments.get()
+    fulfillment.lines.create(order_line=order_line, quantity=2, stock=stock)
+    fulfillment_line_to_refund = fulfilled_order.fulfillments.first().lines.first()
+    order_id = graphene.Node.to_global_id("Order", fulfilled_order.pk)
+    fulfillment_line_id = graphene.Node.to_global_id(
+        "FulfillmentLine", fulfillment_line_to_refund.pk
+    )
+    order_line_from_fulfillment_line = graphene.Node.to_global_id(
+        "OrderLine", fulfillment_line_to_refund.order_line.pk
+    )
+    order_line_id = graphene.Node.to_global_id("OrderLine", order_line.pk)
+    variables = {
+        "order": order_id,
+        "input": {
+            "orderLines": [{"orderLineId": order_line_id, "quantity": 2}],
+            "fulfillmentLines": [
+                {"fulfillmentLineId": fulfillment_line_id, "quantity": 2}
+            ],
+        },
+    }
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+
+    response = staff_api_client.post_graphql(ORDER_FULFILL_REFUND_MUTATION, variables)
+
+    content = get_graphql_content(response)
+    data = content["data"]["orderFulfillmentRefundProducts"]
+    refund_fulfillment = data["fulfillment"]
+    errors = data["errors"]
+
+    assert not errors
+    assert refund_fulfillment["status"] == FulfillmentStatus.REFUNDED.upper()
+    assert len(refund_fulfillment["lines"]) == 2
+    assert refund_fulfillment["lines"][0]["orderLine"]["id"] in [
+        order_line_id,
+        order_line_from_fulfillment_line,
+    ]
+    assert refund_fulfillment["lines"][0]["quantity"] == 2
+
+    assert refund_fulfillment["lines"][1]["orderLine"]["id"] in [
+        order_line_id,
+        order_line_from_fulfillment_line,
+    ]
+    assert refund_fulfillment["lines"][1]["quantity"] == 2
+    amount = fulfillment_line_to_refund.order_line.unit_price_gross_amount * 2
+    amount += order_line.unit_price_gross_amount * 2
+    amount = quantize_price(amount, fulfilled_order.currency)
+    mocked_refund.assert_called_with(
+        payment_dummy,
+        ANY,
+        amount=amount,
+        channel_slug=fulfilled_order.channel.slug,
+        refund_data=RefundData(
+            order_lines_to_refund=[
+                OrderLineInfo(line=order_line, quantity=2, variant=order_line.variant)
+            ],
+            fulfillment_lines_to_refund=[
+                FulfillmentLineData(
+                    line=fulfillment_line_to_refund,
+                    quantity=2,
+                )
+            ],
+        ),
+    )
