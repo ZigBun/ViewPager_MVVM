@@ -185,4 +185,57 @@ def test_transaction_charge_action_request(
 @freeze_time("2020-03-18 12:00:00")
 def test_transaction_void_action_request(
     order, webhook_app, permission_manage_payments
-)
+):
+    # given
+    authorized_value = Decimal("10")
+    webhook_app.permissions.add(permission_manage_payments)
+    transaction = TransactionItem.objects.create(
+        status="Captured",
+        type="Credit card",
+        reference="PSP ref",
+        available_actions=["void"],
+        currency="USD",
+        order_id=order.pk,
+        authorized_value=authorized_value,
+    )
+    webhook = Webhook.objects.create(
+        name="Webhook",
+        app=webhook_app,
+        target_url="http://www.example.com/any",
+        subscription_query=TRANSACTION_ACTION_REQUEST_SUBSCRIPTION_QUERY,
+    )
+    event_type = WebhookEventAsyncType.TRANSACTION_ACTION_REQUEST
+    webhook.events.create(event_type=event_type)
+
+    transaction_id = graphene.Node.to_global_id("TransactionItem", transaction.id)
+
+    transaction_data = TransactionActionData(
+        transaction=transaction,
+        action_type=TransactionAction.VOID,
+    )
+    # when
+    deliveries = create_deliveries_for_subscriptions(
+        event_type, transaction_data, [webhook]
+    )
+
+    # then
+    assert json.loads(deliveries[0].payload.payload) == {
+        "transaction": {
+            "id": transaction_id,
+            "createdAt": "2020-03-18T12:00:00+00:00",
+            "actions": ["VOID"],
+            "authorizedAmount": {
+                "currency": "USD",
+                "amount": quantize_price(authorized_value, "USD"),
+            },
+            "refundedAmount": {"currency": "USD", "amount": 0.0},
+            "voidedAmount": {"currency": "USD", "amount": 0.0},
+            "chargedAmount": {"currency": "USD", "amount": 0.0},
+            "events": [],
+            "status": "Captured",
+            "type": "Credit card",
+            "reference": "PSP ref",
+            "order": {"id": graphene.Node.to_global_id("Order", order.id)},
+        },
+        "action": {"actionType": "VOID", "amount": None},
+    }
