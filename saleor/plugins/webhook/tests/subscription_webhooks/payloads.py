@@ -380,3 +380,87 @@ def generate_voucher_created_payload_with_meta(
 
 def generate_gift_card_payload(gift_card, card_global_id):
     return json.dumps(
+        {
+            "giftCard": {
+                "id": card_global_id,
+                "isActive": gift_card.is_active,
+                "code": gift_card.code,
+                "createdBy": {"email": gift_card.created_by.email},
+            }
+        }
+    )
+
+
+def generate_menu_payload(menu, menu_global_id):
+    menu_items = sorted(menu.items.all(), key=lambda key: key.pk)
+    return {
+        "menu": {
+            "id": menu_global_id,
+            "name": menu.name,
+            "slug": menu.slug,
+            "items": [
+                {
+                    "id": graphene.Node.to_global_id(item.id, "MenuItem"),
+                    "name": item.name,
+                }
+                for item in menu_items
+            ],
+        }
+    }
+
+
+def generate_menu_item_payload(menu_item, menu_item_global_id):
+    menu = (
+        {"id": graphene.Node.to_global_id("Menu", menu_item.menu_id)}
+        if menu_item.menu_id
+        else None
+    )
+    page = (
+        {"id": graphene.Node.to_global_id("Page", menu_item.page_id)}
+        if menu_item.page_id
+        else None
+    )
+    return {
+        "menuItem": {
+            "id": menu_item_global_id,
+            "name": menu_item.name,
+            "menu": menu,
+            "page": page,
+        }
+    }
+
+
+def generate_warehouse_payload(warehouse, warehouse_global_id):
+    return json.dumps(
+        {
+            "warehouse": {
+                "id": warehouse_global_id,
+                "name": warehouse.name,
+                "shippingZones": {
+                    "edges": [
+                        {
+                            "node": {
+                                "id": graphene.Node.to_global_id(
+                                    "ShippingZone", zone.id
+                                )
+                            }
+                        }
+                        for zone in warehouse.shipping_zones.all()
+                    ]
+                },
+                "address": {"companyName": warehouse.address.company_name},
+            }
+        }
+    )
+
+
+def generate_payment_payload(payment):
+    total = payment.get_total()
+    return {
+        "payment": {
+            "id": graphene.Node.to_global_id("Payment", payment.pk),
+            "total": {"amount": float(total.amount), "currency": total.currency},
+            "gateway": payment.gateway,
+            "isActive": payment.is_active,
+        }
+    }
