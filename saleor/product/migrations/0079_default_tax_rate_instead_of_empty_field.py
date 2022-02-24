@@ -42,3 +42,13 @@ class Migration(migrations.Migration):
                     ("pharmaceuticals", "pharmaceuticals"),
                     ("property renovations", "property renovations"),
                     ("restaurants", "restaurants"),
+                    ("social housing", "social housing"),
+                    ("standard", "standard"),
+                    ("water", "water"),
+                ],
+                default="standard",
+                max_length=128,
+            ),
+        ),
+        migrations.RunPython(add_default_tax_rate_instead_of_empty_field),
+    ]
