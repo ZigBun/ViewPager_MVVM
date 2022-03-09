@@ -114,4 +114,11 @@ class VoucherCreate(ModelMutation):
         end_date = instance.end_date
         try:
             validate_end_is_after_start(start_date, end_date)
-        except V
+        except ValidationError as error:
+            error.code = DiscountErrorCode.INVALID.value
+            raise ValidationError({"end_date": error})
+
+    @classmethod
+    def post_save_action(cls, info: ResolveInfo, instance, cleaned_input):
+        manager = get_plugin_manager_promise(info.context).get()
+        cls.call_event(manager.voucher_created, instance)
