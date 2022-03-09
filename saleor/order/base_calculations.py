@@ -59,3 +59,54 @@ def base_order_total(order: "Order", lines: Iterable["OrderLine"]) -> Money:
                 value_type=order_discount.value_type,
                 currency=currency,
                 price_to_discount=subtotal,
+            )
+            shipping_price = apply_discount_to_value(
+                value=order_discount.value,
+                value_type=order_discount.value_type,
+                currency=currency,
+                price_to_discount=shipping_price,
+            )
+        else:
+            temporary_undiscounted_total = subtotal + shipping_price
+            if temporary_undiscounted_total.amount > 0:
+                temporary_total = apply_discount_to_value(
+                    value=order_discount.value,
+                    value_type=order_discount.value_type,
+                    currency=currency,
+                    price_to_discount=temporary_undiscounted_total,
+                )
+                total_discount = temporary_undiscounted_total - temporary_total
+                subtotal_discount = (
+                    subtotal / temporary_undiscounted_total
+                ) * total_discount
+                shipping_discount = total_discount - subtotal_discount
+
+                subtotal -= subtotal_discount
+                shipping_price -= shipping_discount
+        shipping_discount_amount = shipping_price_before_discount - shipping_price
+        subtotal_discount_amount = subtotal_before_discount - subtotal
+        total_discount_amount = shipping_discount_amount + subtotal_discount_amount
+        if order_discount.amount != total_discount_amount:
+            order_discount.amount = total_discount_amount
+            order_discounts_to_update.append(order_discount)
+    if order_discounts_to_update:
+        OrderDiscount.objects.bulk_update(order_discounts_to_update, ["amount_value"])
+    return max(subtotal + shipping_price, zero_money(currency))
+
+
+def base_order_line_total(order_line: "OrderLine") -> OrderTaxedPricesData:
+    quantity = order_line.quantity
+    price_with_discounts = (
+        TaxedMoney(order_line.base_unit_price, order_line.base_unit_price) * quantity
+    )
+    undiscounted_price = (
+        TaxedMoney(
+            order_line.undiscounted_base_unit_price,
+            order_line.undiscounted_base_unit_price,
+        )
+        * quantity
+    )
+    return OrderTaxedPricesData(
+        undiscounted_price=undiscounted_price,
+        price_with_discounts=price_with_discounts,
+    )
