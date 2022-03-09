@@ -96,3 +96,31 @@ def send_csv_export_failed(payload: dict, config: dict, plugin: "AdminEmailPlugi
             return
         subject = get_email_subject(
             plugin.configuration,
+            constants.CSV_EXPORT_FAILED_SUBJECT_FIELD,
+            constants.CSV_EXPORT_FAILED_DEFAULT_SUBJECT,
+        )
+        send_export_failed_email_task.delay(
+            recipient_email, payload, config, subject, template
+        )
+
+
+def send_staff_reset_password(payload: dict, config: dict, plugin: "AdminEmailPlugin"):
+    recipient_email = payload.get("recipient_email")
+    if recipient_email:
+        template = get_email_template_or_default(
+            plugin,
+            constants.STAFF_PASSWORD_RESET_TEMPLATE_FIELD,
+            constants.STAFF_PASSWORD_RESET_DEFAULT_TEMPLATE,
+            constants.DEFAULT_EMAIL_TEMPLATES_PATH,
+        )
+        if not template:
+            # Empty template means that we don't want to trigger a given event.
+            return
+        subject = get_email_subject(
+            plugin.configuration,
+            constants.STAFF_PASSWORD_RESET_SUBJECT_FIELD,
+            constants.STAFF_PASSWORD_RESET_DEFAULT_SUBJECT,
+        )
+        send_staff_password_reset_email_task.delay(
+            recipient_email, payload, config, subject, template
+        )
