@@ -245,4 +245,31 @@ def test_collection_channel_listing_update_update_publication_date_and_published
     published_at = datetime.datetime.now(pytz.utc)
     collection_id = graphene.Node.to_global_id("Collection", collection.pk)
     channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
-    variable
+    variables = {
+        "id": collection_id,
+        "input": {
+            "addChannels": [
+                {
+                    "channelId": channel_id,
+                    "publicationDate": publication_date,
+                    "publishedAt": published_at,
+                }
+            ]
+        },
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        COLLECTION_CHANNEL_LISTING_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_products,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["collectionChannelListingUpdate"]
+    errors = data["errors"]
+    assert len(errors) == 1
+    assert errors[0]["field"] == "publicationDate"
+    assert errors[0]["code"] == CollectionErrorCode.INVALID.name
+    assert errors[0]["channels"] == [channel_id]
