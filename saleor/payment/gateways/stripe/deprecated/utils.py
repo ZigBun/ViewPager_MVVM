@@ -55,3 +55,44 @@ def get_amount_from_stripe(amount, currency):
         # Using Decimal(amount / 100.0) will convert to decimal from float
         # where precision may be lost
         amount /= Decimal(100)
+
+    return amount
+
+
+def get_currency_for_stripe(currency):
+    """Convert Saleor's currency format to Stripe's currency format.
+
+    Stripe's currency is using lowercase while Saleor is using uppercase.
+    """
+    return currency.lower()
+
+
+def get_currency_from_stripe(currency):
+    """Convert Stripe's currency format to Saleor's currency format.
+
+    Stripe's currency is using lowercase while Saleor is using uppercase.
+    """
+    return currency.upper()
+
+
+def get_payment_billing_fullname(payment_information: PaymentData) -> str:
+    # Get billing name from payment
+    payment_billing = payment_information.billing
+    if not payment_billing:
+        return ""
+    return f"{payment_billing.last_name} {payment_billing.first_name}"
+
+
+def shipping_to_stripe_dict(shipping: AddressData) -> Dict:
+    return {
+        "name": shipping.first_name + " " + shipping.last_name,
+        "phone": shipping.phone,
+        "address": {
+            "line1": shipping.street_address_1,
+            "line2": shipping.street_address_2,
+            "city": shipping.city,
+            "state": shipping.country_area,
+            "postal_code": shipping.postal_code,
+            "country": dict(countries).get(shipping.country, ""),
+        },
+    }
