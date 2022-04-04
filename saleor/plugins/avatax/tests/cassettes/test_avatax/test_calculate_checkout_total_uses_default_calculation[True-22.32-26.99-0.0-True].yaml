@@ -1,0 +1,9 @@
+interactions:
+- request:
+    body: '{"createTransactionModel": {"companyCode": "DEFAULT", "type": "SalesOrder",
+      "lines": [{"quantity": 3, "amount": "15.00", "taxCode": "O9999999", "taxIncluded":
+      true, "itemCode": "123", "discounted": true, "description": "Test product",
+      "ref1": "123"}, {"quantity": 1, "amount": "1.99", "taxCode": "O9999999", "taxIncluded":
+      true, "itemCode": "SKU_SINGLE_VARIANT", "discounted": true, "description": "Test
+      product with single variant", "taxOverride": {"type": "taxAmount", "taxAmount":
+      0, "reason": "Charge taxes
