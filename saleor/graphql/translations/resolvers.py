@@ -31,4 +31,47 @@ TYPE_TO_TRANSLATION_LOADER_MAP = {
         dataloaders.ShippingMethodTranslationByIdAndLanguageCodeLoader
     ),
     shipping_interface.ShippingMethodData: (
-        dataloaders.ShippingMet
+        dataloaders.ShippingMethodTranslationByIdAndLanguageCodeLoader
+    ),
+    site_models.SiteSettings: (
+        dataloaders.SiteSettingsTranslationByIdAndLanguageCodeLoader
+    ),
+    discount_models.Voucher: (dataloaders.VoucherTranslationByIdAndLanguageCodeLoader),
+}
+
+
+def resolve_translation(instance, info: ResolveInfo, *, language_code):
+    """Get translation object from instance based on language code."""
+
+    loader = TYPE_TO_TRANSLATION_LOADER_MAP.get(type(instance))
+    if loader:
+        return loader(info.context).load((instance.id, language_code))
+    raise TypeError(f"No dataloader found to {type(instance)}")
+
+
+def resolve_shipping_methods(_info):
+    return shipping_models.ShippingMethod.objects.all()
+
+
+def resolve_attribute_values(_info):
+    return attribute_models.AttributeValue.objects.all()
+
+
+def resolve_products(_info):
+    return product_models.Product.objects.all()
+
+
+def resolve_product_variants(_info):
+    return product_models.ProductVariant.objects.all()
+
+
+def resolve_sales(_info):
+    return discount_models.Sale.objects.all()
+
+
+def resolve_vouchers(_info):
+    return discount_models.Voucher.objects.all()
+
+
+def resolve_collections(_info):
+    return product_models.Collection.objects.all()
