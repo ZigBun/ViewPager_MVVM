@@ -61,4 +61,7 @@ class Migration(migrations.Migration):
                     ("rich-text", "Rich Text"),
                 ],
                 default="dropdown",
-                max_leng
+                max_length=50,
+            ),
+        ),
+    ]
