@@ -538,4 +538,55 @@ class PreorderQuantityReservedByVariantChannelListingIdLoader(DataLoader[int, in
             .values("id", "quantity_reserved")
         )
 
- 
+        reservations_by_listing_id: DefaultDict[int, int] = defaultdict(int)
+        for listing in queryset:
+            reservations_by_listing_id[listing["id"]] += listing["quantity_reserved"]
+        return [reservations_by_listing_id[key] for key in keys]
+
+
+class WarehouseByIdLoader(DataLoader):
+    context_key = "warehouse_by_id"
+
+    def batch_load(self, keys: Iterable[UUID]) -> List[Optional[Warehouse]]:
+        warehouses = (
+            Warehouse.objects.all().using(self.database_connection_name).in_bulk(keys)
+        )
+        return [warehouses.get(warehouse_uuid) for warehouse_uuid in keys]
+
+
+class StockByIdLoader(DataLoader):
+    context_key = "stock_by_id"
+
+    def batch_load(self, keys):
+        stocks = Stock.objects.using(self.database_connection_name).in_bulk(keys)
+        return [stocks.get(key) for key in keys]
+
+
+class WarehousesByChannelIdLoader(DataLoader):
+    context_key = "warehouse_by_channel"
+
+    def batch_load(self, keys):
+        warehouse_and_channel_in_pairs = (
+            ChannelWarehouse.objects.using(self.database_connection_name)
+            .filter(channel_id__in=keys)
+            .values_list("warehouse_id", "channel_id")
+        )
+        channel_warehouse_map = defaultdict(list)
+        for warehouse_id, channel_id in warehouse_and_channel_in_pairs:
+            channel_warehouse_map[channel_id].append(warehouse_id)
+
+        def map_warehouses(warehouses):
+            warehouse_map = {warehouse.pk: warehouse for warehouse in warehouses}
+            return [
+                [
+                    warehouse_map[warehouse_id]
+                    for warehouse_id in channel_warehouse_map[channel_id]
+                ]
+                for channel_id in keys
+            ]
+
+        return (
+            WarehouseByIdLoader(self.context)
+            .load_many({pk for pk, _ in warehouse_and_channel_in_pairs})
+            .then(map_warehouses)
+        )
