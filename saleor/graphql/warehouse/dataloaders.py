@@ -346,4 +346,196 @@ class AvailableQuantityByProductVariantIdCountryCodeAndChannelSlugLoader(
         ) in warehouse_ids_by_shipping_zone_by_variant.items():
             if country_code or variant_id in variants_with_global_cc_warehouses:
                 used_warehouse_ids = []
-                for warehouse_ids in warehouse_ids_sh
+                for warehouse_ids in warehouse_ids_shipping_zone.values():
+                    used_warehouse_ids.extend(warehouse_ids)
+                used_warehouse_ids = set(used_warehouse_ids)
+                # When country code is known or the global collection point warehouse
+                # for this variant exists, return the sum of quantities from all
+                # shipping zones supporting given country.
+                quantity = 0
+                for warehouse_id in used_warehouse_ids:
+                    quantity += available_quantity_by_warehouse_id_and_variant_id[
+                        warehouse_id
+                    ][variant_id]
+                quantity_map[variant_id] = quantity
+            else:
+                # When country code is unknown, return the highest known quantity.
+                quantity_values = []
+                for (
+                    warehouse_ids_per_shipping_zones
+                ) in warehouse_ids_shipping_zone.values():
+                    quantity = 0
+                    for warehouse_id in warehouse_ids_per_shipping_zones:
+                        quantity += available_quantity_by_warehouse_id_and_variant_id[
+                            warehouse_id
+                        ][variant_id]
+                    quantity_values.append(quantity)
+
+                quantity_map[variant_id] = max(quantity_values)
+
+        return quantity_map
+
+
+class StocksWithAvailableQuantityByProductVariantIdCountryCodeAndChannelLoader(
+    DataLoader[VariantIdCountryCodeChannelSlug, Iterable[Stock]]
+):
+    """Return stocks with available quantity based on variant ID, country code, channel.
+
+    For each country code, for each shipping zone supporting that country and channel,
+    return stocks with maximum available quantity.
+    """
+
+    context_key = "stocks_with_available_quantity_by_productvariant_country_and_channel"
+
+    def batch_load(self, keys):
+        # Split the list of keys by country first. A typical query will only touch
+        # a handful of unique countries but may access thousands of product variants
+        # so it's cheaper to execute one query per country.
+        variants_by_country_and_channel: DefaultDict[
+            Tuple[CountryCode, str], List[int]
+        ] = defaultdict(list)
+        for variant_id, country_code, channel_slug in keys:
+            variants_by_country_and_channel[(country_code, channel_slug)].append(
+                variant_id
+            )
+
+        # For each country code execute a single query for all product variants.
+        stocks_by_variant_and_country: DefaultDict[
+            VariantIdCountryCodeChannelSlug, List[Stock]
+        ] = defaultdict(list)
+        for key, variant_ids in variants_by_country_and_channel.items():
+            country_code, channel_slug = key
+            variant_ids_stocks = self.batch_load_stocks_by_country(
+                country_code, channel_slug, variant_ids
+            )
+            for variant_id, stocks in variant_ids_stocks:
+                stocks_by_variant_and_country[
+                    (variant_id, country_code, channel_slug)
+                ].extend(stocks)
+
+        return [stocks_by_variant_and_country[key] for key in keys]
+
+    def batch_load_stocks_by_country(
+        self,
+        country_code: Optional[CountryCode],
+        channel_slug: Optional[str],
+        variant_ids: Iterable[int],
+    ) -> Iterable[Tuple[int, List[Stock]]]:
+        stocks = (
+            Stock.objects.all()
+            .using(self.database_connection_name)
+            .filter(product_variant_id__in=variant_ids)
+        )
+        if country_code:
+            stocks = stocks.filter(
+                warehouse__shipping_zones__countries__contains=country_code
+            )
+        if channel_slug:
+            # click and collect warehouses don't have to be assigned to the shipping
+            # zones, the others must
+            stocks = stocks.filter(
+                Q(
+                    warehouse__shipping_zones__channels__slug=channel_slug,
+                    warehouse__channels__slug=channel_slug,
+                )
+                | Q(
+                    warehouse__channels__slug=channel_slug,
+                    warehouse__click_and_collect_option__in=[
+                        WarehouseClickAndCollectOption.LOCAL_STOCK,
+                        WarehouseClickAndCollectOption.ALL_WAREHOUSES,
+                    ],
+                )
+            )
+        stocks = stocks.annotate_available_quantity()
+
+        stocks_by_variant_id_map: DefaultDict[int, List[Stock]] = defaultdict(list)
+        for stock in stocks:
+            stocks_by_variant_id_map[stock.product_variant_id].append(stock)
+
+        return [
+            (
+                variant_id,
+                stocks_by_variant_id_map[variant_id],
+            )
+            for variant_id in variant_ids
+        ]
+
+
+class StocksReservationsByCheckoutTokenLoader(DataLoader):
+    context_key = "stock_reservations_by_checkout_token"
+
+    def batch_load(self, keys):
+        from ..checkout.dataloaders import CheckoutLinesByCheckoutTokenLoader
+
+        def with_checkouts_lines(checkouts_lines):
+            checkouts_keys_map = {}
+            for i, key in enumerate(keys):
+                for checkout_line in checkouts_lines[i]:
+                    checkouts_keys_map[checkout_line.id] = key
+
+            def with_lines_reservations(lines_reservations):
+                reservations_map = defaultdict(list)
+                for reservations in lines_reservations:
+                    for reservation in reservations:
+                        checkout_key = checkouts_keys_map[reservation.checkout_line_id]
+                        reservations_map[checkout_key].append(reservation)
+
+                return [reservations_map[key] for key in keys]
+
+            return (
+                ActiveReservationsByCheckoutLineIdLoader(self.context)
+                .load_many(checkouts_keys_map.keys())
+                .then(with_lines_reservations)
+            )
+
+        return (
+            CheckoutLinesByCheckoutTokenLoader(self.context)
+            .load_many(keys)
+            .then(with_checkouts_lines)
+        )
+
+
+class ActiveReservationsByCheckoutLineIdLoader(DataLoader):
+    context_key = "active_reservations_by_checkout_line_id"
+
+    def batch_load(self, keys):
+        reservations_by_checkout_line = defaultdict(list)
+        queryset = (
+            Reservation.objects.using(self.database_connection_name)
+            .filter(checkout_line_id__in=keys)
+            .not_expired()
+        )
+        for reservation in queryset:
+            reservations_by_checkout_line[reservation.checkout_line_id].append(
+                reservation
+            )
+        queryset = (
+            PreorderReservation.objects.using(self.database_connection_name)
+            .filter(checkout_line_id__in=keys)
+            .not_expired()
+        )
+        for reservation in queryset:
+            reservations_by_checkout_line[reservation.checkout_line_id].append(
+                reservation
+            )
+        return [reservations_by_checkout_line[key] for key in keys]
+
+
+class PreorderQuantityReservedByVariantChannelListingIdLoader(DataLoader[int, int]):
+    context_key = "preorder_quantity_reserved_by_variant_channel_listing_id"
+
+    def batch_load(self, keys: Iterable[int]):
+        queryset = (
+            ProductVariantChannelListing.objects.using(self.database_connection_name)
+            .filter(id__in=keys)
+            .annotate(
+                quantity_reserved=Coalesce(
+                    Sum("preorder_reservations__quantity_reserved"),
+                    0,
+                ),
+                where=Q(preorder_reservations__reserved_until__gt=timezone.now()),
+            )
+            .values("id", "quantity_reserved")
+        )
+
+ 
