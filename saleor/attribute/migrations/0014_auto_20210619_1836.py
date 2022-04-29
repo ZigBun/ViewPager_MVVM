@@ -32,3 +32,5 @@ class Migration(migrations.Migration):
                 default="dropdown",
                 max_length=50,
             ),
+        ),
+    ]
