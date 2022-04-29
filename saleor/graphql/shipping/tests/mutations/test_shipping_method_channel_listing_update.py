@@ -656,4 +656,139 @@ def test_shipping_method_channel_listing_create_channel_not_valid(
     shipping_method_id = graphene.Node.to_global_id(
         "ShippingMethodType", shipping_method.pk
     )
-    channel_id = graphene.Node.to_global_id("Channel", channel
+    channel_id = graphene.Node.to_global_id("Channel", channel_PLN.id)
+    price = 1
+    min_value = 2
+    max_value = 3
+
+    variables = {
+        "id": shipping_method_id,
+        "input": {
+            "addChannels": [
+                {
+                    "channelId": channel_id,
+                    "price": price,
+                    "minimumOrderPrice": min_value,
+                    "maximumOrderPrice": max_value,
+                }
+            ]
+        },
+    }
+
+    # when
+
+    response = staff_api_client.post_graphql(
+        SHIPPING_METHOD_CHANNEL_LISTING_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_shipping,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["shippingMethodChannelListingUpdate"]
+
+    # then
+    assert data["errors"][0]["field"] == "addChannels"
+    assert data["errors"][0]["code"] == ShippingErrorCode.INVALID.name
+    assert data["errors"][0]["channels"] == [channel_id]
+
+
+@patch(
+    "saleor.graphql.shipping.mutations.channels."
+    "drop_invalid_shipping_methods_relations_for_given_channels.delay"
+)
+def test_shipping_method_channel_listing_update_remove_channels(
+    mocked_drop_invalid_shipping_methods_relations,
+    staff_api_client,
+    shipping_method,
+    permission_manage_shipping,
+    channel_USD,
+):
+    # given
+    shipping_method_id = graphene.Node.to_global_id(
+        "ShippingMethodType", shipping_method.pk
+    )
+    assert shipping_method.channel_listings.count() == 1
+    channel_listing = shipping_method.channel_listings.first()
+    channel = channel_listing.channel
+    channel_id = graphene.Node.to_global_id("Channel", channel.id)
+
+    variables = {
+        "id": shipping_method_id,
+        "input": {"removeChannels": [channel_id]},
+    }
+
+    assert channel_listing.price.amount == 10
+    assert channel_listing.minimum_order_price.amount == 0
+    assert channel_listing.maximum_order_price is None
+
+    # when
+    response = staff_api_client.post_graphql(
+        SHIPPING_METHOD_CHANNEL_LISTING_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_shipping,),
+    )
+    content = get_graphql_content(response)
+
+    data = content["data"]["shippingMethodChannelListingUpdate"]
+    shipping_method_data = data["shippingMethod"]
+    assert not data["errors"]
+    assert shipping_method_data["name"] == shipping_method.name
+
+    # then
+    assert not shipping_method_data["channelListings"]
+    with pytest.raises(channel_listing._meta.model.DoesNotExist):
+        channel_listing.refresh_from_db()
+
+    mocked_drop_invalid_shipping_methods_relations.assert_called_once_with(
+        [shipping_method.pk], [str(channel.pk)]
+    )
+
+
+@pytest.mark.parametrize(
+    "price, min_price, max_price, invalid_field",
+    [(10**9, 2, 3, "price"), (1, 2, 10**11, "maximumOrderPrice")],
+)
+def test_shipping_method_channel_listing_create_channel_max_value_validation(
+    price,
+    min_price,
+    max_price,
+    invalid_field,
+    staff_api_client,
+    shipping_method,
+    permission_manage_shipping,
+    channel_PLN,
+):
+    # given
+    shipping_method.shipping_zone.channels.add(channel_PLN)
+    shipping_method_id = graphene.Node.to_global_id(
+        "ShippingMethodType", shipping_method.pk
+    )
+    channel_id = graphene.Node.to_global_id("Channel", channel_PLN.id)
+    variables = {
+        "id": shipping_method_id,
+        "input": {
+            "addChannels": [
+                {
+                    "channelId": channel_id,
+                    "price": price,
+                    "minimumOrderPrice": min_price,
+                    "maximumOrderPrice": max_price,
+                }
+            ]
+        },
+    }
+
+    # when
+
+    response = staff_api_client.post_graphql(
+        SHIPPING_METHOD_CHANNEL_LISTING_UPDATE_MUTATION,
+        variables=variables,
+        permissions=(permission_manage_shipping,),
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["shippingMethodChannelListingUpdate"]
+    assert data["errors"][0]["field"] == invalid_field
+    assert data["errors"][0]["code"] == ShippingErrorCode.INVALID.name
