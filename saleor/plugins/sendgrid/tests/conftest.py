@@ -54,4 +54,54 @@ def sendgrid_email_plugin(settings, channel_USD):
                         "value": account_change_email_confirm_template_id,
                     },
                     {
-        
+                        "name": "account_change_email_request_template_id",
+                        "value": account_change_email_request_template_id,
+                    },
+                    {
+                        "name": "account_password_reset_template_id",
+                        "value": account_password_reset_template_id,
+                    },
+                    {
+                        "name": "invoice_ready_template_id",
+                        "value": invoice_ready_template_id,
+                    },
+                    {
+                        "name": "order_confirmation_template_id",
+                        "value": order_confirmation_template_id,
+                    },
+                    {
+                        "name": "order_confirmed_template_id",
+                        "value": order_confirmed_template_id,
+                    },
+                    {
+                        "name": "order_fulfillment_confirmation_template_id",
+                        "value": order_fulfillment_confirmation_template_id,
+                    },
+                    {
+                        "name": "order_fulfillment_update_template_id",
+                        "value": order_fulfillment_update_template_id,
+                    },
+                    {
+                        "name": "order_payment_confirmation_template_id",
+                        "value": order_payment_confirmation_template_id,
+                    },
+                    {
+                        "name": "order_canceled_template_id",
+                        "value": order_canceled_template_id,
+                    },
+                    {
+                        "name": "order_refund_confirmation_template_id",
+                        "value": order_refund_confirmation_template_id,
+                    },
+                    {
+                        "name": "send_gift_card_template_id",
+                        "value": send_gift_card_template_id,
+                    },
+                    {"name": "api_key", "value": api_key},
+                ],
+            },
+        )
+        manager = get_plugins_manager()
+        return manager.plugins_per_channel[channel_USD.slug][0]
+
+    return fun
