@@ -88,4 +88,64 @@ class GraphQLOperation(TypedDict):
     name: Optional[JsonTruncText]
     operation_type: Optional[str]
     query: Optional[JsonTruncText]
-    result: Optional[JsonTruncT
+    result: Optional[JsonTruncText]
+    result_invalid: bool
+
+
+class ApiCallRequest(TypedDict):
+    id: str
+    method: str
+    url: str
+    time: float
+    headers: HttpHeaders
+    content_length: int
+
+
+class ApiCallResponse(TypedDict):
+    headers: HttpHeaders
+    status_code: Optional[int]
+    content_length: int
+
+
+class ApiCallPayload(ObservabilityEventBase):
+    request: ApiCallRequest
+    response: ApiCallResponse
+    app: Optional[App]
+    gql_operations: List[GraphQLOperation]
+
+
+class EventDeliveryPayload(TypedDict):
+    content_length: int
+    body: JsonTruncText
+
+
+class EventDelivery(TypedDict):
+    id: str
+    status: str
+    event_type: str
+    event_sync: bool
+    payload: EventDeliveryPayload
+
+
+class EventDeliveryAttemptRequest(TypedDict):
+    headers: HttpHeaders
+
+
+class EventDeliveryAttemptResponse(TypedDict):
+    headers: HttpHeaders
+    status_code: Optional[int]
+    content_length: int
+    body: JsonTruncText
+
+
+class EventDeliveryAttemptPayload(ObservabilityEventBase):
+    id: str
+    time: datetime
+    duration: Optional[float]
+    status: str
+    next_retry: Optional[datetime]
+    request: EventDeliveryAttemptRequest
+    response: EventDeliveryAttemptResponse
+    event_delivery: EventDelivery
+    webhook: Webhook
+    app: App
