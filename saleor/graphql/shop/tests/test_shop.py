@@ -465,4 +465,253 @@ def test_shop_reservation_set_negative_settings_mutation(
     assert site_settings.reserve_stock_duration_authenticated_user is None
 
 
-@pytest.ma
+@pytest.mark.parametrize("quantity_value", [25, 1, None])
+def test_limit_quantity_per_checkout_mutation(
+    staff_api_client, site_settings, permission_manage_settings, quantity_value
+):
+    query = """
+        mutation updateSettings($input: ShopSettingsInput!) {
+            shopSettingsUpdate(input: $input) {
+                shop {
+                    limitQuantityPerCheckout
+                }
+                errors {
+                    field,
+                    message
+                }
+            }
+        }
+    """
+    variables = {"input": {"limitQuantityPerCheckout": quantity_value}}
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_settings]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["shopSettingsUpdate"]["shop"]
+    site_settings.refresh_from_db()
+
+    assert data["limitQuantityPerCheckout"] == quantity_value
+    assert site_settings.limit_quantity_per_checkout == quantity_value
+
+
+@pytest.mark.parametrize("quantity_value", [0, -25])
+def test_limit_quantity_per_checkout_neg_or_zero_value(
+    staff_api_client, site_settings, permission_manage_settings, quantity_value
+):
+    query = """
+        mutation updateSettings($input: ShopSettingsInput!) {
+            shopSettingsUpdate(input: $input) {
+                shop {
+                    limitQuantityPerCheckout
+                }
+                errors {
+                    field,
+                    message
+                }
+            }
+        }
+    """
+    variables = {"input": {"limitQuantityPerCheckout": quantity_value}}
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_settings]
+    )
+    content = get_graphql_content(response)
+    errors = content["data"]["shopSettingsUpdate"]["errors"]
+    site_settings.refresh_from_db()
+
+    assert len(errors) == 1
+    assert errors.pop() == {
+        "field": "limitQuantityPerCheckout",
+        "message": "Quantity limit cannot be lower than 1.",
+    }
+
+    assert site_settings.limit_quantity_per_checkout == 50  # default
+
+
+MUTATION_UPDATE_DEFAULT_MAIL_SENDER_SETTINGS = """
+    mutation updateDefaultSenderSettings($input: ShopSettingsInput!) {
+      shopSettingsUpdate(input: $input) {
+        shop {
+          defaultMailSenderName
+          defaultMailSenderAddress
+        }
+        errors {
+          field
+          message
+        }
+      }
+    }
+"""
+
+
+def test_update_default_sender_settings(staff_api_client, permission_manage_settings):
+    query = MUTATION_UPDATE_DEFAULT_MAIL_SENDER_SETTINGS
+
+    variables = {
+        "input": {
+            "defaultMailSenderName": "Dummy Name",
+            "defaultMailSenderAddress": "dummy@example.com",
+        }
+    }
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_settings]
+    )
+    content = get_graphql_content(response)
+
+    data = content["data"]["shopSettingsUpdate"]["shop"]
+    assert data["defaultMailSenderName"] == "Dummy Name"
+    assert data["defaultMailSenderAddress"] == "dummy@example.com"
+
+
+@pytest.mark.parametrize(
+    "sender_name",
+    (
+        "\nDummy Name",
+        "\rDummy Name",
+        "Dummy Name\r",
+        "Dummy Name\n",
+        "Dummy\rName",
+        "Dummy\nName",
+    ),
+)
+def test_update_default_sender_settings_invalid_name(
+    staff_api_client, permission_manage_settings, sender_name
+):
+    query = MUTATION_UPDATE_DEFAULT_MAIL_SENDER_SETTINGS
+
+    variables = {"input": {"defaultMailSenderName": sender_name}}
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_settings]
+    )
+    content = get_graphql_content(response)
+
+    errors = content["data"]["shopSettingsUpdate"]["errors"]
+    assert errors == [
+        {"field": "defaultMailSenderName", "message": "New lines are not allowed."}
+    ]
+
+
+@pytest.mark.parametrize(
+    "sender_email",
+    (
+        "\ndummy@example.com",
+        "\rdummy@example.com",
+        "dummy@example.com\r",
+        "dummy@example.com\n",
+        "dummy@example\r.com",
+        "dummy@example\n.com",
+    ),
+)
+def test_update_default_sender_settings_invalid_email(
+    staff_api_client, permission_manage_settings, sender_email
+):
+    query = MUTATION_UPDATE_DEFAULT_MAIL_SENDER_SETTINGS
+
+    variables = {"input": {"defaultMailSenderAddress": sender_email}}
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_settings]
+    )
+    content = get_graphql_content(response)
+
+    errors = content["data"]["shopSettingsUpdate"]["errors"]
+    assert errors == [
+        {"field": "defaultMailSenderAddress", "message": "Enter a valid email address."}
+    ]
+
+
+def test_shop_domain_update(staff_api_client, permission_manage_settings):
+    query = """
+        mutation updateSettings($input: SiteDomainInput!) {
+            shopDomainUpdate(input: $input) {
+                shop {
+                    name
+                    domain {
+                        host,
+                    }
+                }
+            }
+        }
+    """
+    new_name = "saleor test store"
+    variables = {"input": {"domain": "lorem-ipsum.com", "name": new_name}}
+    site = Site.objects.get_current()
+    assert site.domain != "lorem-ipsum.com"
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_settings]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["shopDomainUpdate"]["shop"]
+    assert data["domain"]["host"] == "lorem-ipsum.com"
+    assert data["name"] == new_name
+    site.refresh_from_db()
+    assert site.domain == "lorem-ipsum.com"
+    assert site.name == new_name
+
+
+MUTATION_CUSTOMER_SET_PASSWORD_URL_UPDATE = """
+    mutation updateSettings($customerSetPasswordUrl: String!) {
+        shopSettingsUpdate(input: {customerSetPasswordUrl: $customerSetPasswordUrl}){
+            shop {
+                customerSetPasswordUrl
+            }
+            errors {
+                message
+                field
+                code
+            }
+        }
+    }
+"""
+
+
+def test_shop_customer_set_password_url_update(
+    staff_api_client, site_settings, permission_manage_settings
+):
+    customer_set_password_url = "http://www.example.com/set_pass/"
+    variables = {"customerSetPasswordUrl": customer_set_password_url}
+    assert site_settings.customer_set_password_url != customer_set_password_url
+    response = staff_api_client.post_graphql(
+        MUTATION_CUSTOMER_SET_PASSWORD_URL_UPDATE,
+        variables,
+        permissions=[permission_manage_settings],
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["shopSettingsUpdate"]
+    assert not data["errors"]
+    Site.objects.clear_cache()
+    site_settings = Site.objects.get_current().settings
+    assert site_settings.customer_set_password_url == customer_set_password_url
+
+
+@pytest.mark.parametrize(
+    "customer_set_password_url",
+    [
+        ("http://not-allowed-storefron.com/pass"),
+        ("http://[value-error-in-urlparse@test/pass"),
+        ("without-protocole.com/pass"),
+    ],
+)
+def test_shop_customer_set_password_url_update_invalid_url(
+    staff_api_client,
+    site_settings,
+    permission_manage_settings,
+    customer_set_password_url,
+):
+    variables = {"customerSetPasswordUrl": customer_set_password_url}
+    assert not site_settings.customer_set_password_url
+    response = staff_api_client.post_graphql(
+        MUTATION_CUSTOMER_SET_PASSWORD_URL_UPDATE,
+        variables,
+        permissions=[permission_manage_settings],
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["shopSettingsUpdate"]
+    assert data["errors"][0] == {
+        "field": "customerSetPasswordUrl",
+        "code": ShopErrorCode.INVALID.name,
+        "message": ANY,
+    }
+ 
