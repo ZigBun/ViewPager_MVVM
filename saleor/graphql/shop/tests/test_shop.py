@@ -244,4 +244,225 @@ def test_query_default_mail_sender_settings(
 
     data = content["data"]["shop"]
     assert data["defaultMailSenderName"] == "Mirumee Labs Info"
-    assert 
+    assert data["defaultMailSenderAddress"] == "hello@example.com"
+
+
+def test_query_default_mail_sender_settings_not_set(
+    staff_api_client, site_settings, permission_manage_settings, settings
+):
+    site_settings.default_mail_sender_name = ""
+    site_settings.default_mail_sender_address = None
+    site_settings.save(
+        update_fields=["default_mail_sender_name", "default_mail_sender_address"]
+    )
+
+    settings.DEFAULT_FROM_EMAIL = "default@example.com"
+
+    query = QUERY_RETRIEVE_DEFAULT_MAIL_SENDER_SETTINGS
+
+    response = staff_api_client.post_graphql(
+        query, permissions=[permission_manage_settings]
+    )
+    content = get_graphql_content(response)
+
+    data = content["data"]["shop"]
+    assert data["defaultMailSenderName"] == ""
+    assert data["defaultMailSenderAddress"] is None
+
+
+def test_shop_digital_content_settings_mutation(
+    staff_api_client, site_settings, permission_manage_settings
+):
+    query = """
+        mutation updateSettings($input: ShopSettingsInput!) {
+            shopSettingsUpdate(input: $input) {
+                shop {
+                    automaticFulfillmentDigitalProducts
+                    defaultDigitalMaxDownloads
+                    defaultDigitalUrlValidDays
+                }
+                errors {
+                    field,
+                    message
+                }
+            }
+        }
+    """
+
+    max_downloads = 15
+    url_valid_days = 30
+    variables = {
+        "input": {
+            "automaticFulfillmentDigitalProducts": True,
+            "defaultDigitalMaxDownloads": max_downloads,
+            "defaultDigitalUrlValidDays": url_valid_days,
+        }
+    }
+
+    assert not site_settings.automatic_fulfillment_digital_products
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_settings]
+    )
+    content = get_graphql_content(response)
+
+    data = content["data"]["shopSettingsUpdate"]["shop"]
+    assert data["automaticFulfillmentDigitalProducts"]
+    assert data["defaultDigitalMaxDownloads"]
+    assert data["defaultDigitalUrlValidDays"]
+    site_settings.refresh_from_db()
+    assert site_settings.automatic_fulfillment_digital_products
+    assert site_settings.default_digital_max_downloads == max_downloads
+    assert site_settings.default_digital_url_valid_days == url_valid_days
+
+
+def test_shop_settings_mutation(
+    staff_api_client, site_settings, permission_manage_settings
+):
+    query = """
+        mutation updateSettings($input: ShopSettingsInput!) {
+            shopSettingsUpdate(input: $input) {
+                shop {
+                    headerText,
+                    includeTaxesInPrices,
+                    chargeTaxesOnShipping,
+                    fulfillmentAutoApprove,
+                    fulfillmentAllowUnpaid
+                }
+                errors {
+                    field,
+                    message
+                }
+            }
+        }
+    """
+    charge_taxes_on_shipping = site_settings.charge_taxes_on_shipping
+    new_charge_taxes_on_shipping = not charge_taxes_on_shipping
+    variables = {
+        "input": {
+            "includeTaxesInPrices": False,
+            "headerText": "Lorem ipsum",
+            "chargeTaxesOnShipping": new_charge_taxes_on_shipping,
+            "fulfillmentAllowUnpaid": False,
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_settings]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["shopSettingsUpdate"]["shop"]
+    assert data["headerText"] == "Lorem ipsum"
+    assert data["includeTaxesInPrices"] is False
+    assert data["chargeTaxesOnShipping"] == new_charge_taxes_on_shipping
+    assert data["fulfillmentAutoApprove"] is True
+    assert data["fulfillmentAllowUnpaid"] is False
+    site_settings.refresh_from_db()
+    assert not site_settings.include_taxes_in_prices
+    assert site_settings.charge_taxes_on_shipping == new_charge_taxes_on_shipping
+
+
+def test_shop_reservation_settings_mutation(
+    staff_api_client, site_settings, permission_manage_settings
+):
+    query = """
+        mutation updateSettings($input: ShopSettingsInput!) {
+            shopSettingsUpdate(input: $input) {
+                shop {
+                    reserveStockDurationAnonymousUser
+                    reserveStockDurationAuthenticatedUser
+                }
+                errors {
+                    field,
+                    message
+                }
+            }
+        }
+    """
+    variables = {
+        "input": {
+            "reserveStockDurationAnonymousUser": 42,
+            "reserveStockDurationAuthenticatedUser": 24,
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_settings]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["shopSettingsUpdate"]["shop"]
+    assert data["reserveStockDurationAnonymousUser"] == 42
+    assert data["reserveStockDurationAuthenticatedUser"] == 24
+    site_settings.refresh_from_db()
+    assert site_settings.reserve_stock_duration_anonymous_user == 42
+    assert site_settings.reserve_stock_duration_authenticated_user == 24
+
+
+def test_shop_reservation_disable_settings_mutation(
+    staff_api_client, site_settings, permission_manage_settings
+):
+    query = """
+        mutation updateSettings($input: ShopSettingsInput!) {
+            shopSettingsUpdate(input: $input) {
+                shop {
+                    reserveStockDurationAnonymousUser
+                    reserveStockDurationAuthenticatedUser
+                }
+                errors {
+                    field,
+                    message
+                }
+            }
+        }
+    """
+    variables = {
+        "input": {
+            "reserveStockDurationAnonymousUser": None,
+            "reserveStockDurationAuthenticatedUser": None,
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_settings]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["shopSettingsUpdate"]["shop"]
+    assert data["reserveStockDurationAnonymousUser"] is None
+    assert data["reserveStockDurationAuthenticatedUser"] is None
+    site_settings.refresh_from_db()
+    assert site_settings.reserve_stock_duration_anonymous_user is None
+    assert site_settings.reserve_stock_duration_authenticated_user is None
+
+
+def test_shop_reservation_set_negative_settings_mutation(
+    staff_api_client, site_settings, permission_manage_settings
+):
+    query = """
+        mutation updateSettings($input: ShopSettingsInput!) {
+            shopSettingsUpdate(input: $input) {
+                shop {
+                    reserveStockDurationAnonymousUser
+                    reserveStockDurationAuthenticatedUser
+                }
+                errors {
+                    field,
+                    message
+                }
+            }
+        }
+    """
+    variables = {
+        "input": {
+            "reserveStockDurationAnonymousUser": -14,
+            "reserveStockDurationAuthenticatedUser": -6,
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_settings]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["shopSettingsUpdate"]["shop"]
+    assert data["reserveStockDurationAnonymousUser"] is None
+    assert data["reserveStockDurationAuthenticatedUser"] is None
+    site_settings.refresh_from_db()
+    assert site_settings.reserve_stock_duration_anonymous_user is None
+    assert site_settings.reserve_stock_duration_authenticated_user is None
+
+
+@pytest.ma
