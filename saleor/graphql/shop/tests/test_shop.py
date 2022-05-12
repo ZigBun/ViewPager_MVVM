@@ -714,4 +714,256 @@ def test_shop_customer_set_password_url_update_invalid_url(
         "code": ShopErrorCode.INVALID.name,
         "message": ANY,
     }
- 
+    site_settings.refresh_from_db()
+    assert not site_settings.customer_set_password_url
+
+
+def test_query_default_country(user_api_client, settings):
+    settings.DEFAULT_COUNTRY = "US"
+    query = """
+    query {
+        shop {
+            defaultCountry {
+                code
+                country
+            }
+        }
+    }
+    """
+    response = user_api_client.post_graphql(query)
+    content = get_graphql_content(response)
+    data = content["data"]["shop"]["defaultCountry"]
+    assert data["code"] == settings.DEFAULT_COUNTRY
+    assert data["country"] == "United States of America"
+
+
+AVAILABLE_EXTERNAL_AUTHENTICATIONS_QUERY = """
+    query{
+        shop {
+            availableExternalAuthentications{
+                id
+                name
+            }
+        }
+    }
+"""
+
+
+@pytest.mark.parametrize(
+    "external_auths",
+    [
+        [{"id": "auth1", "name": "Auth-1"}],
+        [{"id": "auth1", "name": "Auth-1"}, {"id": "auth2", "name": "Auth-2"}],
+        [],
+    ],
+)
+def test_query_available_external_authentications(
+    external_auths, user_api_client, monkeypatch
+):
+    monkeypatch.setattr(
+        "saleor.plugins.manager.PluginsManager.list_external_authentications",
+        lambda self, active_only: external_auths,
+    )
+    query = AVAILABLE_EXTERNAL_AUTHENTICATIONS_QUERY
+    response = user_api_client.post_graphql(query)
+    content = get_graphql_content(response)
+    data = content["data"]["shop"]["availableExternalAuthentications"]
+    assert data == external_auths
+
+
+AVAILABLE_PAYMENT_GATEWAYS_QUERY = """
+    query Shop($currency: String){
+        shop {
+            availablePaymentGateways(currency: $currency) {
+                id
+                name
+            }
+        }
+    }
+"""
+
+
+def test_query_available_payment_gateways(user_api_client, sample_gateway, channel_USD):
+    query = AVAILABLE_PAYMENT_GATEWAYS_QUERY
+    response = user_api_client.post_graphql(query)
+    content = get_graphql_content(response)
+    data = content["data"]["shop"]["availablePaymentGateways"]
+    assert {gateway["id"] for gateway in data} == {
+        "mirumee.payments.dummy",
+        "sampleDummy.active",
+    }
+    assert {gateway["name"] for gateway in data} == {
+        "Dummy",
+        "SampleDummy",
+    }
+
+
+def test_query_available_payment_gateways_specified_currency_USD(
+    user_api_client, sample_gateway, channel_USD
+):
+    query = AVAILABLE_PAYMENT_GATEWAYS_QUERY
+    response = user_api_client.post_graphql(query, {"currency": "USD"})
+    content = get_graphql_content(response)
+    data = content["data"]["shop"]["availablePaymentGateways"]
+    assert {gateway["id"] for gateway in data} == {
+        "mirumee.payments.dummy",
+        "sampleDummy.active",
+    }
+    assert {gateway["name"] for gateway in data} == {
+        "Dummy",
+        "SampleDummy",
+    }
+
+
+def test_query_available_payment_gateways_specified_currency_EUR(
+    user_api_client, sample_gateway, channel_USD
+):
+    query = AVAILABLE_PAYMENT_GATEWAYS_QUERY
+    response = user_api_client.post_graphql(query, {"currency": "EUR"})
+    content = get_graphql_content(response)
+    data = content["data"]["shop"]["availablePaymentGateways"]
+    assert data[0]["id"] == "sampleDummy.active"
+    assert data[0]["name"] == "SampleDummy"
+
+
+AVAILABLE_SHIPPING_METHODS_QUERY = """
+    query Shop($channel: String!, $address: AddressInput){
+        shop {
+            availableShippingMethods(channel: $channel, address: $address) {
+                id
+                name
+            }
+        }
+    }
+"""
+
+
+def test_query_available_shipping_methods_no_address(
+    staff_api_client, shipping_method, shipping_method_channel_PLN, channel_USD
+):
+    # given
+    query = AVAILABLE_SHIPPING_METHODS_QUERY
+
+    # when
+    response = staff_api_client.post_graphql(query, {"channel": channel_USD.slug})
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["shop"]["availableShippingMethods"]
+    assert len(data) > 0
+    assert {ship_meth["id"] for ship_meth in data} == {
+        graphene.Node.to_global_id("ShippingMethod", ship_meth.pk)
+        for ship_meth in ShippingMethod.objects.filter(
+            shipping_zone__channels__slug=channel_USD.slug,
+            channel_listings__channel__slug=channel_USD.slug,
+        )
+    }
+
+
+def test_query_available_shipping_methods_no_channel_shipping_zones(
+    staff_api_client, shipping_method, shipping_method_channel_PLN, channel_USD
+):
+    # given
+    query = AVAILABLE_SHIPPING_METHODS_QUERY
+    channel_USD.shipping_zones.clear()
+
+    # when
+    response = staff_api_client.post_graphql(query, {"channel": channel_USD.slug})
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["shop"]["availableShippingMethods"]
+    assert len(data) == 0
+
+
+def test_query_available_shipping_methods_for_given_address(
+    staff_api_client,
+    channel_USD,
+    shipping_method,
+    shipping_zone_without_countries,
+    address,
+):
+    # given
+    query = AVAILABLE_SHIPPING_METHODS_QUERY
+    shipping_method_count = ShippingMethod.objects.count()
+    variables = {
+        "channel": channel_USD.slug,
+        "address": {"country": CountryCodeEnum.US.name},
+    }
+
+    # when
+    response = staff_api_client.post_graphql(query, variables)
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["shop"]["availableShippingMethods"]
+    assert len(data) == shipping_method_count - 1
+    assert graphene.Node.to_global_id(
+        "ShippingMethodType",
+        shipping_zone_without_countries.shipping_methods.first().pk,
+    ) not in {ship_meth["id"] for ship_meth in data}
+
+
+def test_query_available_shipping_methods_for_excluded_postal_code(
+    staff_api_client, channel_USD, shipping_method
+):
+    # given
+    query = AVAILABLE_SHIPPING_METHODS_QUERY
+    variables = {
+        "channel": channel_USD.slug,
+        "address": {"country": CountryCodeEnum.PL.name, "postalCode": "53-601"},
+    }
+    shipping_method.postal_code_rules.create(
+        start="53-600", end="54-600", inclusion_type=PostalCodeRuleInclusionType.EXCLUDE
+    )
+
+    # when
+    response = staff_api_client.post_graphql(query, variables)
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["shop"]["availableShippingMethods"]
+    assert graphene.Node.to_global_id("ShippingMethodType", shipping_method.pk) not in {
+        ship_meth["id"] for ship_meth in data
+    }
+
+
+def test_query_available_shipping_methods_for_included_postal_code(
+    staff_api_client, channel_USD, shipping_method
+):
+    # given
+    query = AVAILABLE_SHIPPING_METHODS_QUERY
+    variables = {
+        "channel": channel_USD.slug,
+        "address": {"country": CountryCodeEnum.PL.name, "postalCode": "53-601"},
+    }
+    shipping_method.postal_code_rules.create(
+        start="53-600", end="54-600", inclusion_type=PostalCodeRuleInclusionType.INCLUDE
+    )
+
+    # when
+    response = staff_api_client.post_graphql(query, variables)
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["shop"]["availableShippingMethods"]
+    assert graphene.Node.to_global_id("ShippingMethod", shipping_method.pk) in {
+        ship_meth["id"] for ship_meth in data
+    }
+
+
+MUTATION_SHOP_ADDRESS_UPDATE = """
+    mutation updateShopAddress($input: AddressInput){
+        shopAddressUpdate(input: $input){
+            errors{
+                field
+                message
+            }
+        }
+    }
+"""
+
+
+def test_mutation_update_company_address(
+    staff_api_client,
+    permission_manage_settings,
