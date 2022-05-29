@@ -1448,4 +1448,266 @@ def test_order_settings_update_by_user_without_permissions(
 
 ORDER_SETTINGS_QUERY = """
     query orderSettings {
-        ord
+        orderSettings {
+            automaticallyConfirmAllNewOrders
+            automaticallyFulfillNonShippableGiftCard
+        }
+    }
+"""
+
+
+def test_order_settings_query_one_channel(
+    staff_api_client, permission_manage_orders, channel_USD
+):
+    # given
+    channel_USD.automatically_confirm_all_new_orders = False
+    channel_USD.automatically_fulfill_non_shippable_gift_card = True
+    channel_USD.save()
+
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+
+    # when
+    response = staff_api_client.post_graphql(ORDER_SETTINGS_QUERY)
+
+    # then
+    content = get_graphql_content(response)
+
+    assert content["data"]["orderSettings"]["automaticallyConfirmAllNewOrders"] is False
+    assert (
+        content["data"]["orderSettings"]["automaticallyFulfillNonShippableGiftCard"]
+        is True
+    )
+
+
+def test_order_settings_query_multiple_channels(
+    staff_api_client, permission_manage_orders, channel_USD, channel_PLN
+):
+    # given
+    channel_USD.automatically_confirm_all_new_orders = False
+    channel_USD.automatically_fulfill_non_shippable_gift_card = True
+    channel_USD.save()
+
+    channel_PLN.automatically_confirm_all_new_orders = True
+    channel_PLN.automatically_fulfill_non_shippable_gift_card = False
+    channel_PLN.save()
+
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+
+    # when
+    response = staff_api_client.post_graphql(ORDER_SETTINGS_QUERY)
+
+    # then
+    content = get_graphql_content(response)
+
+    assert content["data"]["orderSettings"]["automaticallyConfirmAllNewOrders"] is True
+    assert (
+        content["data"]["orderSettings"]["automaticallyFulfillNonShippableGiftCard"]
+        is False
+    )
+
+
+def test_order_settings_query_as_user(user_api_client, channel_USD, channel_PLN):
+    response = user_api_client.post_graphql(ORDER_SETTINGS_QUERY)
+    assert_no_permission(response)
+
+
+GIFT_CARD_SETTINGS_QUERY = """
+    query giftCardSettings {
+        giftCardSettings {
+            expiryType
+            expiryPeriod {
+                type
+                amount
+            }
+        }
+    }
+"""
+
+
+def test_gift_card_settings_query_as_staff(
+    staff_api_client, permission_manage_gift_card, site_settings
+):
+    assert site_settings.gift_card_expiry_period is None
+
+    staff_api_client.user.user_permissions.add(permission_manage_gift_card)
+    response = staff_api_client.post_graphql(GIFT_CARD_SETTINGS_QUERY)
+    content = get_graphql_content(response)
+
+    assert (
+        content["data"]["giftCardSettings"]["expiryType"]
+        == site_settings.gift_card_expiry_type.upper()
+    )
+    assert content["data"]["giftCardSettings"]["expiryPeriod"] is None
+
+
+def test_query_gift_card_settings_expiry_period(
+    staff_api_client, permission_manage_gift_card, site_settings
+):
+    expiry_type = GiftCardSettingsExpiryType.EXPIRY_PERIOD
+    expiry_period_type = TimePeriodType.MONTH
+    expiry_period = 3
+    site_settings.gift_card_expiry_type = expiry_type
+    site_settings.gift_card_expiry_period_type = expiry_period_type
+    site_settings.gift_card_expiry_period = expiry_period
+    site_settings.save(
+        update_fields=[
+            "gift_card_expiry_type",
+            "gift_card_expiry_period_type",
+            "gift_card_expiry_period",
+        ]
+    )
+
+    staff_api_client.user.user_permissions.add(permission_manage_gift_card)
+    response = staff_api_client.post_graphql(GIFT_CARD_SETTINGS_QUERY)
+    content = get_graphql_content(response)
+
+    assert content["data"]["giftCardSettings"]["expiryType"] == expiry_type.upper()
+    assert (
+        content["data"]["giftCardSettings"]["expiryPeriod"]["type"]
+        == expiry_period_type.upper()
+    )
+    assert (
+        content["data"]["giftCardSettings"]["expiryPeriod"]["amount"] == expiry_period
+    )
+
+
+def test_gift_card_settings_query_as_app(
+    app_api_client, permission_manage_gift_card, site_settings
+):
+    assert site_settings.gift_card_expiry_period is None
+
+    response = app_api_client.post_graphql(
+        GIFT_CARD_SETTINGS_QUERY, permissions=[permission_manage_gift_card]
+    )
+    content = get_graphql_content(response)
+
+    assert (
+        content["data"]["giftCardSettings"]["expiryType"]
+        == site_settings.gift_card_expiry_type.upper()
+    )
+    assert content["data"]["giftCardSettings"]["expiryPeriod"] is None
+
+
+def test_gift_card_settings_query_as_user(user_api_client, site_settings):
+    response = user_api_client.post_graphql(GIFT_CARD_SETTINGS_QUERY)
+    assert_no_permission(response)
+
+
+API_VERSION_QUERY = """
+    query {
+        shop {
+            version
+        }
+    }
+"""
+
+
+def test_version_query_as_anonymous_user(api_client):
+    response = api_client.post_graphql(API_VERSION_QUERY)
+    assert_no_permission(response)
+
+
+def test_version_query_as_customer(user_api_client):
+    response = user_api_client.post_graphql(API_VERSION_QUERY)
+    assert_no_permission(response)
+
+
+def test_version_query_as_app(app_api_client):
+    response = app_api_client.post_graphql(API_VERSION_QUERY)
+    content = get_graphql_content(response)
+    assert content["data"]["shop"]["version"] == __version__
+
+
+def test_version_query_as_staff_user(staff_api_client):
+    response = staff_api_client.post_graphql(API_VERSION_QUERY)
+    content = get_graphql_content(response)
+    assert content["data"]["shop"]["version"] == __version__
+
+
+def test_schema_version_query(api_client):
+    # given
+    query = """
+        query {
+            shop {
+                schemaVersion
+            }
+        }
+    """
+    m = re.match(r"^(\d+)\.(\d+)\.\d+", __version__)
+    assert m is not None
+    major, minor = m.groups()
+
+    # when
+    response = api_client.post_graphql(query)
+    content = get_graphql_content(response)
+
+    # then
+    assert content["data"]["shop"]["schemaVersion"] == f"{major}.{minor}"
+
+
+def test_cannot_get_shop_limit_info_when_not_staff(user_api_client):
+    query = LIMIT_INFO_QUERY
+    response = user_api_client.post_graphql(query)
+    assert_no_permission(response)
+
+
+def test_get_shop_limit_info_returns_null_by_default(staff_api_client):
+    query = LIMIT_INFO_QUERY
+    response = staff_api_client.post_graphql(query)
+    content = get_graphql_content(response)
+    assert content["data"] == {
+        "shop": {
+            "limits": {
+                "currentUsage": {"channels": None},
+                "allowedUsage": {"channels": None},
+            }
+        }
+    }
+
+
+CHANNEL_CURRENCIES_QUERY = """
+    query {
+        shop {
+            channelCurrencies
+        }
+    }
+"""
+
+
+def test_fetch_channel_currencies(
+    staff_api_client, channel_PLN, channel_USD, other_channel_USD
+):
+    query = CHANNEL_CURRENCIES_QUERY
+    response = staff_api_client.post_graphql(query)
+    content = get_graphql_content(response)
+    assert set(content["data"]["shop"]["channelCurrencies"]) == {
+        channel_PLN.currency_code,
+        channel_USD.currency_code,
+    }
+
+
+def test_fetch_channel_currencies_by_app(
+    app_api_client, channel_PLN, channel_USD, other_channel_USD
+):
+    query = CHANNEL_CURRENCIES_QUERY
+    response = app_api_client.post_graphql(query)
+    content = get_graphql_content(response)
+    assert set(content["data"]["shop"]["channelCurrencies"]) == {
+        channel_PLN.currency_code,
+        channel_USD.currency_code,
+    }
+
+
+def test_fetch_channel_currencies_by_customer(api_client, channel_PLN, channel_USD):
+    query = CHANNEL_CURRENCIES_QUERY
+    response = api_client.post_graphql(query)
+    assert_no_permission(response)
+
+
+COUNTRY_FILTER_QUERY = """
+    query($filter: CountryFilterInput!) {
+        shop {
+            countries(filter: $filter){
+            code
+            }
+  
