@@ -84,4 +84,242 @@ def handle_webhook(
         WEBHOOK_SUCCESS_EVENT: handle_successful_payment_intent,
         WEBHOOK_AUTHORIZED_EVENT: handle_authorized_payment_intent,
         WEBHOOK_PROCESSING_EVENT: handle_processing_payment_intent,
-        WEBHOOK_FAILED_EVENT: handle_failed_paym
+        WEBHOOK_FAILED_EVENT: handle_failed_payment_intent,
+        WEBHOOK_CANCELED_EVENT: handle_failed_payment_intent,
+        WEBHOOK_REFUND_EVENT: handle_refund,
+    }
+    if event.type in webhook_handlers:
+        logger.debug(
+            "Processing new Stripe webhook",
+            extra={
+                "event_type": event.type,
+                "event_id": event.id,
+                "channel_slug": channel_slug,
+            },
+        )
+        webhook_handlers[event.type](event.data.object, gateway_config, channel_slug)
+    else:
+        logger.warning(
+            "Received unhandled webhook events", extra={"event_type": event.type}
+        )
+    return HttpResponse(status=200)
+
+
+def _channel_slug_is_different_from_payment_channel_slug(
+    channel_slug: str, payment: Payment
+) -> bool:
+    checkout = payment.checkout
+    order = payment.order
+    if checkout is not None:
+        return channel_slug != checkout.channel.slug
+    elif order is not None:
+        return channel_slug != order.channel.slug
+    else:
+        raise ValueError(
+            "Both payment.checkout and payment.order cannot be None"
+        )  # pragma: no cover
+
+
+def _get_payment(payment_intent_id: str) -> Optional[Payment]:
+    return (
+        Payment.objects.prefetch_related(
+            Prefetch("checkout", queryset=Checkout.objects.select_related("channel")),
+            Prefetch("order", queryset=Order.objects.select_related("channel")),
+        )
+        .select_for_update(of=("self",))
+        .filter(transactions__token=payment_intent_id)
+        .first()
+    )
+
+
+def _get_checkout(payment_id: int) -> Optional[Checkout]:
+    return (
+        Checkout.objects.prefetch_related("payments")
+        .select_for_update(of=("self",))
+        .filter(payments__id=payment_id, payments__is_active=True)
+        .first()
+    )
+
+
+def _finalize_checkout(
+    checkout: Checkout,
+    payment: Payment,
+    payment_intent: StripeObject,
+    kind: str,
+    amount: str,
+    currency: str,
+):
+    gateway_response = GatewayResponse(
+        kind=kind,
+        action_required=False,
+        transaction_id=payment_intent.id,
+        is_success=True,
+        amount=price_from_minor_unit(amount, currency),
+        currency=payment_intent.currency,
+        error=None,
+        raw_response=payment_intent.last_response,
+        psp_reference=payment_intent.id,
+    )
+
+    transaction = create_transaction(
+        payment,
+        kind=kind,
+        payment_information=None,
+        action_required=False,
+        gateway_response=gateway_response,
+    )
+
+    # To avoid zombie payments we have to update payment `charge_status` without
+    # changing `to_confirm` flag. In case when order cannot be created then
+    # payment will be refunded.
+    update_payment_charge_status(payment, transaction)
+    payment.refresh_from_db()
+    checkout.refresh_from_db()
+
+    manager = get_plugins_manager()
+    discounts = fetch_active_discounts()
+    lines, unavailable_variant_pks = fetch_checkout_lines(checkout)
+    if unavailable_variant_pks:
+        raise ValidationError("Some of the checkout lines variants are unavailable.")
+    checkout_info = fetch_checkout_info(checkout, lines, discounts, manager)
+    checkout_total = calculate_checkout_total_with_gift_cards(
+        manager=manager,
+        checkout_info=checkout_info,
+        lines=lines,
+        address=checkout.shipping_address or checkout.billing_address,
+        discounts=discounts,
+    )
+
+    try:
+        # when checkout total value is different than total amount from payments
+        # it means that some products has been removed during the payment was completed
+        if checkout_total.gross.amount != payment.total:
+            payment_refund_or_void(payment, manager, checkout_info.channel.slug)
+            raise ValidationError(
+                "Cannot complete checkout - some products do not exist anymore."
+            )
+
+        order, _, _ = complete_checkout(
+            manager=manager,
+            checkout_info=checkout_info,
+            lines=lines,
+            payment_data={},
+            store_source=False,
+            discounts=discounts,
+            user=checkout.user or None,
+            app=None,
+        )
+    except ValidationError as e:
+        logger.info("Failed to complete checkout %s.", checkout.pk, extra={"error": e})
+        return None
+
+
+def _get_or_create_transaction(
+    payment: Payment, stripe_object: StripeObject, kind: str, amount: str, currency: str
+):
+    transaction = payment.transactions.filter(
+        token=stripe_object.id,
+        action_required=False,
+        is_success=True,
+        kind=kind,
+    ).last()
+    if not transaction:
+        transaction = _update_payment_with_new_transaction(
+            payment, stripe_object, kind, amount, currency
+        )
+    return transaction
+
+
+def _update_payment_with_new_transaction(
+    payment: Payment, stripe_object: StripeObject, kind: str, amount: str, currency: str
+):
+    gateway_response = GatewayResponse(
+        kind=kind,
+        action_required=False,
+        transaction_id=stripe_object.id,
+        is_success=True,
+        amount=price_from_minor_unit(amount, currency),
+        currency=currency,
+        error=None,
+        raw_response=stripe_object.last_response,
+        psp_reference=stripe_object.id,
+    )
+    transaction = create_transaction(
+        payment,
+        kind=kind,
+        payment_information=None,
+        action_required=False,
+        gateway_response=gateway_response,
+    )
+    gateway_postprocess(transaction, payment)
+
+    return transaction
+
+
+def _process_payment_with_checkout(
+    payment: Payment,
+    payment_intent: StripeObject,
+    kind: str,
+    amount: str,
+    currency: str,
+):
+    checkout = _get_checkout(payment.id)
+
+    if checkout:
+        _finalize_checkout(checkout, payment, payment_intent, kind, amount, currency)
+
+
+def _update_payment_method_metadata(
+    payment: Payment,
+    payment_intent: StripeObject,
+    gateway_config: "GatewayConfig",
+) -> None:
+    api_key = gateway_config.connection_params["secret_api_key"]
+    metadata = payment.metadata
+
+    if metadata:
+        update_payment_method(api_key, payment_intent.payment_method, metadata)
+
+
+def update_payment_method_details_from_intent(
+    payment: Payment, payment_intent: StripeObject
+):
+    if payment_method_info := get_payment_method_details(payment_intent):
+        changed_fields: List[str] = []
+        update_payment_method_details(payment, payment_method_info, changed_fields)
+        if changed_fields:
+            payment.save(update_fields=changed_fields)
+
+
+def handle_authorized_payment_intent(
+    payment_intent: StripeObject, gateway_config: "GatewayConfig", channel_slug: str
+):
+    payment = _get_payment(payment_intent.id)
+
+    if not payment:
+        logger.warning(
+            "Payment for PaymentIntent was not found",
+            extra={"payment_intent": payment_intent.id},
+        )
+        return
+
+    if _channel_slug_is_different_from_payment_channel_slug(channel_slug, payment):
+        return
+
+    _update_payment_method_metadata(payment, payment_intent, gateway_config)
+    update_payment_method_details_from_intent(payment, payment_intent)
+
+    if not payment.is_active:
+        transaction = _get_or_create_transaction(
+            payment,
+            payment_intent,
+            TransactionKind.AUTH,
+            payment_intent.amount,
+            payment_intent.currency,
+        )
+        manager = get_plugins_manager()
+        try_void_or_refund_inactive_payment(payment, transaction, manager)
+        return
+
+    if payment.order_id:
+        if payment.charge_status == ChargeStatus.PENDING:
