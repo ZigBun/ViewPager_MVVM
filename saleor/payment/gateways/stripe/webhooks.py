@@ -323,3 +323,191 @@ def handle_authorized_payment_intent(
 
     if payment.order_id:
         if payment.charge_status == ChargeStatus.PENDING:
+            _update_payment_with_new_transaction(
+                payment,
+                payment_intent,
+                TransactionKind.AUTH,
+                payment_intent.amount,
+                payment_intent.currency,
+            )
+        # Order already created
+        return
+
+    if payment.checkout_id:
+        _process_payment_with_checkout(
+            payment,
+            payment_intent,
+            kind=TransactionKind.AUTH,
+            amount=payment_intent.amount,
+            currency=payment_intent.currency,
+        )
+
+
+def handle_failed_payment_intent(
+    payment_intent: StripeObject, _gateway_config: "GatewayConfig", channel_slug: str
+):
+    payment = _get_payment(payment_intent.id)
+
+    if not payment:
+        logger.warning(
+            "Payment for PaymentIntent was not found",
+            extra={"payment_intent": payment_intent.id},
+        )
+        return
+
+    if _channel_slug_is_different_from_payment_channel_slug(channel_slug, payment):
+        return
+
+    _update_payment_with_new_transaction(
+        payment,
+        payment_intent,
+        TransactionKind.CANCEL,
+        payment_intent.amount,
+        payment_intent.currency,
+    )
+
+    if payment.order:
+        order_voided(payment.order, None, None, payment, get_plugins_manager())
+
+
+def handle_processing_payment_intent(
+    payment_intent: StripeObject, _gateway_config: "GatewayConfig", channel_slug: str
+):
+    payment = _get_payment(payment_intent.id)
+
+    if not payment:
+        logger.warning(
+            "Payment for PaymentIntent was not found",
+            extra={"payment_intent": payment_intent.id},
+        )
+        return
+
+    if _channel_slug_is_different_from_payment_channel_slug(channel_slug, payment):
+        return
+
+    if not payment.is_active:
+        # we can't cancel/refund processing payment
+        return
+
+    if payment.order_id:
+        # Order already created
+        return
+
+    if payment.checkout_id:
+        _process_payment_with_checkout(
+            payment,
+            payment_intent,
+            TransactionKind.PENDING,
+            amount=payment_intent.amount,
+            currency=payment_intent.currency,
+        )
+
+
+def handle_successful_payment_intent(
+    payment_intent: StripeObject, gateway_config: "GatewayConfig", channel_slug: str
+):
+    payment = _get_payment(payment_intent.id)
+
+    if not payment:
+        logger.warning(
+            "Payment for PaymentIntent was not found",
+            extra={"payment_intent": payment_intent.id},
+        )
+        return
+
+    if _channel_slug_is_different_from_payment_channel_slug(channel_slug, payment):
+        return
+
+    _update_payment_method_metadata(payment, payment_intent, gateway_config)
+    update_payment_method_details_from_intent(payment, payment_intent)
+
+    if not payment.is_active:
+        transaction = _get_or_create_transaction(
+            payment,
+            payment_intent,
+            TransactionKind.CAPTURE,
+            payment_intent.amount_received,
+            payment_intent.currency,
+        )
+        try_void_or_refund_inactive_payment(payment, transaction, get_plugins_manager())
+        return
+
+    if payment.order:
+        if payment.charge_status in [ChargeStatus.PENDING, ChargeStatus.NOT_CHARGED]:
+            capture_transaction = _update_payment_with_new_transaction(
+                payment,
+                payment_intent,
+                TransactionKind.CAPTURE,
+                payment_intent.amount_received,
+                payment_intent.currency,
+            )
+            order_info = fetch_order_info(payment.order)
+            order_captured(
+                order_info,
+                None,
+                None,
+                capture_transaction.amount,
+                payment,
+                get_plugins_manager(),
+            )
+        return
+
+    if payment.checkout_id:
+        _process_payment_with_checkout(
+            payment,
+            payment_intent,
+            TransactionKind.CAPTURE,
+            amount=payment_intent.amount_received,
+            currency=payment_intent.currency,
+        )
+
+
+def handle_refund(
+    charge: StripeObject, _gateway_config: "GatewayConfig", channel_slug: str
+):
+    payment_intent_id = charge.payment_intent
+    payment = _get_payment(payment_intent_id)
+
+    refund = charge.refunds.data[0]
+    if not payment:
+        logger.warning(
+            "Payment for PaymentIntent was not found",
+            extra={"payment_intent": payment_intent_id},
+        )
+        return
+
+    if _channel_slug_is_different_from_payment_channel_slug(channel_slug, payment):
+        return
+
+    already_processed = payment.transactions.filter(token=refund.id).exists()
+
+    if already_processed:
+        logger.debug(
+            "Refund already processed",
+            extra={
+                "refund": refund.id,
+                "payment": payment.id,
+                "payment_intent_id": payment_intent_id,
+            },
+        )
+        return
+
+    if payment.charge_status in ChargeStatus.FULLY_REFUNDED:
+        logger.info(
+            "Order already fully refunded", extra={"order_id": payment.order_id}
+        )
+        return
+
+    refund_transaction = _update_payment_with_new_transaction(
+        payment, refund, TransactionKind.REFUND, refund.amount, refund.currency
+    )
+
+    if payment.order:
+        order_refunded(
+            payment.order,
+            None,
+            None,
+            refund_transaction.amount,
+            payment,
+            get_plugins_manager(),
+        )
