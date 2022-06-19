@@ -42,4 +42,96 @@ class BaseTranslationByIdAndLanguageCodeLoader(DataLoader):
 
 
 class AttributeTranslationByIdAndLanguageCodeLoader(
-    BaseTranslationById
+    BaseTranslationByIdAndLanguageCodeLoader
+):
+    context_key = "attribute_translation_by_id_and_language_code"
+    model = attribute_models.AttributeTranslation
+    relation_name = "attribute_id"
+
+
+class AttributeValueTranslationByIdAndLanguageCodeLoader(
+    BaseTranslationByIdAndLanguageCodeLoader
+):
+    context_key = "attribute_value_translation_by_id_and_language_code"
+    model = attribute_models.AttributeValueTranslation
+    relation_name = "attribute_value_id"
+
+
+class CategoryTranslationByIdAndLanguageCodeLoader(
+    BaseTranslationByIdAndLanguageCodeLoader
+):
+    context_key = "category_translation_by_id_and_language_code"
+    model = product_models.CategoryTranslation
+    relation_name = "category_id"
+
+
+class CollectionTranslationByIdAndLanguageCodeLoader(
+    BaseTranslationByIdAndLanguageCodeLoader
+):
+    context_key = "collection_translation_by_id_and_language_code"
+    model = product_models.CollectionTranslation
+    relation_name = "collection_id"
+
+
+class MenuItemTranslationByIdAndLanguageCodeLoader(
+    BaseTranslationByIdAndLanguageCodeLoader
+):
+    context_key = "menu_item_translation_by_id_and_language_code"
+    model = menu_models.MenuItemTranslation
+    relation_name = "menu_item_id"
+
+
+class PageTranslationByIdAndLanguageCodeLoader(
+    BaseTranslationByIdAndLanguageCodeLoader
+):
+    context_key = "page_translation_by_id_and_language_code"
+    model = page_models.PageTranslation
+    relation_name = "page_id"
+
+
+class ProductTranslationByIdAndLanguageCodeLoader(
+    BaseTranslationByIdAndLanguageCodeLoader
+):
+    context_key = "product_translation_by_id_and_language_code"
+    model = product_models.ProductTranslation
+    relation_name = "product_id"
+
+
+class ProductVariantTranslationByIdAndLanguageCodeLoader(
+    BaseTranslationByIdAndLanguageCodeLoader
+):
+    context_key = "product_variant_translation_by_id_and_language_code"
+    model = product_models.ProductVariantTranslation
+    relation_name = "product_variant_id"
+
+
+class SaleTranslationByIdAndLanguageCodeLoader(
+    BaseTranslationByIdAndLanguageCodeLoader
+):
+    context_key = "sale_translation_by_id_and_language_code"
+    model = discount_models.SaleTranslation
+    relation_name = "sale_id"
+
+
+class ShippingMethodTranslationByIdAndLanguageCodeLoader(
+    BaseTranslationByIdAndLanguageCodeLoader
+):
+    context_key = "shipping_method_translation_by_id_and_language_code"
+    model = shipping_models.ShippingMethodTranslation
+    relation_name = "shipping_method_id"
+
+
+class SiteSettingsTranslationByIdAndLanguageCodeLoader(
+    BaseTranslationByIdAndLanguageCodeLoader
+):
+    context_key = "site_settings_translation_by_id_and_language_code"
+    model = site_models.SiteSettingsTranslation
+    relation_name = "site_settings_id"
+
+
+class VoucherTranslationByIdAndLanguageCodeLoader(
+    BaseTranslationByIdAndLanguageCodeLoader
+):
+    context_key = "voucher_translation_by_id_and_language_code"
+    model = discount_models.VoucherTranslation
+    relation_name = "voucher_id"
