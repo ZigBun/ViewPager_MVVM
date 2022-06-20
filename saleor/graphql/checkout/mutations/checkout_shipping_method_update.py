@@ -182,4 +182,68 @@ class CheckoutShippingMethodUpdate(BaseMutation):
                     )
                 }
             )
-        delivery_method = convert_to_shipping_method
+        delivery_method = convert_to_shipping_method_data(shipping_method, listing)
+
+        cls._check_delivery_method(
+            checkout_info, lines, delivery_method=delivery_method
+        )
+
+        delete_external_shipping_id(checkout=checkout)
+        checkout.shipping_method = shipping_method
+        discounts = load_discounts(info.context)
+        invalidate_prices_updated_fields = invalidate_checkout_prices(
+            checkout_info, lines, manager, discounts, save=False
+        )
+        checkout.save(
+            update_fields=[
+                "shipping_method",
+            ]
+            + invalidate_prices_updated_fields
+        )
+        get_or_create_checkout_metadata(checkout).save(
+            update_fields=[
+                "private_metadata",
+            ]
+        )
+
+        cls.call_event(manager.checkout_updated, checkout)
+        return CheckoutShippingMethodUpdate(checkout=checkout)
+
+    @classmethod
+    def perform_on_external_shipping_method(
+        cls,
+        info: ResolveInfo,
+        shipping_method_id,
+        checkout_info,
+        lines,
+        checkout,
+        manager,
+    ):
+        delivery_method = manager.get_shipping_method(
+            checkout=checkout,
+            channel_slug=checkout.channel.slug,
+            shipping_method_id=shipping_method_id,
+        )
+
+        cls._check_delivery_method(
+            checkout_info, lines, delivery_method=delivery_method
+        )
+
+        set_external_shipping_id(checkout=checkout, app_shipping_id=delivery_method.id)
+        checkout.shipping_method = None
+        discounts = load_discounts(info.context)
+        invalidate_prices_updated_fields = invalidate_checkout_prices(
+            checkout_info, lines, manager, discounts, save=False
+        )
+        checkout.save(
+            update_fields=[
+                "shipping_method",
+            ]
+            + invalidate_prices_updated_fields
+        )
+        get_or_create_checkout_metadata(checkout).save(
+            update_fields=["private_metadata"]
+        )
+        cls.call_event(manager.checkout_updated, checkout)
+
+        return CheckoutShippingMethodUpdate(checkout=checkout)
