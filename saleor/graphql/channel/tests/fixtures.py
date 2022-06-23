@@ -78,4 +78,5 @@ def channel_JPY(db):
         is_active=True,
         allocation_strategy=AllocationStrategy.PRIORITIZE_HIGH_STOCK,
     )
-    _create_channel_tax_configuration(channel
+    _create_channel_tax_configuration(channel)
+    return channel
