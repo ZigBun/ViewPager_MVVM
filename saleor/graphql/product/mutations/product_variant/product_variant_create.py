@@ -292,4 +292,44 @@ class ProductVariantCreate(ModelMutation):
             )
 
     @classmethod
-    def save(cls, info: ResolveInfo, i
+    def save(cls, info: ResolveInfo, instance, cleaned_input):
+        new_variant = instance.pk is None
+        with traced_atomic_transaction():
+            instance.save()
+            if not instance.product.default_variant:
+                instance.product.default_variant = instance
+                instance.product.save(update_fields=["default_variant", "updated_at"])
+            # Recalculate the "discounted price" for the parent product
+            update_product_discounted_price_task.delay(instance.product_id)
+            stocks = cleaned_input.get("stocks")
+            if stocks:
+                cls.create_variant_stocks(instance, stocks)
+
+            attributes = cleaned_input.get("attributes")
+            if attributes:
+                AttributeAssignmentMixin.save(instance, attributes)
+
+            if not instance.name:
+                generate_and_set_variant_name(instance, cleaned_input.get("sku"))
+
+            manager = get_plugin_manager_promise(info.context).get()
+            update_product_search_vector(instance.product)
+            event_to_call = (
+                manager.product_variant_created
+                if new_variant
+                else manager.product_variant_updated
+            )
+            cls.call_event(event_to_call, instance)
+
+    @classmethod
+    def create_variant_stocks(cls, variant, stocks):
+        warehouse_ids = [stock["warehouse"] for stock in stocks]
+        warehouses = cls.get_nodes_or_error(
+            warehouse_ids, "warehouse", only_type=Warehouse
+        )
+        create_stocks(variant, stocks, warehouses)
+
+    @classmethod
+    def success_response(cls, instance):
+        instance = ChannelContext(node=instance, channel_slug=None)
+        return super().success_response(instance)
