@@ -419,4 +419,21 @@ class InactivePaymentGateway(BasePlugin):
     def get_supported_currencies(self, previous_value):
         return self.SUPPORTED_CURRENCIES
 
-    def get_payment_co
+    def get_payment_config(self, previous_value):
+        return self.CLIENT_CONFIG
+
+
+ACTIVE_PLUGINS = (
+    ChannelPluginSample,
+    ActivePaymentGateway,
+    ActivePlugin,
+    ActiveDummyPaymentGateway,
+)
+
+INACTIVE_PLUGINS = (
+    InactivePaymentGateway,
+    PluginInactive,
+    InactiveChannelPluginSample,
+)
+
+ALL_PLUGINS = ACTIVE_PLUGINS + INACTIVE_PLUGINS
