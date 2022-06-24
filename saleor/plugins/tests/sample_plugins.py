@@ -173,4 +173,250 @@ class PluginSample(BasePlugin):
         currency = order_line.unit_price.currency
         price = Money("1.0", currency)
         return OrderTaxedPricesData(
-        
+            price_with_discounts=TaxedMoney(price, price),
+            undiscounted_price=TaxedMoney(price, price),
+        )
+
+    def get_tax_rate_type_choices(self, previous_value):
+        return [TaxType(code="123", description="abc")]
+
+    def show_taxes_on_storefront(self, previous_value: bool) -> bool:
+        return True
+
+    def external_authentication_url(
+        self, data: dict, request: WSGIRequest, previous_value
+    ) -> dict:
+        return {"authorizeUrl": "http://www.auth.provider.com/authorize/"}
+
+    def external_obtain_access_tokens(
+        self, data: dict, request: WSGIRequest, previous_value
+    ) -> ExternalAccessTokens:
+        return ExternalAccessTokens(
+            token="token1", refresh_token="refresh2", csrf_token="csrf3"
+        )
+
+    def external_refresh(
+        self, data: dict, request: WSGIRequest, previous_value
+    ) -> ExternalAccessTokens:
+        return ExternalAccessTokens(
+            token="token4", refresh_token="refresh5", csrf_token="csrf6"
+        )
+
+    def external_verify(
+        self, data: dict, request: WSGIRequest, previous_value
+    ) -> Tuple[Optional[User], dict]:
+        user = User.objects.get()
+        return user, {"some_data": "data"}
+
+    def authenticate_user(
+        self, request: WSGIRequest, previous_value
+    ) -> Optional["User"]:
+        return User.objects.filter().first()
+
+    def external_logout(self, data: dict, request: WSGIRequest, previous_value) -> dict:
+        return {"logoutUrl": "http://www.auth.provider.com/logout/"}
+
+    def sale_created(
+        self,
+        sale: "Sale",
+        current_catalogue: DefaultDict[str, Set[str]],
+        previous_value: Any,
+    ):
+        return sale, current_catalogue
+
+    def sale_updated(
+        self,
+        sale: "Sale",
+        previous_catalogue: DefaultDict[str, Set[str]],
+        current_catalogue: DefaultDict[str, Set[str]],
+        previous_value: Any,
+    ):
+        return sale, previous_catalogue, current_catalogue
+
+    def sale_deleted(
+        self,
+        sale: "Sale",
+        previous_catalogue: DefaultDict[str, Set[str]],
+        previous_value: Any,
+    ):
+        return sale, previous_catalogue
+
+    def sale_toggle(
+        self,
+        sale: "Sale",
+        catalogue: DefaultDict[str, Set[str]],
+        previous_value: Any,
+    ):
+        return sale, catalogue
+
+    def get_checkout_line_tax_rate(
+        self,
+        checkout_info: "CheckoutInfo",
+        lines: Iterable["CheckoutLineInfo"],
+        checkout_line_info: "CheckoutLineInfo",
+        address: Optional["Address"],
+        discounts: Iterable["DiscountInfo"],
+        previous_value: Decimal,
+    ) -> Decimal:
+        return Decimal("0.080").quantize(Decimal(".01"))
+
+    def get_order_line_tax_rate(
+        self,
+        order: "Order",
+        product: "Product",
+        variant: "ProductVariant",
+        address: Optional["Address"],
+        previous_value: Decimal,
+    ) -> Decimal:
+        return Decimal("0.080").quantize(Decimal(".01"))
+
+    def get_checkout_shipping_tax_rate(
+        self,
+        checkout_info: "CheckoutInfo",
+        lines: Iterable["CheckoutLineInfo"],
+        address: Optional["Address"],
+        discounts: Iterable["DiscountInfo"],
+        previous_value: Decimal,
+    ):
+        return Decimal("0.080").quantize(Decimal(".01"))
+
+    def get_order_shipping_tax_rate(self, order: "Order", previous_value: Decimal):
+        return Decimal("0.080").quantize(Decimal(".01"))
+
+    def get_taxes_for_checkout(
+        self, checkout_info: "CheckoutInfo", lines, previous_value
+    ) -> Optional["TaxData"]:
+        return sample_tax_data(checkout_info.checkout)
+
+    def get_taxes_for_order(
+        self, order: "Order", previous_value
+    ) -> Optional["TaxData"]:
+        return sample_tax_data(order)
+
+    def sample_not_implemented(self, previous_value):
+        return NotImplemented
+
+    def event_delivery_retry(self, delivery: "EventDelivery", previous_value: Any):
+        return True
+
+    def perform_mutation(
+        self,
+        mutation_cls: Mutation,
+        root,
+        info: ResolveInfo,
+        data: dict,
+        previous_value: Optional[Union[ExecutionResult, GraphQLError]],
+    ) -> Optional[Union[ExecutionResult, GraphQLError]]:
+        return None
+
+
+class ChannelPluginSample(PluginSample):
+    PLUGIN_ID = "channel.plugin.sample"
+    PLUGIN_NAME = "Channel Plugin"
+    PLUGIN_DESCRIPTION = "Test channel plugin"
+    DEFAULT_ACTIVE = True
+    CONFIGURATION_PER_CHANNEL = True
+    DEFAULT_CONFIGURATION = [{"name": "input-per-channel", "value": None}]
+    CONFIG_STRUCTURE = {
+        "input-per-channel": {
+            "type": ConfigurationTypeField.STRING,
+            "help_text": "Test input",
+            "label": "Input per channel",
+        }
+    }
+
+
+class InactiveChannelPluginSample(PluginSample):
+    PLUGIN_ID = "channel.plugin.inactive.sample"
+    PLUGIN_NAME = "Inactive Channel Plugin"
+    PLUGIN_DESCRIPTION = "Test channel plugin"
+    DEFAULT_ACTIVE = False
+    CONFIGURATION_PER_CHANNEL = True
+    DEFAULT_CONFIGURATION = [{"name": "input-per-channel", "value": None}]
+    CONFIG_STRUCTURE = {
+        "input-per-channel": {
+            "type": ConfigurationTypeField.STRING,
+            "help_text": "Test input",
+            "label": "Input per channel",
+        }
+    }
+
+
+class PluginInactive(BasePlugin):
+    PLUGIN_ID = "mirumee.taxes.plugin.inactive"
+    PLUGIN_NAME = "PluginInactive"
+    PLUGIN_DESCRIPTION = "Test plugin description_2"
+    CONFIGURATION_PER_CHANNEL = False
+    DEFAULT_ACTIVE = False
+
+    def external_obtain_access_tokens(
+        self, data: dict, request: WSGIRequest, previous_value
+    ) -> ExternalAccessTokens:
+        return ExternalAccessTokens(
+            token="token1", refresh_token="refresh2", csrf_token="csrf3"
+        )
+
+
+class ActivePlugin(BasePlugin):
+    PLUGIN_ID = "mirumee.x.plugin.active"
+    PLUGIN_NAME = "Active"
+    PLUGIN_DESCRIPTION = "Not working"
+    DEFAULT_ACTIVE = True
+    CONFIGURATION_PER_CHANNEL = False
+
+
+class ActivePaymentGateway(BasePlugin):
+    PLUGIN_ID = "mirumee.gateway.active"
+    CLIENT_CONFIG = [
+        {"field": "foo", "value": "bar"},
+    ]
+    PLUGIN_NAME = "braintree"
+    DEFAULT_ACTIVE = True
+    SUPPORTED_CURRENCIES = ["USD"]
+
+    def process_payment(self, payment_information, previous_value):
+        pass
+
+    def get_supported_currencies(self, previous_value):
+        return self.SUPPORTED_CURRENCIES
+
+    def get_payment_config(self, previous_value):
+        return self.CLIENT_CONFIG
+
+
+class ActiveDummyPaymentGateway(BasePlugin):
+    PLUGIN_ID = "sampleDummy.active"
+    CLIENT_CONFIG = [
+        {"field": "foo", "value": "bar"},
+    ]
+    PLUGIN_NAME = "SampleDummy"
+    DEFAULT_ACTIVE = True
+    SUPPORTED_CURRENCIES = ["EUR", "USD"]
+
+    def process_payment(self, payment_information, previous_value):
+        pass
+
+    def get_supported_currencies(self, previous_value):
+        return self.SUPPORTED_CURRENCIES
+
+    def get_payment_config(self, previous_value):
+        return self.CLIENT_CONFIG
+
+    def check_payment_balance(self, request_data: dict, previous_value):
+        return {"test_response": "success"}
+
+
+class InactivePaymentGateway(BasePlugin):
+    PLUGIN_ID = "gateway.inactive"
+    PLUGIN_NAME = "stripe"
+    DEFAULT_ACTIVE = False
+    SUPPORTED_CURRENCIES = []
+    CLIENT_CONFIG = []
+
+    def process_payment(self, payment_information, previous_value):
+        pass
+
+    def get_supported_currencies(self, previous_value):
+        return self.SUPPORTED_CURRENCIES
+
+    def get_payment_co
