@@ -38,4 +38,35 @@ def sanitize_descriptions_json(apps, schema_editor):
     qs = Product.objects.all()
 
     for product in qs:
-        product.description_json = clean_draft_js(product.description_jso
+        product.description_json = clean_draft_js(product.description_json)
+        product.save(update_fields=["description_json"])
+
+    ProductTranslation = apps.get_model("product", "ProductTranslation")
+    qs = ProductTranslation.objects.all()
+
+    for product in qs:
+        product.description_json = clean_draft_js(product.description_json)
+        product.save(update_fields=["description_json"])
+
+
+class Migration(migrations.Migration):
+    dependencies = [("product", "0095_auto_20190618_0842")]
+
+    operations = [
+        migrations.RunPython(convert_products_html_to_json),
+        migrations.RunPython(sanitize_descriptions_json),
+        migrations.AlterField(
+            model_name="product",
+            name="description_json",
+            field=SanitizedJSONField(
+                blank=True, default=dict, sanitizer=clean_draft_js
+            ),
+        ),
+        migrations.AlterField(
+            model_name="producttranslation",
+            name="description_json",
+            field=SanitizedJSONField(
+                blank=True, default=dict, sanitizer=clean_draft_js
+            ),
+        ),
+    ]
