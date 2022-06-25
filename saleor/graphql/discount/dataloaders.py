@@ -185,4 +185,52 @@ class VoucherInfoByVoucherCodeLoader(DataLoader[str, Optional[VoucherInfo]]):
             .values_list("voucher_id", "collection_id")
         )
         voucher_categories = (
-            Voucher.categories.through.objects.using(self.database_connection_
+            Voucher.categories.through.objects.using(self.database_connection_name)
+            .filter(voucher__in=vouchers)
+            .values_list("voucher_id", "category_id")
+        )
+        product_pks_map = defaultdict(list)
+        variant_pks_map = defaultdict(list)
+        category_pks_map = defaultdict(list)
+        collection_pks_map = defaultdict(list)
+        for voucher_id, product_id in voucher_products:
+            product_pks_map[voucher_id].append(product_id)
+        for voucher_id, variant_id in voucher_variants:
+            variant_pks_map[voucher_id].append(variant_id)
+        for voucher_id, category_id in voucher_categories:
+            category_pks_map[voucher_id].append(category_id)
+        for voucher_id, collection_id in voucher_collections:
+            collection_pks_map[voucher_id].append(collection_id)
+        voucher_infos: List[Optional[VoucherInfo]] = []
+        for code in keys:
+            voucher = vouchers_map.get(code)
+            if not voucher:
+                voucher_infos.append(None)
+                continue
+            voucher_infos.append(
+                VoucherInfo(
+                    voucher=voucher,
+                    product_pks=product_pks_map.get(voucher.id, []),
+                    variant_pks=variant_pks_map.get(voucher.id, []),
+                    category_pks=category_pks_map.get(voucher.id, []),
+                    collection_pks=collection_pks_map.get(voucher.id, []),
+                )
+            )
+        return voucher_infos
+
+
+class OrderDiscountsByOrderIDLoader(DataLoader):
+    context_key = "orderdiscounts_by_order_id"
+
+    def batch_load(self, keys):
+        discounts = OrderDiscount.objects.using(self.database_connection_name).filter(
+            order_id__in=keys
+        )
+        discount_map = defaultdict(list)
+        for discount in discounts:
+            discount_map[discount.order_id].append(discount)
+        return [discount_map.get(order_id, []) for order_id in keys]
+
+
+def load_discounts(request):
+    return DiscountsByDateTimeLoader(request).load(request.request_time).get()
