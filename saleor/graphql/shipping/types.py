@@ -319,4 +319,106 @@ class ShippingZone(ChannelContextTypeWithMetadata[models.ShippingZone]):
             return (
                 ShippingMethodsByShippingZoneIdAndChannelSlugLoader(info.context)
                 .load((root.node.id, channel_slug))
-      
+                .then(wrap_shipping_method_with_channel_context)
+            )
+
+        return (
+            ShippingMethodsByShippingZoneIdLoader(info.context)
+            .load(root.node.id)
+            .then(wrap_shipping_method_with_channel_context)
+        )
+
+    @staticmethod
+    def resolve_warehouses(root: ChannelContext[models.ShippingZone], _info):
+        return root.node.warehouses.all()
+
+    @staticmethod
+    def resolve_channels(root: ChannelContext[models.ShippingZone], info):
+        return ChannelsByShippingZoneIdLoader(info.context).load(root.node.id)
+
+
+class ShippingMethod(graphene.ObjectType):
+    id = graphene.ID(
+        required=True, description="Unique ID of ShippingMethod available for Order."
+    )
+    type = ShippingMethodTypeEnum(
+        description="Type of the shipping method.",
+        deprecation_reason=DEPRECATED_IN_3X_FIELD,
+    )
+    name = graphene.String(required=True, description="Shipping method name.")
+    description = JSONString(description="Shipping method description." + RICH_CONTENT)
+    maximum_delivery_days = graphene.Int(
+        description="Maximum delivery days for this shipping method."
+    )
+    minimum_delivery_days = graphene.Int(
+        description="Minimum delivery days for this shipping method."
+    )
+    maximum_order_weight = graphene.Field(
+        Weight,
+        description="Maximum order weight for this shipping method.",
+        deprecation_reason=DEPRECATED_IN_3X_FIELD,
+    )
+    minimum_order_weight = graphene.Field(
+        Weight,
+        description="Minimum order weight for this shipping method.",
+        deprecation_reason=DEPRECATED_IN_3X_FIELD,
+    )
+    translation = TranslationField(
+        ShippingMethodTranslation,
+        type_name="shipping method",
+        resolver=resolve_shipping_translation,
+    )
+    price = graphene.Field(
+        Money, required=True, description="The price of selected shipping method."
+    )
+    maximum_order_price = graphene.Field(
+        Money, description="Maximum order price for this shipping method."
+    )
+    minimum_order_price = graphene.Field(
+        Money, description="Minimal order price for this shipping method."
+    )
+    active = graphene.Boolean(
+        required=True,
+        description="Describes if this shipping method is active and can be selected.",
+    )
+    message = graphene.String(description="Message connected to this shipping method.")
+
+    class Meta:
+        interfaces = [relay.Node, ObjectWithMetadata]
+        description = (
+            "Shipping methods that can be used as means of shipping "
+            "for orders and checkouts."
+        )
+
+    @staticmethod
+    def resolve_id(root: ShippingMethodData, _info):
+        return root.graphql_id
+
+    @staticmethod
+    def resolve_maximum_order_weight(root: ShippingMethodData, _info):
+        return convert_weight_to_default_weight_unit(root.maximum_order_weight)
+
+    @staticmethod
+    def resolve_minimum_order_weight(root: ShippingMethodData, _info):
+        return convert_weight_to_default_weight_unit(root.minimum_order_weight)
+
+
+class ShippingZoneCountableConnection(CountableConnection):
+    class Meta:
+        node = ShippingZone
+
+
+class ShippingMethodsPerCountry(graphene.ObjectType):
+    country_code = graphene.Field(
+        CountryCodeEnum, required=True, description="The country code."
+    )
+    shipping_methods = NonNullList(
+        ShippingMethod, description="List of available shipping methods."
+    )
+
+    class Meta:
+        description = (
+            "List of shipping methods available for the country."
+            + ADDED_IN_36
+            + PREVIEW_FEATURE
+        )
