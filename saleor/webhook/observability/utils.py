@@ -108,4 +108,100 @@ def pop_events_with_remaining_size() -> Tuple[List[Any], int]:
             events, remaining = buffer.pop_events_get_size()
             batch_count = buffer.in_batches(remaining)
         except Exception:
-            logger.error("Could not p
+            logger.error("Could not pop observability events batch.", exc_info=True)
+            events, batch_count = [], 0
+    return events, batch_count
+
+
+@dataclass
+class GraphQLOperationResponse:
+    name: Optional[str] = None
+    query: Optional[GraphQLDocument] = None
+    variables: Optional[Dict] = None
+    result: Optional[Dict] = None
+    result_invalid: bool = False
+
+
+class ApiCall:
+    def __init__(self, request: "HttpRequest"):
+        self.gql_operations: List[GraphQLOperationResponse] = []
+        self.response: Optional["HttpResponse"] = None
+        self._reported = False
+        self.request = request
+
+    def report(self):
+        if self._reported or not settings.OBSERVABILITY_ACTIVE:
+            return
+        only_app_api_call = not settings.OBSERVABILITY_REPORT_ALL_API_CALLS
+        if only_app_api_call and getattr(self.request, "app", None) is None:
+            return
+        if self.response is None:
+            logger.error("HttpResponse not provided, observability event dropped.")
+            return
+        self._reported = True
+        with opentracing_trace("report_api_call", "reporter"):
+            if get_webhooks():
+                put_event(
+                    partial(
+                        generate_api_call_payload,
+                        self.request,
+                        self.response,
+                        self.gql_operations,
+                        settings.OBSERVABILITY_MAX_PAYLOAD_SIZE,
+                    )
+                )
+
+
+@contextmanager
+def report_api_call(request: "HttpRequest") -> Generator[ApiCall, None, None]:
+    root = False
+    if not hasattr(_context, "api_call"):
+        _context.api_call, root = ApiCall(request), True
+    yield _context.api_call
+    if root:
+        _context.api_call.report()
+        del _context.api_call
+
+
+@contextmanager
+def report_gql_operation() -> Generator[GraphQLOperationResponse, None, None]:
+    root = False
+    if not hasattr(_context, "gql_operation"):
+        _context.gql_operation, root = GraphQLOperationResponse(), True
+    yield _context.gql_operation
+    if root:
+        if hasattr(_context, "api_call"):
+            _context.api_call.gql_operations.append(_context.gql_operation)
+        del _context.gql_operation
+
+
+def report_view(method):
+    @functools.wraps(method)
+    def wrapper(self, request, *args, **kwargs):
+        with report_api_call(request) as api_call:
+            response = method(self, request, *args, **kwargs)
+            api_call.response = response
+            return response
+
+    return wrapper
+
+
+def report_event_delivery_attempt(
+    attempt: "EventDeliveryAttempt", next_retry: Optional["datetime"] = None
+):
+    if not settings.OBSERVABILITY_ACTIVE:
+        return
+    if attempt.delivery is None:
+        logger.error(
+            "Observability event dropped. %r not assigned to delivery.", attempt
+        )
+    with opentracing_trace("report_event_delivery_attempt", "reporter"):
+        if get_webhooks():
+            put_event(
+                partial(
+                    generate_event_delivery_attempt_payload,
+                    attempt,
+                    next_retry,
+                    settings.OBSERVABILITY_MAX_PAYLOAD_SIZE,
+                )
+            )
