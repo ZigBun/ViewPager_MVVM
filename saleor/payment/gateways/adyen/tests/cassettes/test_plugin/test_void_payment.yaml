@@ -1,0 +1,21 @@
+interactions:
+- request:
+    body: '{"merchantAccount": "SaleorECOM", "originalReference": "852610010025849H",
+      "reference": "UGF5bWVudDoxMTY4", "applicationInfo": {"adyenLibrary": {"name":
+      "adyen-python-api-library", "version": "4.0.0"}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '202'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - adyen-python-api-library/4.0.0
+      x-api-key:
+      - test_key
+    metho
