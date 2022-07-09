@@ -125,4 +125,138 @@ def test_charge(
 
     assert response.kind == TransactionKind.CAPTURE
     assert response.amount == TRANSACTION_AMOUNT
-    assert respon
+    assert response.currency == razorpay_success_response["currency"]
+    assert response.raw_response == razorpay_success_response
+    assert response.transaction_id == razorpay_success_response["id"]
+
+
+@pytest.mark.integration
+def test_charge_unsupported_currency(razorpay_payment, gateway_config):
+    # Set the payment currency to an unsupported currency
+    razorpay_payment.currency = "USD"
+
+    # Data to be passed
+    payment_token = "123"
+
+    payment_info = create_payment_information(
+        razorpay_payment, payment_token=payment_token, amount=TRANSACTION_AMOUNT
+    )
+
+    # Attempt charging
+    response = capture(payment_info, gateway_config)
+
+    # Ensure a error was returned
+    assert response.error == (errors.UNSUPPORTED_CURRENCY % {"currency": "USD"})
+    assert not response.is_success
+
+    # Ensure the response is correctly set
+    assert response.kind == TransactionKind.CAPTURE
+    assert response.transaction_id == payment_token
+
+
+@patch.object(logger, "exception")
+@patch("razorpay.Client")
+def test_charge_invalid_request(
+    mocked_gateway, mocked_logger, razorpay_payment, gateway_config
+):
+    # Data to be passed
+    payment_token = "123"
+
+    # Assign the side effect to the gateway's `capture()` method,
+    # that should trigger the expected error.
+    mocked_gateway.return_value.payment.capture.side_effect = BadRequestError()
+
+    payment_info = create_payment_information(
+        razorpay_payment, payment_token=payment_token, amount=TRANSACTION_AMOUNT
+    )
+
+    # Attempt charging
+    response = capture(payment_info, gateway_config)
+
+    # Ensure an error was returned
+    assert response.error == errors.INVALID_REQUEST
+    assert not response.is_success
+
+    # Ensure the response is correctly set
+    assert response.kind == TransactionKind.CAPTURE
+    assert response.transaction_id == payment_token
+
+    # Ensure the HTTP error was logged
+    assert mocked_logger.call_count == 1
+
+
+@pytest.mark.integration
+@patch("razorpay.Client")
+def test_refund(
+    mocked_gateway, charged_payment, razorpay_success_response, gateway_config
+):
+    # Mock the gateway response to a success response
+    mocked_gateway.return_value.payment.refund.return_value = razorpay_success_response
+
+    payment_info = create_payment_information(
+        charged_payment, amount=TRANSACTION_AMOUNT
+    )
+
+    # Attempt charging
+    response = refund(payment_info, gateway_config)
+
+    # Ensure the was no error returned
+    assert not response.error
+    assert response.is_success
+
+    assert response.kind == TransactionKind.REFUND
+    assert response.amount == TRANSACTION_AMOUNT
+    assert response.currency == razorpay_success_response["currency"]
+    assert response.raw_response == razorpay_success_response
+    assert response.transaction_id == razorpay_success_response["id"]
+
+
+@pytest.mark.integration
+def test_refund_unsupported_currency(razorpay_payment, charged_payment, gateway_config):
+    # Set the payment currency to an unsupported currency
+    razorpay_payment.currency = "USD"
+
+    payment_info = create_payment_information(
+        razorpay_payment, amount=TRANSACTION_AMOUNT
+    )
+
+    # Attempt charging
+    response = refund(payment_info, gateway_config)
+
+    # Ensure a error was returned
+    assert response.error == (errors.UNSUPPORTED_CURRENCY % {"currency": "USD"})
+    assert not response.is_success
+
+    # Ensure the kind is correctly set
+    assert response.kind == TransactionKind.REFUND
+
+
+@pytest.mark.integration
+@patch.object(logger, "exception")
+@patch("razorpay.Client")
+def test_refund_invalid_data(
+    mocked_gateway,
+    mocked_logger,
+    charged_payment,
+    razorpay_success_response,
+    gateway_config,
+):
+    # Assign the side effect to the gateway's `refund()` method,
+    # that should trigger the expected error.
+    mocked_gateway.return_value.payment.refund.side_effect = ServerError()
+
+    # Attempt charging
+    payment_info = create_payment_information(
+        charged_payment, amount=TRANSACTION_AMOUNT
+    )
+    response = refund(payment_info, gateway_config)
+
+    # Ensure a error was returned
+    assert response.error == errors.SERVER_ERROR
+    assert not response.is_success
+
+    # Ensure the transaction is correctly set
+    assert response.kind == TransactionKind.REFUND
+
+    # Ensure the HTTP error was logged
+    assert mocked_logger.call_count == 1
