@@ -281,4 +281,60 @@ class AttributeValueTranslation(Translation):
     attribute_value = models.ForeignKey(
         AttributeValue, related_name="translations", on_delete=models.CASCADE
     )
-    name = models.CharField(max_len
+    name = models.CharField(max_length=100)
+    rich_text = SanitizedJSONField(blank=True, null=True, sanitizer=clean_editor_js)
+    plain_text = models.TextField(
+        blank=True,
+        null=True,
+    )
+
+    class Meta:
+        unique_together = (("language_code", "attribute_value"),)
+
+    def __repr__(self) -> str:
+        class_ = type(self)
+        return "%s(pk=%r, name=%r, attribute_value_pk=%r)" % (
+            class_.__name__,
+            self.pk,
+            self.name,
+            self.attribute_value_id,
+        )
+
+    def __str__(self) -> str:
+        return self.name
+
+    def get_translated_object_id(self):
+        return "AttributeValue", self.attribute_value_id
+
+    def get_translated_keys(self):
+        return {"name": self.name, "rich_text": self.rich_text}
+
+    def get_translation_context(self):
+        context = {}
+        attribute_value = self.attribute_value
+        attribute = attribute_value.attribute
+        context["attribute_id"] = attribute.id
+        if attribute.input_type in AttributeInputType.TYPES_WITH_UNIQUE_VALUES:
+            if attribute.type == AttributeType.PRODUCT_TYPE:
+                if assigned_variant_attribute_value := (
+                    attribute_value.variantvalueassignment.first()
+                ):
+                    if variant := assigned_variant_attribute_value.assignment.variant:
+                        context["product_variant_id"] = variant.id
+                        context["product_id"] = variant.product_id
+                elif assigned_product_attribute_value := (
+                    attribute_value.productvalueassignment.first()
+                ):
+                    if product_id := (
+                        assigned_product_attribute_value.assignment.product_id
+                    ):
+                        context["product_id"] = product_id
+            elif attribute.type == AttributeType.PAGE_TYPE:
+                if assigned_page_attribute_value := (
+                    attribute_value.pagevalueassignment.first()
+                ):
+                    if page := assigned_page_attribute_value.assignment.page:
+                        context["page_id"] = page.id
+                        if page_type_id := page.page_type_id:
+                            context["page_type_id"] = page_type_id
+        return context
