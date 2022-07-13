@@ -32,4 +32,15 @@ class Thumbnail(models.Model):
         null=True,
         blank=True,
         on_delete=models.CASCADE,
-        related_name="thum
+        related_name="thumbnails",
+    )
+    product_media = models.ForeignKey(
+        ProductMedia,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="thumbnails",
+    )
+    user = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.CASCADE, related_name="thumbnails"
+    )
