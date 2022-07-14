@@ -149,4 +149,196 @@ class StripeGatewayPlugin(BasePlugin):
 
         # payment still requires an action
         if status in ACTION_REQUIRED_STATUSES:
-            kind = TransactionKind.ACTION_TO_CO
+            kind = TransactionKind.ACTION_TO_CONFIRM
+        elif status == PROCESSING_STATUS:
+            kind = TransactionKind.PENDING
+            action_required = False
+        elif status == SUCCESS_STATUS:
+            kind = TransactionKind.CAPTURE
+            action_required = False
+        elif status == AUTHORIZED_STATUS:
+            kind = TransactionKind.AUTH
+            action_required = False
+
+        return kind, action_required
+
+    def _get_setup_future_usage_from_store_payment_method(
+        self, store_payment_method: StorePaymentMethodEnum
+    ) -> Optional[str]:
+        if store_payment_method == StorePaymentMethodEnum.ON_SESSION:
+            return "on_session"
+        elif store_payment_method == StorePaymentMethodEnum.OFF_SESSION:
+            return "off_session"
+        else:
+            return None
+
+    def process_payment(
+        self, payment_information: "PaymentData", previous_value
+    ) -> "GatewayResponse":
+        if not self.active:
+            return previous_value
+
+        api_key = self.config.connection_params["secret_api_key"]
+
+        auto_capture = self.config.auto_capture
+        if self.order_auto_confirmation is False:
+            auto_capture = False
+
+        data = payment_information.data
+
+        payment_method_id = data.get("payment_method_id") if data else None
+
+        setup_future_usage = None
+        # DEPRECATED: reuse_source will be removed in Saleor 4.0
+        if payment_information.reuse_source:
+            setup_future_usage = data.get("setup_future_usage") if data else None
+
+        off_session = data.get("off_session") if data else None
+
+        payment_method_types = data.get("payment_method_types") if data else None
+
+        if not setup_future_usage:
+            setup_future_usage = self._get_setup_future_usage_from_store_payment_method(
+                payment_information.store_payment_method
+            )
+
+        customer = None
+        # confirm that we creates customer on stripe side only for log-in customers
+        # Stripe doesn't allow to search users by email, so each create customer
+        # call creates new customer on Stripe side.
+        if payment_information.graphql_customer_id:
+            customer = get_or_create_customer(
+                api_key=api_key,
+                customer_email=payment_information.customer_email,
+                customer_id=payment_information.customer_id,
+            )
+        intent, error = create_payment_intent(
+            api_key=api_key,
+            amount=payment_information.amount,
+            currency=payment_information.currency,
+            auto_capture=auto_capture,
+            customer=customer,
+            payment_method_id=payment_method_id,
+            metadata={
+                **payment_information.payment_metadata,
+                "channel": self.channel.slug,  # type: ignore
+                "payment_id": payment_information.graphql_payment_id,
+            },
+            setup_future_usage=setup_future_usage,
+            off_session=off_session,
+            payment_method_types=payment_method_types,
+            customer_email=payment_information.customer_email,
+        )
+
+        raw_response = None
+        if error:
+            raw_response = getattr(error, "json_body", None)
+            if payment_method_id and not intent:
+                # we can receive an error which is caused by a required authentication
+                # but stripe already created payment_intent.
+                if error.code == "authentication_required":
+                    stripe_error = error.error
+                    intent = getattr(stripe_error, "payment_intent", None)
+                error = None if intent else error
+
+        client_secret = None
+        intent_id = None
+        kind = TransactionKind.ACTION_TO_CONFIRM
+        action_required = True
+        payment_method_info = None
+        if intent:
+            kind, action_required = self._get_transaction_details_for_stripe_status(
+                intent.status
+            )
+            if kind in (TransactionKind.AUTH, TransactionKind.CAPTURE):
+                payment_method_info = get_payment_method_details(intent)
+            client_secret = intent.client_secret
+            last_response = intent.last_response
+            raw_response = last_response.data if last_response else None
+            intent_id = intent.id
+
+        return GatewayResponse(
+            is_success=True if not error else False,
+            action_required=action_required,
+            kind=kind,
+            amount=payment_information.amount,
+            currency=payment_information.currency,
+            transaction_id=intent.id if intent else "",
+            error=error.user_message if error else None,
+            raw_response=raw_response,
+            action_required_data={"client_secret": client_secret, "id": intent_id},
+            customer_id=customer.id if customer else None,
+            psp_reference=intent.id if intent else None,
+            payment_method_info=payment_method_info,
+        )
+
+    def confirm_payment(
+        self, payment_information: "PaymentData", previous_value
+    ) -> "GatewayResponse":
+        if not self.active:
+            return previous_value
+        payment_intent_id = payment_information.token
+        api_key = self.config.connection_params["secret_api_key"]
+
+        # before we will call stripe API, let's check if the transaction object hasn't
+        # been created by webhook handler
+        payment_transaction = Transaction.objects.filter(
+            payment_id=payment_information.payment_id,
+            is_success=True,
+            action_required=False,
+            kind__in=[
+                TransactionKind.AUTH,
+                TransactionKind.CAPTURE,
+                TransactionKind.PENDING,
+            ],
+        ).first()
+
+        if payment_transaction:
+            return GatewayResponse(
+                is_success=True,
+                action_required=False,
+                kind=payment_transaction.kind,
+                amount=payment_transaction.amount,
+                currency=payment_transaction.currency,
+                transaction_id=payment_transaction.token,
+                error=None,
+                raw_response=payment_transaction.gateway_response,
+                transaction_already_processed=True,
+            )
+
+        payment_intent = None
+        error = None
+        payment_method_info = None
+        if payment_intent_id:
+            payment_intent, error = retrieve_payment_intent(api_key, payment_intent_id)
+
+        kind = TransactionKind.AUTH
+        if payment_intent:
+            amount = price_from_minor_unit(
+                payment_intent.amount, payment_intent.currency
+            )
+            currency = payment_intent.currency
+
+            kind, action_required = self._get_transaction_details_for_stripe_status(
+                payment_intent.status
+            )
+
+            if kind in (TransactionKind.AUTH, TransactionKind.CAPTURE):
+                payment_method_info = get_payment_method_details(payment_intent)
+
+        else:
+            action_required = False
+            amount = payment_information.amount
+            currency = payment_information.currency
+
+        raw_response = None
+        if payment_intent and payment_intent.last_response:
+            raw_response = payment_intent.last_response.data
+
+        return GatewayResponse(
+            is_success=True if payment_intent else False,
+            action_required=action_required,
+            kind=kind,
+            amount=amount,
+            currency=currency,
+            transac
