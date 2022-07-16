@@ -341,4 +341,197 @@ class StripeGatewayPlugin(BasePlugin):
             kind=kind,
             amount=amount,
             currency=currency,
-            transac
+            transaction_id=payment_intent.id if payment_intent else "",
+            error=error.user_message if error else None,
+            raw_response=raw_response,
+            psp_reference=payment_intent.id if payment_intent else None,
+            payment_method_info=payment_method_info,
+        )
+
+    def capture_payment(
+        self, payment_information: "PaymentData", previous_value
+    ) -> "GatewayResponse":
+        if not self.active:
+            return previous_value
+        payment_intent_id = payment_information.token
+        capture_amount = price_to_minor_unit(
+            payment_information.amount, payment_information.currency
+        )
+        payment_intent, error = capture_payment_intent(
+            api_key=self.config.connection_params["secret_api_key"],
+            payment_intent_id=payment_intent_id,  # type: ignore
+            amount_to_capture=capture_amount,
+        )
+
+        raw_response = None
+        if payment_intent and payment_intent.last_response:
+            raw_response = payment_intent.last_response.data
+
+        payment_method_info = None
+        if payment_intent and payment_intent.status == SUCCESS_STATUS:
+            payment_method_info = get_payment_method_details(payment_intent)
+
+        return GatewayResponse(
+            is_success=True if payment_intent else False,
+            action_required=False,
+            kind=TransactionKind.CAPTURE,
+            amount=payment_information.amount,
+            currency=payment_information.currency,
+            transaction_id=payment_intent.id if payment_intent else "",
+            error=error.user_message if error else None,
+            raw_response=raw_response,
+            payment_method_info=payment_method_info,
+        )
+
+    def refund_payment(
+        self, payment_information: "PaymentData", previous_value
+    ) -> "GatewayResponse":
+        if not self.active:
+            return previous_value
+        payment_intent_id = payment_information.token
+        refund_amount = price_to_minor_unit(
+            payment_information.amount, payment_information.currency
+        )
+        refund, error = refund_payment_intent(
+            api_key=self.config.connection_params["secret_api_key"],
+            payment_intent_id=payment_intent_id,  # type: ignore
+            amount_to_refund=refund_amount,
+        )
+
+        raw_response = None
+        if refund and refund.last_response:
+            raw_response = refund.last_response.data
+
+        return GatewayResponse(
+            is_success=True if refund else False,
+            action_required=False,
+            kind=TransactionKind.REFUND,
+            amount=payment_information.amount,
+            currency=payment_information.currency,
+            transaction_id=refund.id if refund else "",
+            error=error.user_message if error else None,
+            raw_response=raw_response,
+        )
+
+    def void_payment(
+        self, payment_information: "PaymentData", previous_value
+    ) -> "GatewayResponse":
+        if not self.active:
+            return previous_value
+        payment_intent_id = payment_information.token
+
+        payment_intent, error = cancel_payment_intent(
+            api_key=self.config.connection_params["secret_api_key"],
+            payment_intent_id=payment_intent_id,  # type: ignore
+        )
+
+        raw_response = None
+        if payment_intent and payment_intent.last_response:
+            raw_response = payment_intent.last_response.data
+
+        return GatewayResponse(
+            is_success=True if payment_intent else False,
+            action_required=False,
+            kind=TransactionKind.VOID,
+            amount=payment_information.amount,
+            currency=payment_information.currency,
+            transaction_id=payment_intent.id if payment_intent else "",
+            error=error.user_message if error else None,
+            raw_response=raw_response,
+        )
+
+    def list_payment_sources(
+        self, customer_id: str, previous_value
+    ) -> List[CustomerSource]:
+        if not self.active:
+            return previous_value
+        payment_methods, error = list_customer_payment_methods(
+            api_key=self.config.connection_params["secret_api_key"],
+            customer_id=customer_id,
+        )
+        if payment_methods:
+            customer_sources = [
+                CustomerSource(
+                    id=payment_method.id,
+                    gateway=PLUGIN_ID,
+                    credit_card_info=PaymentMethodInfo(
+                        exp_year=payment_method.card.exp_year,
+                        exp_month=payment_method.card.exp_month,
+                        last_4=payment_method.card.last4,
+                        name=None,
+                        brand=payment_method.card.brand,
+                    ),
+                    metadata=payment_method.metadata,
+                )
+                for payment_method in payment_methods
+            ]
+            previous_value.extend(customer_sources)
+        return previous_value
+
+    @classmethod
+    def pre_save_plugin_configuration(cls, plugin_configuration: "PluginConfiguration"):
+        configuration = plugin_configuration.configuration
+        flat_configuration = {item["name"]: item for item in configuration}
+
+        api_key = flat_configuration["secret_api_key"]["value"]
+        webhook_id = flat_configuration.get("webhook_endpoint_id", {}).get("value")
+        webhook_secret_data = flat_configuration.get("webhook_secret_key", {})
+        if not plugin_configuration.active:
+            if webhook_id:
+                # delete all webhook details when we disable a stripe integration.
+                webhook_id_field = [
+                    c_field
+                    for c_field in configuration
+                    if c_field["name"] == "webhook_endpoint_id"
+                ][0]
+                webhook_id_field["value"] = ""
+
+                if webhook_secret_data:
+                    plugin_configuration.configuration.remove(webhook_secret_data)
+                delete_webhook(api_key, webhook_id)
+
+            return
+
+        # check saved domain. Make sure that it is not localhost domain. We are not able
+        # to subscribe to stripe webhooks with localhost.
+        domain = Site.objects.get_current().domain
+        localhost_domains = ["localhost", "127.0.0.1"]
+        domain, _ = split_domain_port(domain)
+        if not domain:
+            logger.warning(
+                "Site doesn't have defined domain. Unable to subscribe Stripe webhooks"
+            )
+            return
+        if domain in localhost_domains:
+            logger.warning(
+                "Unable to subscribe localhost domain - %s to Stripe webhooks. Stripe "
+                "webhooks require domain which will be accessible from the network",
+                domain,
+            )
+            return
+
+        webhook = None
+        if not webhook_id and not webhook_secret_data.get("value"):
+            webhook = subscribe_webhook(
+                api_key, plugin_configuration.channel.slug  # type: ignore
+            )
+
+        if not webhook:
+            logger.warning(
+                "Unable to subscribe to Stripe webhook", extra={"domain": domain}
+            )
+            return
+        cls._update_or_create_config_field(
+            plugin_configuration.configuration, "webhook_endpoint_id", webhook.id
+        )
+        cls._update_or_create_config_field(
+            plugin_configuration.configuration, "webhook_secret_key", webhook.secret
+        )
+
+    @classmethod
+    def _update_or_create_config_field(cls, configuration, field, value):
+        for c_field in configuration:
+            if c_field["name"] == field:
+                c_field["value"] = value
+                return
+     
