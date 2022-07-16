@@ -534,4 +534,47 @@ class StripeGatewayPlugin(BasePlugin):
             if c_field["name"] == field:
                 c_field["value"] = value
                 return
-     
+        configuration.append({"name": field, "value": value})
+
+    @classmethod
+    def validate_plugin_configuration(
+        cls, plugin_configuration: "PluginConfiguration", **kwargs
+    ):
+        configuration = plugin_configuration.configuration
+        configuration = {item["name"]: item["value"] for item in configuration}
+        required_fields = ["secret_api_key", "public_api_key"]
+        all_required_fields_provided = all(
+            [configuration.get(field) for field in required_fields]
+        )
+        if plugin_configuration.active:
+            if not all_required_fields_provided:
+                raise ValidationError(
+                    {
+                        field: ValidationError(
+                            "The parameter is required.",
+                            code=PluginErrorCode.REQUIRED.value,
+                        )
+                        for field in required_fields
+                    }
+                )
+
+            api_key = configuration["secret_api_key"]
+            if not is_secret_api_key_valid(api_key):
+                raise ValidationError(
+                    {
+                        "secret_api_key": ValidationError(
+                            "Secret API key is incorrect",
+                            code=PluginErrorCode.INVALID.value,
+                        )
+                    }
+                )
+
+    def get_payment_config(self, previous_value):
+        if not self.active:
+            return previous_value
+        return [
+            {
+                "field": "api_key",
+                "value": self.config.connection_params["public_api_key"],
+            },
+        ]
