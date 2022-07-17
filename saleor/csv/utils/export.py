@@ -141,4 +141,95 @@ def create_file_with_headers(file_headers: List[str], delimiter: str, file_type:
     table = etl.wrap([file_headers])
 
     if file_type == FileTypes.CSV:
-        temp_file = Nam
+        temp_file = NamedTemporaryFile("ab+", suffix=".csv")
+        etl.tocsv(table, temp_file.name, delimiter=delimiter)
+    else:
+        temp_file = NamedTemporaryFile("ab+", suffix=".xlsx")
+        etl.io.xlsx.toxlsx(table, temp_file.name)
+
+    return temp_file
+
+
+def export_products_in_batches(
+    queryset: "QuerySet",
+    export_info: Dict[str, list],
+    export_fields: Set[str],
+    headers: List[str],
+    delimiter: str,
+    temporary_file: Any,
+    file_type: str,
+):
+    warehouses = export_info.get("warehouses")
+    attributes = export_info.get("attributes")
+    channels = export_info.get("channels")
+
+    for batch_pks in queryset_in_batches(queryset):
+        product_batch = Product.objects.filter(pk__in=batch_pks).prefetch_related(
+            "attributes",
+            "variants",
+            "collections",
+            "media",
+            "product_type",
+            "category",
+        )
+
+        export_data = get_products_data(
+            product_batch, export_fields, attributes, warehouses, channels
+        )
+
+        append_to_file(export_data, headers, temporary_file, file_type, delimiter)
+
+
+def export_gift_cards_in_batches(
+    queryset: "QuerySet",
+    export_fields: List[str],
+    delimiter: str,
+    temporary_file: Any,
+    file_type: str,
+):
+    for batch_pks in queryset_in_batches(queryset):
+        gift_card_batch = GiftCard.objects.filter(pk__in=batch_pks)
+
+        export_data = list(gift_card_batch.values(*export_fields))
+
+        append_to_file(export_data, export_fields, temporary_file, file_type, delimiter)
+
+
+def queryset_in_batches(queryset):
+    """Slice a queryset into batches.
+
+    Input queryset should be sorted be pk.
+    """
+    start_pk = 0
+
+    while True:
+        qs = queryset.order_by("pk").filter(pk__gt=start_pk)[:BATCH_SIZE]
+        pks = list(qs.values_list("pk", flat=True))
+
+        if not pks:
+            break
+
+        yield pks
+
+        start_pk = pks[-1]
+
+
+def append_to_file(
+    export_data: List[Dict[str, Union[str, bool]]],
+    headers: List[str],
+    temporary_file: Any,
+    file_type: str,
+    delimiter: str,
+):
+    table = etl.fromdicts(export_data, header=headers, missing=" ")
+
+    if file_type == FileTypes.CSV:
+        etl.io.csv.appendcsv(table, temporary_file.name, delimiter=delimiter)
+    else:
+        etl.io.xlsx.appendxlsx(table, temporary_file.name)
+
+
+def save_csv_file_in_export_file(
+    export_file: "ExportFile", temporary_file: IO[bytes], file_name: str
+):
+    export_file.content_file.save(file_name, temporary_file)
