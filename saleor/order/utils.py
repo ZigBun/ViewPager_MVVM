@@ -596,4 +596,201 @@ def get_all_shipping_methods_for_order(
 
 
 def get_valid_shipping_methods_for_order(
-    order:
+    order: Order,
+    shipping_channel_listings: Iterable["ShippingMethodChannelListing"],
+    manager: "PluginsManager",
+) -> List[ShippingMethodData]:
+    """Return a list of shipping methods according to Saleor's own business logic."""
+    valid_methods = get_all_shipping_methods_for_order(order, shipping_channel_listings)
+    if not valid_methods:
+        return []
+
+    excluded_methods = manager.excluded_shipping_methods_for_order(order, valid_methods)
+    initialize_shipping_method_active_status(valid_methods, excluded_methods)
+
+    return valid_methods
+
+
+def is_shipping_required(lines: Iterable["OrderLine"]):
+    return any(line.is_shipping_required for line in lines)
+
+
+def get_valid_collection_points_for_order(
+    lines: Iterable["OrderLine"], channel_id: int
+):
+    if not is_shipping_required(lines):
+        return []
+
+    line_ids = [line.id for line in lines]
+    qs = OrderLine.objects.filter(id__in=line_ids)
+
+    return Warehouse.objects.applicable_for_click_and_collect(qs, channel_id)
+
+
+def get_discounted_lines(lines, voucher):
+    discounted_products = voucher.products.all()
+    discounted_categories = set(voucher.categories.all())
+    discounted_collections = set(voucher.collections.all())
+
+    discounted_lines = []
+    if discounted_products or discounted_collections or discounted_categories:
+        for line in lines:
+            line_product = line.variant.product
+            line_category = line.variant.product.category
+            line_collections = set(line.variant.product.collections.all())
+            if line.variant and (
+                line_product in discounted_products
+                or line_category in discounted_categories
+                or line_collections.intersection(discounted_collections)
+            ):
+                discounted_lines.append(line)
+    else:
+        # If there's no discounted products, collections or categories,
+        # it means that all products are discounted
+        discounted_lines.extend(list(lines))
+    return discounted_lines
+
+
+def get_prices_of_discounted_specific_product(
+    lines: Iterable[OrderLine],
+    voucher: Voucher,
+) -> List[Money]:
+    """Get prices of variants belonging to the discounted specific products.
+
+    Specific products are products, collections and categories.
+    Product must be assigned directly to the discounted category, assigning
+    product to child category won't work.
+    """
+    line_prices = []
+    discounted_lines = get_discounted_lines(lines, voucher)
+
+    for line in discounted_lines:
+        line_prices.extend([line.unit_price_gross] * line.quantity)
+
+    return line_prices
+
+
+def get_products_voucher_discount_for_order(order: Order, voucher: Voucher) -> Money:
+    """Calculate products discount value for a voucher, depending on its type."""
+    prices = None
+    if voucher and voucher.type == VoucherType.SPECIFIC_PRODUCT:
+        prices = get_prices_of_discounted_specific_product(order.lines.all(), voucher)
+    if not prices:
+        msg = "This offer is only valid for selected items."
+        raise NotApplicable(msg)
+    return get_products_voucher_discount(voucher, prices, order.channel)
+
+
+def get_voucher_discount_for_order(order: Order) -> Money:
+    """Calculate discount value depending on voucher and discount types.
+
+    Raise NotApplicable if voucher of given type cannot be applied.
+    """
+    if not order.voucher:
+        return zero_money(order.currency)
+    validate_voucher_in_order(order)
+    subtotal = order.get_subtotal()
+    if order.voucher.type == VoucherType.ENTIRE_ORDER:
+        return order.voucher.get_discount_amount_for(subtotal.gross, order.channel)
+    if order.voucher.type == VoucherType.SHIPPING:
+        return order.voucher.get_discount_amount_for(
+            order.shipping_price.gross, order.channel
+        )
+    if order.voucher.type == VoucherType.SPECIFIC_PRODUCT:
+        return get_products_voucher_discount_for_order(order, order.voucher)
+    raise NotImplementedError("Unknown discount type")
+
+
+def match_orders_with_new_user(user: User) -> None:
+    Order.objects.confirmed().filter(user_email=user.email, user=None).update(user=user)
+
+
+def get_total_order_discount(order: Order) -> Money:
+    """Return total order discount assigned to the order."""
+    all_discounts = order.discounts.all()
+    total_order_discount = Money(
+        sum([discount.amount_value for discount in all_discounts]),
+        currency=order.currency,
+    )
+    total_order_discount = min(total_order_discount, order.undiscounted_total_gross)
+    return total_order_discount
+
+
+def get_total_order_discount_excluding_shipping(order: Order) -> Money:
+    """Return total discounts assigned to the order excluding shipping discounts."""
+    # If the order has an assigned shipping voucher we want to exclude the corresponding
+    # order discount from the calculation.
+    # The calculation is based on assumption that an order can have only one voucher.
+    all_discounts = order.discounts.all()
+    if order.voucher and order.voucher.type == VoucherType.SHIPPING:
+        all_discounts = all_discounts.exclude(type=OrderDiscountType.VOUCHER)
+    total_order_discount = Money(
+        sum([discount.amount_value for discount in all_discounts]),
+        currency=order.currency,
+    )
+    total_order_discount = min(total_order_discount, order.undiscounted_total_gross)
+    return total_order_discount
+
+
+def get_order_discounts(order: Order) -> List[OrderDiscount]:
+    """Return all discounts applied to the order by staff user."""
+    return list(order.discounts.filter(type=OrderDiscountType.MANUAL))
+
+
+def create_order_discount_for_order(
+    order: Order, reason: str, value_type: str, value: Decimal
+):
+    """Add new order discount and update the prices."""
+
+    current_total = order.undiscounted_total
+    currency = order.currency
+
+    gross_total = apply_discount_to_value(
+        value, value_type, currency, current_total.gross
+    )
+
+    new_amount = quantize_price((current_total - gross_total).gross, currency)
+
+    order_discount = order.discounts.create(
+        value_type=value_type,
+        value=value,
+        reason=reason,
+        amount=new_amount,  # type: ignore
+    )
+    return order_discount
+
+
+def remove_order_discount_from_order(order: Order, order_discount: OrderDiscount):
+    """Remove the order discount from order and update the prices."""
+
+    discount_amount = order_discount.amount
+    order_discount.delete()
+
+    order.total += discount_amount
+    order.save(update_fields=["total_net_amount", "total_gross_amount", "updated_at"])
+
+
+def update_discount_for_order_line(
+    order_line: OrderLine,
+    order: "Order",
+    reason: Optional[str],
+    value_type: Optional[str],
+    value: Optional[Decimal],
+):
+    """Update discount fields for order line. Apply discount to the price."""
+    current_value = order_line.unit_discount_value
+    current_value_type = order_line.unit_discount_type
+    value = value or current_value
+    value_type = value_type or current_value_type
+    fields_to_update = []
+    if reason is not None:
+        order_line.unit_discount_reason = reason
+        fields_to_update.append("unit_discount_reason")
+    if current_value != value or current_value_type != value_type:
+        undiscounted_base_unit_price = order_line.undiscounted_base_unit_price
+        currency = undiscounted_base_unit_price.currency
+        base_unit_price = apply_discount_to_value(
+            value, value_type, currency, undiscounted_base_unit_price
+        )
+
+        order_line.unit_discount = undiscounted_base_unit_price - base_unit_price
