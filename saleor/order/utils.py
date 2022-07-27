@@ -794,3 +794,178 @@ def update_discount_for_order_line(
         )
 
         order_line.unit_discount = undiscounted_base_unit_price - base_unit_price
+
+        order_line.unit_price = TaxedMoney(base_unit_price, base_unit_price)
+        order_line.base_unit_price = base_unit_price
+
+        order_line.unit_discount_type = value_type
+        order_line.unit_discount_value = value
+        order_line.total_price = order_line.unit_price * order_line.quantity
+        order_line.undiscounted_unit_price = (
+            order_line.unit_price + order_line.unit_discount
+        )
+        order_line.undiscounted_total_price = (
+            order_line.quantity * order_line.undiscounted_unit_price
+        )
+        fields_to_update.extend(
+            [
+                "tax_rate",
+                "unit_discount_value",
+                "unit_discount_amount",
+                "unit_discount_type",
+                "unit_discount_reason",
+                "unit_price_gross_amount",
+                "unit_price_net_amount",
+                "total_price_net_amount",
+                "total_price_gross_amount",
+                "base_unit_price_amount",
+                "undiscounted_unit_price_gross_amount",
+                "undiscounted_unit_price_net_amount",
+                "undiscounted_total_price_gross_amount",
+                "undiscounted_total_price_net_amount",
+            ]
+        )
+
+    # Save lines before calculating the taxes as some plugin can fetch all order data
+    # from db
+    order_line.save(update_fields=fields_to_update)
+
+
+def remove_discount_from_order_line(order_line: OrderLine, order: "Order"):
+    """Drop discount applied to order line. Restore undiscounted price."""
+    order_line.unit_price = TaxedMoney(
+        net=order_line.undiscounted_base_unit_price,
+        gross=order_line.undiscounted_base_unit_price,
+    )
+    order_line.base_unit_price = order_line.undiscounted_base_unit_price
+    order_line.undiscounted_unit_price = TaxedMoney(
+        net=order_line.undiscounted_base_unit_price,
+        gross=order_line.undiscounted_base_unit_price,
+    )
+    order_line.unit_discount_amount = Decimal(0)
+    order_line.unit_discount_value = Decimal(0)
+    order_line.unit_discount_reason = ""
+    order_line.total_price = order_line.unit_price * order_line.quantity
+    order_line.save(
+        update_fields=[
+            "unit_discount_value",
+            "unit_discount_amount",
+            "unit_discount_reason",
+            "unit_price_gross_amount",
+            "unit_price_net_amount",
+            "base_unit_price_amount",
+            "total_price_net_amount",
+            "total_price_gross_amount",
+            "tax_rate",
+        ]
+    )
+
+
+def update_order_charge_status(order: Order):
+    """Update the current charge status for the order.
+
+    We treat the order as overcharged when the charged amount is bigger that order.total
+    We treat the order as fully charged when the charged amount is equal to order.total.
+    We treat the order as partially charged when the charged amount covers only part of
+    the order.total
+    We treat the order as not charged when the charged amount is 0.
+    """
+    total_charged = order.total_charged_amount or Decimal("0")
+    total_charged = quantize_price(total_charged, order.currency)
+
+    total_gross = order.total_gross_amount or Decimal(0)
+    total_gross = quantize_price(total_gross, order.currency)
+
+    if total_charged <= 0:
+        order.charge_status = OrderChargeStatus.NONE
+    elif total_charged < total_gross:
+        order.charge_status = OrderChargeStatus.PARTIAL
+    elif total_charged == total_gross:
+        order.charge_status = OrderChargeStatus.FULL
+    else:
+        order.charge_status = OrderChargeStatus.OVERCHARGED
+
+
+def _update_order_total_charged(order: Order):
+    order.total_charged_amount = (
+        sum(order.payments.values_list("captured_amount", flat=True)) or 0
+    )
+    order.total_charged_amount += sum(
+        order.payment_transactions.values_list("charged_value", flat=True)
+    )
+
+
+def update_order_charge_data(order: Order, with_save=True):
+    _update_order_total_charged(order)
+    update_order_charge_status(order)
+    if with_save:
+        order.save(
+            update_fields=["total_charged_amount", "charge_status", "updated_at"]
+        )
+
+
+def _update_order_total_authorized(order: Order):
+    order.total_authorized_amount = get_total_authorized(
+        order.payments.all(), order.currency
+    ).amount
+    order.total_authorized_amount += (
+        sum(order.payment_transactions.values_list("authorized_value", flat=True)) or 0
+    )
+
+
+def update_order_authorize_status(order: Order):
+    """Update the current authorize status for the order.
+
+    We treat the order as fully authorized when the sum of authorized and charged funds
+    cover the order.total.
+    We treat the order as partially authorized when the sum of authorized and charged
+    funds covers only part of the order.total
+    We treat the order as not authorized when the sum of authorized and charged funds is
+    0.
+    """
+    total_covered = (
+        order.total_authorized_amount + order.total_charged_amount or Decimal("0")
+    )
+    total_covered = quantize_price(total_covered, order.currency)
+    total_gross = order.total_gross_amount or Decimal("0")
+    total_gross = quantize_price(total_gross, order.currency)
+
+    if total_covered == 0:
+        order.authorize_status = OrderAuthorizeStatus.NONE
+    elif total_covered >= total_gross:
+        order.authorize_status = OrderAuthorizeStatus.FULL
+    else:
+        order.authorize_status = OrderAuthorizeStatus.PARTIAL
+
+
+def update_order_authorize_data(order: Order, with_save=True):
+    _update_order_total_authorized(order)
+    update_order_authorize_status(order)
+    if with_save:
+        order.save(
+            update_fields=["total_authorized_amount", "authorize_status", "updated_at"]
+        )
+
+
+def update_order_display_gross_prices(order: "Order"):
+    """Update Order's `display_gross_prices` DB field.
+
+    It gets the appropriate country code based on the current order lines and addresses.
+    Having the country code get the proper tax configuration for this channel and
+    country and determine whether gross prices should be displayed for this order.
+    Doesn't save the value in the database.
+    """
+    channel = order.channel
+    tax_configuration = channel.tax_configuration
+    country_code = get_tax_country(
+        channel,
+        order.is_shipping_required(),
+        order.shipping_address,
+        order.billing_address,
+    )
+    country_tax_configuration = tax_configuration.country_exceptions.filter(
+        country=country_code
+    ).first()
+    order.display_gross_prices = get_display_gross_prices(
+        tax_configuration, country_tax_configuration
+    )
