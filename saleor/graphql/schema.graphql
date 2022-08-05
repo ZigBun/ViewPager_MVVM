@@ -1,0 +1,7160 @@
+
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+type Query {
+  """
+  Look up a webhook by ID. Requires one of the following permissions: MANAGE_APPS, OWNER.
+  """
+  webhook(
+    """ID of the webhook."""
+    id: ID!
+  ): Webhook
+
+  """
+  List of all available webhook events.
+  
+  Requires one of the following permissions: MANAGE_APPS.
+  """
+  webhookEvents: [WebhookEvent!] @deprecated(reason: "This field will be removed in Saleor 4.0. Use `WebhookEventTypeAsyncEnum` and `WebhookEventTypeSyncEnum` to get available event types.")
+
+  """
+  Retrieve a sample payload for a given webhook event based on real data. It can be useful for some integrations where sample payload is required.
+  """
+  webhookSamplePayload(
+    """Name of the requested event type."""
+    eventType: WebhookSampleEventTypeEnum!
+  ): JSONString
+
+  """
+  Look up a warehouse by ID.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS, MANAGE_ORDERS, MANAGE_SHIPPING.
+  """
+  warehouse(
+    """ID of a warehouse."""
+    id: ID
+
+    """
+    External ID of a warehouse. 
+    
+    Added in Saleor 3.10.
+    """
+    externalReference: String
+  ): Warehouse
+
+  """
+  List of warehouses.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS, MANAGE_ORDERS, MANAGE_SHIPPING.
+  """
+  warehouses(
+    filter: WarehouseFilterInput
+    sortBy: WarehouseSortingInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): WarehouseCountableConnection
+
+  """
+  Returns a list of all translatable items of a given kind.
+  
+  Requires one of the following permissions: MANAGE_TRANSLATIONS.
+  """
+  translations(
+    """Kind of objects to retrieve."""
+    kind: TranslatableKinds!
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): TranslatableItemConnection
+
+  """
+  Lookup a translatable item by ID.
+  
+  Requires one of the following permissions: MANAGE_TRANSLATIONS.
+  """
+  translation(
+    """ID of the object to retrieve."""
+    id: ID!
+
+    """Kind of the object to retrieve."""
+    kind: TranslatableKinds!
+  ): TranslatableItem
+
+  """
+  Look up a tax configuration.
+  
+  Added in Saleor 3.9.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  
+  Requires one of the following permissions: AUTHENTICATED_STAFF_USER, AUTHENTICATED_APP.
+  """
+  taxConfiguration(
+    """ID of a tax configuration."""
+    id: ID!
+  ): TaxConfiguration
+
+  """
+  List of tax configurations.
+  
+  Added in Saleor 3.9.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  
+  Requires one of the following permissions: AUTHENTICATED_STAFF_USER, AUTHENTICATED_APP.
+  """
+  taxConfigurations(
+    """Filtering options for tax configurations."""
+    filter: TaxConfigurationFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): TaxConfigurationCountableConnection
+
+  """
+  Look up a tax class.
+  
+  Added in Saleor 3.9.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  
+  Requires one of the following permissions: AUTHENTICATED_STAFF_USER, AUTHENTICATED_APP.
+  """
+  taxClass(
+    """ID of a tax class."""
+    id: ID!
+  ): TaxClass
+
+  """
+  List of tax classes.
+  
+  Added in Saleor 3.9.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  
+  Requires one of the following permissions: AUTHENTICATED_STAFF_USER, AUTHENTICATED_APP.
+  """
+  taxClasses(
+    """Sort tax classes."""
+    sortBy: TaxClassSortingInput
+
+    """Filtering options for tax classes."""
+    filter: TaxClassFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): TaxClassCountableConnection
+
+  """
+  Tax class rates grouped by country.
+  
+  Requires one of the following permissions: AUTHENTICATED_STAFF_USER, AUTHENTICATED_APP.
+  """
+  taxCountryConfiguration(
+    """Country for which to return tax class rates."""
+    countryCode: CountryCode!
+  ): TaxCountryConfiguration
+
+  "\\n\\nRequires one of the following permissions: AUTHENTICATED_STAFF_USER, AUTHENTICATED_APP."
+  taxCountryConfigurations: [TaxCountryConfiguration!]
+
+  """
+  Look up a stock by ID
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  stock(
+    """ID of an warehouse"""
+    id: ID!
+  ): Stock
+
+  """
+  List of stocks.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  stocks(
+    filter: StockFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): StockCountableConnection
+
+  """Return information about the shop."""
+  shop: Shop!
+
+  """
+  Order related settings from site settings. Returns `orderSettings` for the first `channel` in alphabetical order.
+  
+  Requires one of the following permissions: MANAGE_ORDERS.
+  """
+  orderSettings: OrderSettings @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `channel` query to fetch the `orderSettings` field instead.")
+
+  """
+  Gift card related settings from site settings.
+  
+  Requires one of the following permissions: MANAGE_GIFT_CARD.
+  """
+  giftCardSettings: GiftCardSettings!
+
+  """
+  Look up a shipping zone by ID.
+  
+  Requires one of the following permissions: MANAGE_SHIPPING.
+  """
+  shippingZone(
+    """ID of the shipping zone."""
+    id: ID!
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ShippingZone
+
+  """
+  List of the shop's shipping zones.
+  
+  Requires one of the following permissions: MANAGE_SHIPPING.
+  """
+  shippingZones(
+    """Filtering options for shipping zones."""
+    filter: ShippingZoneFilterInput
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): ShippingZoneCountableConnection
+
+  """
+  Look up digital content by ID.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  digitalContent(
+    """ID of the digital content."""
+    id: ID!
+  ): DigitalContent
+
+  """
+  List of digital content.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  digitalContents(
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): DigitalContentCountableConnection
+
+  """List of the shop's categories."""
+  categories(
+    """Filtering options for categories."""
+    filter: CategoryFilterInput
+
+    """Sort categories."""
+    sortBy: CategorySortingInput
+
+    """Filter categories by the nesting level in the category tree."""
+    level: Int
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): CategoryCountableConnection
+
+  """Look up a category by ID or slug."""
+  category(
+    """ID of the category."""
+    id: ID
+
+    """Slug of the category"""
+    slug: String
+  ): Category
+
+  """
+  Look up a collection by ID. Requires one of the following permissions to include the unpublished items: MANAGE_ORDERS, MANAGE_DISCOUNTS, MANAGE_PRODUCTS.
+  """
+  collection(
+    """ID of the collection."""
+    id: ID
+
+    """Slug of the category"""
+    slug: String
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Collection
+
+  """
+  List of the shop's collections. Requires one of the following permissions to include the unpublished items: MANAGE_ORDERS, MANAGE_DISCOUNTS, MANAGE_PRODUCTS.
+  """
+  collections(
+    """Filtering options for collections."""
+    filter: CollectionFilterInput
+
+    """Sort collections."""
+    sortBy: CollectionSortingInput
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): CollectionCountableConnection
+
+  """
+  Look up a product by ID. Requires one of the following permissions to include the unpublished items: MANAGE_ORDERS, MANAGE_DISCOUNTS, MANAGE_PRODUCTS.
+  """
+  product(
+    """ID of the product."""
+    id: ID
+
+    """Slug of the product."""
+    slug: String
+
+    """
+    External ID of the product. 
+    
+    Added in Saleor 3.10.
+    """
+    externalReference: String
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Product
+
+  """
+  List of the shop's products. Requires one of the following permissions to include the unpublished items: MANAGE_ORDERS, MANAGE_DISCOUNTS, MANAGE_PRODUCTS.
+  """
+  products(
+    """Filtering options for products."""
+    filter: ProductFilterInput
+
+    """Sort products."""
+    sortBy: ProductOrder
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): ProductCountableConnection
+
+  """Look up a product type by ID."""
+  productType(
+    """ID of the product type."""
+    id: ID!
+  ): ProductType
+
+  """List of the shop's product types."""
+  productTypes(
+    """Filtering options for product types."""
+    filter: ProductTypeFilterInput
+
+    """Sort product types."""
+    sortBy: ProductTypeSortingInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): ProductTypeCountableConnection
+
+  """
+  Look up a product variant by ID or SKU. Requires one of the following permissions to include the unpublished items: MANAGE_ORDERS, MANAGE_DISCOUNTS, MANAGE_PRODUCTS.
+  """
+  productVariant(
+    """ID of the product variant."""
+    id: ID
+
+    """Sku of the product variant."""
+    sku: String
+
+    """
+    External ID of the product. 
+    
+    Added in Saleor 3.10.
+    """
+    externalReference: String
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ProductVariant
+
+  """
+  List of product variants. Requires one of the following permissions to include the unpublished items: MANAGE_ORDERS, MANAGE_DISCOUNTS, MANAGE_PRODUCTS.
+  """
+  productVariants(
+    """Filter product variants by given IDs."""
+    ids: [ID!]
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """Filtering options for product variant."""
+    filter: ProductVariantFilterInput
+
+    """Sort products variants."""
+    sortBy: ProductVariantSortingInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): ProductVariantCountableConnection
+
+  """
+  List of top selling products.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  reportProductSales(
+    """Span of time."""
+    period: ReportingPeriod!
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String!
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): ProductVariantCountableConnection
+
+  """
+  Look up a payment by ID.
+  
+  Requires one of the following permissions: MANAGE_ORDERS.
+  """
+  payment(
+    """ID of the payment."""
+    id: ID!
+  ): Payment
+
+  """
+  List of payments.
+  
+  Requires one of the following permissions: MANAGE_ORDERS.
+  """
+  payments(
+    """Filtering options for payments."""
+    filter: PaymentFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): PaymentCountableConnection
+
+  """
+  Look up a transaction by ID.
+  
+  Added in Saleor 3.6.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  
+  Requires one of the following permissions: HANDLE_PAYMENTS.
+  """
+  transaction(
+    """ID of a transaction."""
+    id: ID!
+  ): TransactionItem
+
+  """Look up a page by ID or slug."""
+  page(
+    """ID of the page."""
+    id: ID
+
+    """The slug of the page."""
+    slug: String
+  ): Page
+
+  """List of the shop's pages."""
+  pages(
+    """Sort pages."""
+    sortBy: PageSortingInput
+
+    """Filtering options for pages."""
+    filter: PageFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): PageCountableConnection
+
+  """Look up a page type by ID."""
+  pageType(
+    """ID of the page type."""
+    id: ID!
+  ): PageType
+
+  """List of the page types."""
+  pageTypes(
+    """Sort page types."""
+    sortBy: PageTypeSortingInput
+
+    """Filtering options for page types."""
+    filter: PageTypeFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): PageTypeCountableConnection
+
+  """
+  List of activity events to display on homepage (at the moment it only contains order-events).
+  
+  Requires one of the following permissions: MANAGE_ORDERS.
+  """
+  homepageEvents(
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): OrderEventCountableConnection
+
+  """Look up an order by ID or external reference."""
+  order(
+    """ID of an order."""
+    id: ID
+
+    """
+    External ID of an order. 
+    
+    Added in Saleor 3.10.
+    """
+    externalReference: String
+  ): Order
+
+  """
+  List of orders.
+  
+  Requires one of the following permissions: MANAGE_ORDERS.
+  """
+  orders(
+    """Sort orders."""
+    sortBy: OrderSortingInput
+
+    """Filtering options for orders."""
+    filter: OrderFilterInput
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): OrderCountableConnection
+
+  """
+  List of draft orders.
+  
+  Requires one of the following permissions: MANAGE_ORDERS.
+  """
+  draftOrders(
+    """Sort draft orders."""
+    sortBy: OrderSortingInput
+
+    """Filtering options for draft orders."""
+    filter: OrderDraftFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): OrderCountableConnection
+
+  """
+  Return the total sales amount from a specific period.
+  
+  Requires one of the following permissions: MANAGE_ORDERS.
+  """
+  ordersTotal(
+    """A period of time."""
+    period: ReportingPeriod
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): TaxedMoney
+
+  """Look up an order by token."""
+  orderByToken(
+    """The order's token."""
+    token: UUID!
+  ): Order @deprecated(reason: "This field will be removed in Saleor 4.0.")
+
+  """Look up a navigation menu by ID or name."""
+  menu(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """ID of the menu."""
+    id: ID
+
+    """The menu's name."""
+    name: String
+
+    """The menu's slug."""
+    slug: String
+  ): Menu
+
+  """List of the storefront's menus."""
+  menus(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """Sort menus."""
+    sortBy: MenuSortingInput
+
+    """
+    Filtering options for menus. 
+    
+    `slug`: This field will be removed in Saleor 4.0. Use `slugs` instead.
+    """
+    filter: MenuFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): MenuCountableConnection
+
+  """Look up a menu item by ID."""
+  menuItem(
+    """ID of the menu item."""
+    id: ID!
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): MenuItem
+
+  """List of the storefronts's menu items."""
+  menuItems(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """Sort menus items."""
+    sortBy: MenuItemSortingInput
+
+    """Filtering options for menu items."""
+    filter: MenuItemFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): MenuItemCountableConnection
+
+  """
+  Look up a gift card by ID.
+  
+  Requires one of the following permissions: MANAGE_GIFT_CARD.
+  """
+  giftCard(
+    """ID of the gift card."""
+    id: ID!
+  ): GiftCard
+
+  """
+  List of gift cards.
+  
+  Requires one of the following permissions: MANAGE_GIFT_CARD.
+  """
+  giftCards(
+    """
+    Sort gift cards.
+    
+    Added in Saleor 3.1.
+    
+    Note: this API is currently in Feature Preview and can be subject to changes at later point.
+    """
+    sortBy: GiftCardSortingInput
+
+    """
+    Filtering options for gift cards.
+    
+    Added in Saleor 3.1.
+    
+    Note: this API is currently in Feature Preview and can be subject to changes at later point.
+    """
+    filter: GiftCardFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): GiftCardCountableConnection
+
+  """
+  List of gift card currencies.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  
+  Requires one of the following permissions: MANAGE_GIFT_CARD.
+  """
+  giftCardCurrencies: [String!]!
+
+  """
+  List of gift card tags.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  
+  Requires one of the following permissions: MANAGE_GIFT_CARD.
+  """
+  giftCardTags(
+    """Filtering options for gift card tags."""
+    filter: GiftCardTagFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): GiftCardTagCountableConnection
+
+  """
+  Look up a plugin by ID.
+  
+  Requires one of the following permissions: MANAGE_PLUGINS.
+  """
+  plugin(
+    """ID of the plugin."""
+    id: ID!
+  ): Plugin
+
+  """
+  List of plugins.
+  
+  Requires one of the following permissions: MANAGE_PLUGINS.
+  """
+  plugins(
+    """Filtering options for plugins."""
+    filter: PluginFilterInput
+
+    """Sort plugins."""
+    sortBy: PluginSortingInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): PluginCountableConnection
+
+  """
+  Look up a sale by ID.
+  
+  Requires one of the following permissions: MANAGE_DISCOUNTS.
+  """
+  sale(
+    """ID of the sale."""
+    id: ID!
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Sale
+
+  """
+  List of the shop's sales.
+  
+  Requires one of the following permissions: MANAGE_DISCOUNTS.
+  """
+  sales(
+    """Filtering options for sales."""
+    filter: SaleFilterInput
+
+    """Sort sales."""
+    sortBy: SaleSortingInput
+
+    """
+    Search sales by name, value or type. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `filter.search` input instead.
+    """
+    query: String
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): SaleCountableConnection
+
+  """
+  Look up a voucher by ID.
+  
+  Requires one of the following permissions: MANAGE_DISCOUNTS.
+  """
+  voucher(
+    """ID of the voucher."""
+    id: ID!
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Voucher
+
+  """
+  List of the shop's vouchers.
+  
+  Requires one of the following permissions: MANAGE_DISCOUNTS.
+  """
+  vouchers(
+    """Filtering options for vouchers."""
+    filter: VoucherFilterInput
+
+    """Sort voucher."""
+    sortBy: VoucherSortingInput
+
+    """
+    Search vouchers by name or code. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `filter.search` input instead.
+    """
+    query: String
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): VoucherCountableConnection
+
+  """
+  Look up a export file by ID.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  exportFile(
+    """ID of the export file job."""
+    id: ID!
+  ): ExportFile
+
+  """
+  List of export files.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  exportFiles(
+    """Filtering options for export files."""
+    filter: ExportFileFilterInput
+
+    """Sort export files."""
+    sortBy: ExportFileSortingInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): ExportFileCountableConnection
+
+  """List of all tax rates available from tax gateway."""
+  taxTypes: [TaxType!]
+
+  """Look up a checkout by token and slug of channel."""
+  checkout(
+    """
+    The checkout's ID.
+    
+    Added in Saleor 3.4.
+    """
+    id: ID
+
+    """
+    The checkout's token.
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    token: UUID
+  ): Checkout
+
+  """
+  List of checkouts.
+  
+  Requires one of the following permissions: MANAGE_CHECKOUTS.
+  """
+  checkouts(
+    """
+    Sort checkouts.
+    
+    Added in Saleor 3.1.
+    """
+    sortBy: CheckoutSortingInput
+
+    """
+    Filtering options for checkouts.
+    
+    Added in Saleor 3.1.
+    """
+    filter: CheckoutFilterInput
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): CheckoutCountableConnection
+
+  """
+  List of checkout lines.
+  
+  Requires one of the following permissions: MANAGE_CHECKOUTS.
+  """
+  checkoutLines(
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): CheckoutLineCountableConnection
+
+  """Look up a channel by ID or slug."""
+  channel(
+    """ID of the channel."""
+    id: ID
+
+    """
+    Slug of the channel.
+    
+    Added in Saleor 3.6.
+    
+    Note: this API is currently in Feature Preview and can be subject to changes at later point.
+    """
+    slug: String
+  ): Channel
+
+  """
+  List of all channels.
+  
+  Requires one of the following permissions: AUTHENTICATED_APP, AUTHENTICATED_STAFF_USER.
+  """
+  channels: [Channel!]
+
+  """List of the shop's attributes."""
+  attributes(
+    """Filtering options for attributes."""
+    filter: AttributeFilterInput
+
+    """
+    Filtering options for attributes.
+    
+    Added in Saleor 3.11.
+    
+    Note: this API is currently in Feature Preview and can be subject to changes at later point.
+    """
+    where: AttributeWhereInput
+
+    """
+    Search attributes.
+    
+    Added in Saleor 3.11.
+    
+    Note: this API is currently in Feature Preview and can be subject to changes at later point.
+    """
+    search: String
+
+    """Sorting options for attributes."""
+    sortBy: AttributeSortingInput
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): AttributeCountableConnection
+
+  """Look up an attribute by ID, slug or external reference."""
+  attribute(
+    """ID of the attribute."""
+    id: ID
+
+    """Slug of the attribute."""
+    slug: String
+
+    """
+    External ID of the attribute. 
+    
+    Added in Saleor 3.10.
+    """
+    externalReference: String
+  ): Attribute
+
+  """
+  List of all apps installations
+  
+  Requires one of the following permissions: MANAGE_APPS.
+  """
+  appsInstallations: [AppInstallation!]!
+
+  """
+  List of the apps.
+  
+  Requires one of the following permissions: AUTHENTICATED_STAFF_USER, MANAGE_APPS.
+  """
+  apps(
+    """Filtering options for apps."""
+    filter: AppFilterInput
+
+    """Sort apps."""
+    sortBy: AppSortingInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): AppCountableConnection
+
+  """
+  Look up an app by ID. If ID is not provided, return the currently authenticated app.
+  
+  Requires one of the following permissions: AUTHENTICATED_STAFF_USER AUTHENTICATED_APP. The authenticated app has access to its resources. Fetching different apps requires MANAGE_APPS permission.
+  """
+  app(
+    """ID of the app."""
+    id: ID
+  ): App
+
+  """
+  List of all extensions.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  
+  Requires one of the following permissions: AUTHENTICATED_STAFF_USER, AUTHENTICATED_APP.
+  """
+  appExtensions(
+    """Filtering options for apps extensions."""
+    filter: AppExtensionFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): AppExtensionCountableConnection
+
+  """
+  Look up an app extension by ID.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  
+  Requires one of the following permissions: AUTHENTICATED_STAFF_USER, AUTHENTICATED_APP.
+  """
+  appExtension(
+    """ID of the app extension."""
+    id: ID!
+  ): AppExtension
+
+  """Returns address validation rules."""
+  addressValidationRules(
+    """Two-letter ISO 3166-1 country code."""
+    countryCode: CountryCode!
+
+    """Designation of a region, province or state."""
+    countryArea: String
+
+    """City or a town name."""
+    city: String
+
+    """Sublocality like a district."""
+    cityArea: String
+  ): AddressValidationData
+
+  """Look up an address by ID."""
+  address(
+    """ID of an address."""
+    id: ID!
+  ): Address
+
+  """
+  List of the shop's customers.
+  
+  Requires one of the following permissions: MANAGE_ORDERS, MANAGE_USERS.
+  """
+  customers(
+    """Filtering options for customers."""
+    filter: CustomerFilterInput
+
+    """Sort customers."""
+    sortBy: UserSortingInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): UserCountableConnection
+
+  """
+  List of permission groups.
+  
+  Requires one of the following permissions: MANAGE_STAFF.
+  """
+  permissionGroups(
+    """Filtering options for permission groups."""
+    filter: PermissionGroupFilterInput
+
+    """Sort permission groups."""
+    sortBy: PermissionGroupSortingInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): GroupCountableConnection
+
+  """
+  Look up permission group by ID.
+  
+  Requires one of the following permissions: MANAGE_STAFF.
+  """
+  permissionGroup(
+    """ID of the group."""
+    id: ID!
+  ): Group
+
+  """Return the currently authenticated user."""
+  me: User
+
+  """
+  List of the shop's staff users.
+  
+  Requires one of the following permissions: MANAGE_STAFF.
+  """
+  staffUsers(
+    """Filtering options for staff users."""
+    filter: StaffUserInput
+
+    """Sort staff users."""
+    sortBy: UserSortingInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): UserCountableConnection
+
+  """
+  Look up a user by ID or email address.
+  
+  Requires one of the following permissions: MANAGE_STAFF, MANAGE_USERS, MANAGE_ORDERS.
+  """
+  user(
+    """ID of the user."""
+    id: ID
+
+    """Email address of the user."""
+    email: String
+
+    """
+    External ID of the user. 
+    
+    Added in Saleor 3.10.
+    """
+    externalReference: String
+  ): User
+  _entities(representations: [_Any]): [_Entity]
+  _service: _Service
+}
+
+"""Webhook."""
+type Webhook implements Node {
+  id: ID!
+  name: String!
+
+  """List of webhook events."""
+  events: [WebhookEvent!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `asyncEvents` or `syncEvents` instead.")
+
+  """List of synchronous webhook events."""
+  syncEvents: [WebhookEventSync!]!
+
+  """List of asynchronous webhook events."""
+  asyncEvents: [WebhookEventAsync!]!
+  app: App!
+
+  """Event deliveries."""
+  eventDeliveries(
+    """Event delivery sorter."""
+    sortBy: EventDeliverySortingInput
+
+    """Event delivery filter options."""
+    filter: EventDeliveryFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): EventDeliveryCountableConnection
+
+  """Target URL for webhook."""
+  targetUrl: String!
+
+  """Informs if webhook is activated."""
+  isActive: Boolean!
+
+  """Used to create a hash signature for each payload."""
+  secretKey: String @deprecated(reason: "This field will be removed in Saleor 4.0. As of Saleor 3.5, webhook payloads default to signing using a verifiable JWS.")
+
+  """Used to define payloads for specific events."""
+  subscriptionQuery: String
+
+  """
+  Custom headers, which will be added to HTTP request.
+  
+  Added in Saleor 3.12.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  customHeaders: JSONString
+}
+
+"""An object with an ID"""
+interface Node {
+  """The ID of the object."""
+  id: ID!
+}
+
+"""Webhook event."""
+type WebhookEvent {
+  """Display name of the event."""
+  name: String!
+
+  """Internal name of the event type."""
+  eventType: WebhookEventTypeEnum!
+}
+
+"""Enum determining type of webhook."""
+enum WebhookEventTypeEnum {
+  """All the events."""
+  ANY_EVENTS
+
+  """A new address created."""
+  ADDRESS_CREATED
+
+  """An address updated."""
+  ADDRESS_UPDATED
+
+  """An address deleted."""
+  ADDRESS_DELETED
+
+  """A new app installed."""
+  APP_INSTALLED
+
+  """An app updated."""
+  APP_UPDATED
+
+  """An app deleted."""
+  APP_DELETED
+
+  """An app status is changed."""
+  APP_STATUS_CHANGED
+
+  """A new attribute is created."""
+  ATTRIBUTE_CREATED
+
+  """An attribute is updated."""
+  ATTRIBUTE_UPDATED
+
+  """An attribute is deleted."""
+  ATTRIBUTE_DELETED
+
+  """A new attribute value is created."""
+  ATTRIBUTE_VALUE_CREATED
+
+  """An attribute value is updated."""
+  ATTRIBUTE_VALUE_UPDATED
+
+  """An attribute value is deleted."""
+  ATTRIBUTE_VALUE_DELETED
+
+  """A new category created."""
+  CATEGORY_CREATED
+
+  """A category is updated."""
+  CATEGORY_UPDATED
+
+  """A category is deleted."""
+  CATEGORY_DELETED
+
+  """A new channel created."""
+  CHANNEL_CREATED
+
+  """A channel is updated."""
+  CHANNEL_UPDATED
+
+  """A channel is deleted."""
+  CHANNEL_DELETED
+
+  """A channel status is changed."""
+  CHANNEL_STATUS_CHANGED
+
+  """A new gift card created."""
+  GIFT_CARD_CREATED
+
+  """A gift card is updated."""
+  GIFT_CARD_UPDATED
+
+  """A gift card is deleted."""
+  GIFT_CARD_DELETED
+
+  """A gift card status is changed."""
+  GIFT_CARD_STATUS_CHANGED
+
+  """
+  A gift card metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  GIFT_CARD_METADATA_UPDATED
+
+  """A new menu created."""
+  MENU_CREATED
+
+  """A menu is updated."""
+  MENU_UPDATED
+
+  """A menu is deleted."""
+  MENU_DELETED
+
+  """A new menu item created."""
+  MENU_ITEM_CREATED
+
+  """A menu item is updated."""
+  MENU_ITEM_UPDATED
+
+  """A menu item is deleted."""
+  MENU_ITEM_DELETED
+
+  """A new order is placed."""
+  ORDER_CREATED
+
+  """
+  An order is confirmed (status change unconfirmed -> unfulfilled) by a staff user using the OrderConfirm mutation. It also triggers when the user completes the checkout and the shop setting `automatically_confirm_all_new_orders` is enabled.
+  """
+  ORDER_CONFIRMED
+
+  """Payment is made and an order is fully paid."""
+  ORDER_FULLY_PAID
+
+  """
+  An order is updated; triggered for all changes related to an order; covers all other order webhooks, except for ORDER_CREATED.
+  """
+  ORDER_UPDATED
+
+  """An order is cancelled."""
+  ORDER_CANCELLED
+
+  """An order is fulfilled."""
+  ORDER_FULFILLED
+
+  """
+  An order metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  ORDER_METADATA_UPDATED
+
+  """A draft order is created."""
+  DRAFT_ORDER_CREATED
+
+  """A draft order is updated."""
+  DRAFT_ORDER_UPDATED
+
+  """A draft order is deleted."""
+  DRAFT_ORDER_DELETED
+
+  """A sale is created."""
+  SALE_CREATED
+
+  """A sale is updated."""
+  SALE_UPDATED
+
+  """A sale is deleted."""
+  SALE_DELETED
+
+  """A sale is activated or deactivated."""
+  SALE_TOGGLE
+
+  """An invoice for order requested."""
+  INVOICE_REQUESTED
+
+  """An invoice is deleted."""
+  INVOICE_DELETED
+
+  """Invoice has been sent."""
+  INVOICE_SENT
+
+  """A new customer account is created."""
+  CUSTOMER_CREATED
+
+  """A customer account is updated."""
+  CUSTOMER_UPDATED
+
+  """A customer account is deleted."""
+  CUSTOMER_DELETED
+
+  """
+  A customer account metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  CUSTOMER_METADATA_UPDATED
+
+  """A new collection is created."""
+  COLLECTION_CREATED
+
+  """A collection is updated."""
+  COLLECTION_UPDATED
+
+  """A collection is deleted."""
+  COLLECTION_DELETED
+
+  """
+  A collection metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  COLLECTION_METADATA_UPDATED
+
+  """A new product is created."""
+  PRODUCT_CREATED
+
+  """A product is updated."""
+  PRODUCT_UPDATED
+
+  """A product is deleted."""
+  PRODUCT_DELETED
+
+  """
+  A new product media is created.
+  
+  Added in Saleor 3.12.
+  """
+  PRODUCT_MEDIA_CREATED
+
+  """
+  A product media is updated.
+  
+  Added in Saleor 3.12.
+  """
+  PRODUCT_MEDIA_UPDATED
+
+  """
+  A product media is deleted.
+  
+  Added in Saleor 3.12.
+  """
+  PRODUCT_MEDIA_DELETED
+
+  """
+  A product metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  PRODUCT_METADATA_UPDATED
+
+  """A new product variant is created."""
+  PRODUCT_VARIANT_CREATED
+
+  """A product variant is updated."""
+  PRODUCT_VARIANT_UPDATED
+
+  """A product variant is deleted."""
+  PRODUCT_VARIANT_DELETED
+
+  """A product variant is out of stock."""
+  PRODUCT_VARIANT_OUT_OF_STOCK
+
+  """A product variant is back in stock."""
+  PRODUCT_VARIANT_BACK_IN_STOCK
+
+  """A product variant stock is updated"""
+  PRODUCT_VARIANT_STOCK_UPDATED
+
+  """
+  A product variant metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  PRODUCT_VARIANT_METADATA_UPDATED
+
+  """A new checkout is created."""
+  CHECKOUT_CREATED
+
+  """
+  A checkout is updated. It also triggers all updates related to the checkout.
+  """
+  CHECKOUT_UPDATED
+
+  """
+  A checkout metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  CHECKOUT_METADATA_UPDATED
+
+  """A new fulfillment is created."""
+  FULFILLMENT_CREATED
+
+  """A fulfillment is cancelled."""
+  FULFILLMENT_CANCELED
+
+  """A fulfillment is approved."""
+  FULFILLMENT_APPROVED
+
+  """
+  A fulfillment metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  FULFILLMENT_METADATA_UPDATED
+
+  """User notification triggered."""
+  NOTIFY_USER
+
+  """A new page is created."""
+  PAGE_CREATED
+
+  """A page is updated."""
+  PAGE_UPDATED
+
+  """A page is deleted."""
+  PAGE_DELETED
+
+  """A new page type is created."""
+  PAGE_TYPE_CREATED
+
+  """A page type is updated."""
+  PAGE_TYPE_UPDATED
+
+  """A page type is deleted."""
+  PAGE_TYPE_DELETED
+
+  """A new permission group is created."""
+  PERMISSION_GROUP_CREATED
+
+  """A permission group is updated."""
+  PERMISSION_GROUP_UPDATED
+
+  """A permission group is deleted."""
+  PERMISSION_GROUP_DELETED
+
+  """A new shipping price is created."""
+  SHIPPING_PRICE_CREATED
+
+  """A shipping price is updated."""
+  SHIPPING_PRICE_UPDATED
+
+  """A shipping price is deleted."""
+  SHIPPING_PRICE_DELETED
+
+  """A new shipping zone is created."""
+  SHIPPING_ZONE_CREATED
+
+  """A shipping zone is updated."""
+  SHIPPING_ZONE_UPDATED
+
+  """A shipping zone is deleted."""
+  SHIPPING_ZONE_DELETED
+
+  """
+  A shipping zone metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  SHIPPING_ZONE_METADATA_UPDATED
+
+  """A new staff user is created."""
+  STAFF_CREATED
+
+  """A staff user is updated."""
+  STAFF_UPDATED
+
+  """A staff user is deleted."""
+  STAFF_DELETED
+
+  """An action requested for transaction."""
+  TRANSACTION_ACTION_REQUEST
+
+  """
+  Transaction item metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  TRANSACTION_ITEM_METADATA_UPDATED
+
+  """A new translation is created."""
+  TRANSLATION_CREATED
+
+  """A translation is updated."""
+  TRANSLATION_UPDATED
+
+  """A new warehouse created."""
+  WAREHOUSE_CREATED
+
+  """A warehouse is updated."""
+  WAREHOUSE_UPDATED
+
+  """A warehouse is deleted."""
+  WAREHOUSE_DELETED
+
+  """
+  A warehouse metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  WAREHOUSE_METADATA_UPDATED
+
+  """A new voucher created."""
+  VOUCHER_CREATED
+
+  """A voucher is updated."""
+  VOUCHER_UPDATED
+
+  """A voucher is deleted."""
+  VOUCHER_DELETED
+
+  """
+  A voucher metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  VOUCHER_METADATA_UPDATED
+
+  """An observability event is created."""
+  OBSERVABILITY
+
+  """
+  A thumbnail is created.
+  
+  Added in Saleor 3.12.
+  """
+  THUMBNAIL_CREATED
+
+  """Authorize payment."""
+  PAYMENT_AUTHORIZE
+
+  """Capture payment."""
+  PAYMENT_CAPTURE
+
+  """Confirm payment."""
+  PAYMENT_CONFIRM
+
+  """Listing available payment gateways."""
+  PAYMENT_LIST_GATEWAYS
+
+  """Process payment."""
+  PAYMENT_PROCESS
+
+  """Refund payment."""
+  PAYMENT_REFUND
+
+  """Void payment."""
+  PAYMENT_VOID
+
+  """
+  Event called for checkout tax calculation.
+  
+  Added in Saleor 3.6.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  CHECKOUT_CALCULATE_TAXES
+
+  """
+  Event called for order tax calculation.
+  
+  Added in Saleor 3.6.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  ORDER_CALCULATE_TAXES
+
+  """Fetch external shipping methods for checkout."""
+  SHIPPING_LIST_METHODS_FOR_CHECKOUT
+
+  """Filter shipping methods for order."""
+  ORDER_FILTER_SHIPPING_METHODS
+
+  """Filter shipping methods for checkout."""
+  CHECKOUT_FILTER_SHIPPING_METHODS
+}
+
+"""Synchronous webhook event."""
+type WebhookEventSync {
+  """Display name of the event."""
+  name: String!
+
+  """Internal name of the event type."""
+  eventType: WebhookEventTypeSyncEnum!
+}
+
+"""Enum determining type of webhook."""
+enum WebhookEventTypeSyncEnum {
+  """Authorize payment."""
+  PAYMENT_AUTHORIZE
+
+  """Capture payment."""
+  PAYMENT_CAPTURE
+
+  """Confirm payment."""
+  PAYMENT_CONFIRM
+
+  """Listing available payment gateways."""
+  PAYMENT_LIST_GATEWAYS
+
+  """Process payment."""
+  PAYMENT_PROCESS
+
+  """Refund payment."""
+  PAYMENT_REFUND
+
+  """Void payment."""
+  PAYMENT_VOID
+
+  """
+  Event called for checkout tax calculation.
+  
+  Added in Saleor 3.6.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  CHECKOUT_CALCULATE_TAXES
+
+  """
+  Event called for order tax calculation.
+  
+  Added in Saleor 3.6.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  ORDER_CALCULATE_TAXES
+
+  """Fetch external shipping methods for checkout."""
+  SHIPPING_LIST_METHODS_FOR_CHECKOUT
+
+  """Filter shipping methods for order."""
+  ORDER_FILTER_SHIPPING_METHODS
+
+  """Filter shipping methods for checkout."""
+  CHECKOUT_FILTER_SHIPPING_METHODS
+}
+
+"""Asynchronous webhook event."""
+type WebhookEventAsync {
+  """Display name of the event."""
+  name: String!
+
+  """Internal name of the event type."""
+  eventType: WebhookEventTypeAsyncEnum!
+}
+
+"""Enum determining type of webhook."""
+enum WebhookEventTypeAsyncEnum {
+  """All the events."""
+  ANY_EVENTS
+
+  """A new address created."""
+  ADDRESS_CREATED
+
+  """An address updated."""
+  ADDRESS_UPDATED
+
+  """An address deleted."""
+  ADDRESS_DELETED
+
+  """A new app installed."""
+  APP_INSTALLED
+
+  """An app updated."""
+  APP_UPDATED
+
+  """An app deleted."""
+  APP_DELETED
+
+  """An app status is changed."""
+  APP_STATUS_CHANGED
+
+  """A new attribute is created."""
+  ATTRIBUTE_CREATED
+
+  """An attribute is updated."""
+  ATTRIBUTE_UPDATED
+
+  """An attribute is deleted."""
+  ATTRIBUTE_DELETED
+
+  """A new attribute value is created."""
+  ATTRIBUTE_VALUE_CREATED
+
+  """An attribute value is updated."""
+  ATTRIBUTE_VALUE_UPDATED
+
+  """An attribute value is deleted."""
+  ATTRIBUTE_VALUE_DELETED
+
+  """A new category created."""
+  CATEGORY_CREATED
+
+  """A category is updated."""
+  CATEGORY_UPDATED
+
+  """A category is deleted."""
+  CATEGORY_DELETED
+
+  """A new channel created."""
+  CHANNEL_CREATED
+
+  """A channel is updated."""
+  CHANNEL_UPDATED
+
+  """A channel is deleted."""
+  CHANNEL_DELETED
+
+  """A channel status is changed."""
+  CHANNEL_STATUS_CHANGED
+
+  """A new gift card created."""
+  GIFT_CARD_CREATED
+
+  """A gift card is updated."""
+  GIFT_CARD_UPDATED
+
+  """A gift card is deleted."""
+  GIFT_CARD_DELETED
+
+  """A gift card status is changed."""
+  GIFT_CARD_STATUS_CHANGED
+
+  """
+  A gift card metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  GIFT_CARD_METADATA_UPDATED
+
+  """A new menu created."""
+  MENU_CREATED
+
+  """A menu is updated."""
+  MENU_UPDATED
+
+  """A menu is deleted."""
+  MENU_DELETED
+
+  """A new menu item created."""
+  MENU_ITEM_CREATED
+
+  """A menu item is updated."""
+  MENU_ITEM_UPDATED
+
+  """A menu item is deleted."""
+  MENU_ITEM_DELETED
+
+  """A new order is placed."""
+  ORDER_CREATED
+
+  """
+  An order is confirmed (status change unconfirmed -> unfulfilled) by a staff user using the OrderConfirm mutation. It also triggers when the user completes the checkout and the shop setting `automatically_confirm_all_new_orders` is enabled.
+  """
+  ORDER_CONFIRMED
+
+  """Payment is made and an order is fully paid."""
+  ORDER_FULLY_PAID
+
+  """
+  An order is updated; triggered for all changes related to an order; covers all other order webhooks, except for ORDER_CREATED.
+  """
+  ORDER_UPDATED
+
+  """An order is cancelled."""
+  ORDER_CANCELLED
+
+  """An order is fulfilled."""
+  ORDER_FULFILLED
+
+  """
+  An order metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  ORDER_METADATA_UPDATED
+
+  """A draft order is created."""
+  DRAFT_ORDER_CREATED
+
+  """A draft order is updated."""
+  DRAFT_ORDER_UPDATED
+
+  """A draft order is deleted."""
+  DRAFT_ORDER_DELETED
+
+  """A sale is created."""
+  SALE_CREATED
+
+  """A sale is updated."""
+  SALE_UPDATED
+
+  """A sale is deleted."""
+  SALE_DELETED
+
+  """A sale is activated or deactivated."""
+  SALE_TOGGLE
+
+  """An invoice for order requested."""
+  INVOICE_REQUESTED
+
+  """An invoice is deleted."""
+  INVOICE_DELETED
+
+  """Invoice has been sent."""
+  INVOICE_SENT
+
+  """A new customer account is created."""
+  CUSTOMER_CREATED
+
+  """A customer account is updated."""
+  CUSTOMER_UPDATED
+
+  """A customer account is deleted."""
+  CUSTOMER_DELETED
+
+  """
+  A customer account metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  CUSTOMER_METADATA_UPDATED
+
+  """A new collection is created."""
+  COLLECTION_CREATED
+
+  """A collection is updated."""
+  COLLECTION_UPDATED
+
+  """A collection is deleted."""
+  COLLECTION_DELETED
+
+  """
+  A collection metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  COLLECTION_METADATA_UPDATED
+
+  """A new product is created."""
+  PRODUCT_CREATED
+
+  """A product is updated."""
+  PRODUCT_UPDATED
+
+  """A product is deleted."""
+  PRODUCT_DELETED
+
+  """
+  A new product media is created.
+  
+  Added in Saleor 3.12.
+  """
+  PRODUCT_MEDIA_CREATED
+
+  """
+  A product media is updated.
+  
+  Added in Saleor 3.12.
+  """
+  PRODUCT_MEDIA_UPDATED
+
+  """
+  A product media is deleted.
+  
+  Added in Saleor 3.12.
+  """
+  PRODUCT_MEDIA_DELETED
+
+  """
+  A product metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  PRODUCT_METADATA_UPDATED
+
+  """A new product variant is created."""
+  PRODUCT_VARIANT_CREATED
+
+  """A product variant is updated."""
+  PRODUCT_VARIANT_UPDATED
+
+  """A product variant is deleted."""
+  PRODUCT_VARIANT_DELETED
+
+  """A product variant is out of stock."""
+  PRODUCT_VARIANT_OUT_OF_STOCK
+
+  """A product variant is back in stock."""
+  PRODUCT_VARIANT_BACK_IN_STOCK
+
+  """A product variant stock is updated"""
+  PRODUCT_VARIANT_STOCK_UPDATED
+
+  """
+  A product variant metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  PRODUCT_VARIANT_METADATA_UPDATED
+
+  """A new checkout is created."""
+  CHECKOUT_CREATED
+
+  """
+  A checkout is updated. It also triggers all updates related to the checkout.
+  """
+  CHECKOUT_UPDATED
+
+  """
+  A checkout metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  CHECKOUT_METADATA_UPDATED
+
+  """A new fulfillment is created."""
+  FULFILLMENT_CREATED
+
+  """A fulfillment is cancelled."""
+  FULFILLMENT_CANCELED
+
+  """A fulfillment is approved."""
+  FULFILLMENT_APPROVED
+
+  """
+  A fulfillment metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  FULFILLMENT_METADATA_UPDATED
+
+  """User notification triggered."""
+  NOTIFY_USER
+
+  """A new page is created."""
+  PAGE_CREATED
+
+  """A page is updated."""
+  PAGE_UPDATED
+
+  """A page is deleted."""
+  PAGE_DELETED
+
+  """A new page type is created."""
+  PAGE_TYPE_CREATED
+
+  """A page type is updated."""
+  PAGE_TYPE_UPDATED
+
+  """A page type is deleted."""
+  PAGE_TYPE_DELETED
+
+  """A new permission group is created."""
+  PERMISSION_GROUP_CREATED
+
+  """A permission group is updated."""
+  PERMISSION_GROUP_UPDATED
+
+  """A permission group is deleted."""
+  PERMISSION_GROUP_DELETED
+
+  """A new shipping price is created."""
+  SHIPPING_PRICE_CREATED
+
+  """A shipping price is updated."""
+  SHIPPING_PRICE_UPDATED
+
+  """A shipping price is deleted."""
+  SHIPPING_PRICE_DELETED
+
+  """A new shipping zone is created."""
+  SHIPPING_ZONE_CREATED
+
+  """A shipping zone is updated."""
+  SHIPPING_ZONE_UPDATED
+
+  """A shipping zone is deleted."""
+  SHIPPING_ZONE_DELETED
+
+  """
+  A shipping zone metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  SHIPPING_ZONE_METADATA_UPDATED
+
+  """A new staff user is created."""
+  STAFF_CREATED
+
+  """A staff user is updated."""
+  STAFF_UPDATED
+
+  """A staff user is deleted."""
+  STAFF_DELETED
+
+  """An action requested for transaction."""
+  TRANSACTION_ACTION_REQUEST
+
+  """
+  Transaction item metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  TRANSACTION_ITEM_METADATA_UPDATED
+
+  """A new translation is created."""
+  TRANSLATION_CREATED
+
+  """A translation is updated."""
+  TRANSLATION_UPDATED
+
+  """A new warehouse created."""
+  WAREHOUSE_CREATED
+
+  """A warehouse is updated."""
+  WAREHOUSE_UPDATED
+
+  """A warehouse is deleted."""
+  WAREHOUSE_DELETED
+
+  """
+  A warehouse metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  WAREHOUSE_METADATA_UPDATED
+
+  """A new voucher created."""
+  VOUCHER_CREATED
+
+  """A voucher is updated."""
+  VOUCHER_UPDATED
+
+  """A voucher is deleted."""
+  VOUCHER_DELETED
+
+  """
+  A voucher metadata is updated.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  VOUCHER_METADATA_UPDATED
+
+  """An observability event is created."""
+  OBSERVABILITY
+
+  """
+  A thumbnail is created.
+  
+  Added in Saleor 3.12.
+  """
+  THUMBNAIL_CREATED
+}
+
+"""Represents app data."""
+type App implements Node & ObjectWithMetadata {
+  id: ID!
+
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+
+  """List of the app's permissions."""
+  permissions: [Permission!]
+
+  """The date and time when the app was created."""
+  created: DateTime
+
+  """Determine if app will be set active or not."""
+  isActive: Boolean
+
+  """Name of the app."""
+  name: String
+
+  """Type of the app."""
+  type: AppTypeEnum
+
+  """
+  Last 4 characters of the tokens.
+  
+  Requires one of the following permissions: MANAGE_APPS, OWNER.
+  """
+  tokens: [AppToken!]
+
+  """
+  List of webhooks assigned to this app.
+  
+  Requires one of the following permissions: MANAGE_APPS, OWNER.
+  """
+  webhooks: [Webhook!]
+
+  """Description of this app."""
+  aboutApp: String
+
+  """Description of the data privacy defined for this app."""
+  dataPrivacy: String @deprecated(reason: "This field will be removed in Saleor 4.0. Use `dataPrivacyUrl` instead.")
+
+  """URL to details about the privacy policy on the app owner page."""
+  dataPrivacyUrl: String
+
+  """Homepage of the app."""
+  homepageUrl: String
+
+  """Support page for the app."""
+  supportUrl: String
+
+  """URL to iframe with the configuration for the app."""
+  configurationUrl: String @deprecated(reason: "This field will be removed in Saleor 4.0. Use `appUrl` instead.")
+
+  """URL to iframe with the app."""
+  appUrl: String
+
+  """
+  URL to manifest used during app's installation.
+  
+  Added in Saleor 3.5.
+  """
+  manifestUrl: String
+
+  """Version number of the app."""
+  version: String
+
+  """JWT token used to authenticate by thridparty app."""
+  accessToken: String
+
+  """
+  App's dashboard extensions.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  extensions: [AppExtension!]!
+}
+
+interface ObjectWithMetadata {
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  """
+  metafields(keys: [String!]): Metadata
+}
+
+type MetadataItem {
+  """Key of a metadata item."""
+  key: String!
+
+  """Value of a metadata item."""
+  value: String!
+}
+
+"""
+Metadata is a map of key-value pairs, both keys and values are `String`.
+
+Example:
+```
+{
+    "key1": "value1",
+    "key2": "value2"
+}
+```
+"""
+scalar Metadata
+
+"""Represents a permission object in a friendly form."""
+type Permission {
+  """Internal code for permission."""
+  code: PermissionEnum!
+
+  """Describe action(s) allowed to do by permission."""
+  name: String!
+}
+
+"""An enumeration."""
+enum PermissionEnum {
+  MANAGE_USERS
+  MANAGE_STAFF
+  IMPERSONATE_USER
+  MANAGE_APPS
+  MANAGE_OBSERVABILITY
+  MANAGE_CHECKOUTS
+  HANDLE_CHECKOUTS
+  HANDLE_TAXES
+  MANAGE_TAXES
+  MANAGE_CHANNELS
+  MANAGE_DISCOUNTS
+  MANAGE_GIFT_CARD
+  MANAGE_MENUS
+  MANAGE_ORDERS
+  MANAGE_PAGES
+  MANAGE_PAGE_TYPES_AND_ATTRIBUTES
+  HANDLE_PAYMENTS
+  MANAGE_PLUGINS
+  MANAGE_PRODUCTS
+  MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES
+  MANAGE_SHIPPING
+  MANAGE_SETTINGS
+  MANAGE_TRANSLATIONS
+}
+
+"""
+The `DateTime` scalar type represents a DateTime
+value as specified by
+[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
+"""
+scalar DateTime
+
+"""Enum determining type of your App."""
+enum AppTypeEnum {
+  """
+  Local Saleor App. The app is fully manageable from dashboard. You can change assigned permissions, add webhooks, or authentication token
+  """
+  LOCAL
+
+  """
+  Third party external App. Installation is fully automated. Saleor uses a defined App manifest to gather all required information.
+  """
+  THIRDPARTY
+}
+
+"""Represents token data."""
+type AppToken implements Node {
+  id: ID!
+
+  """Name of the authenticated token."""
+  name: String
+
+  """Last 4 characters of the token."""
+  authToken: String
+}
+
+"""Represents app data."""
+type AppExtension implements Node {
+  id: ID!
+
+  """List of the app extension's permissions."""
+  permissions: [Permission!]!
+
+  """Label of the extension to show in the dashboard."""
+  label: String!
+
+  """URL of a view where extension's iframe is placed."""
+  url: String!
+
+  """Place where given extension will be mounted."""
+  mount: AppExtensionMountEnum!
+
+  """Type of way how app extension will be opened."""
+  target: AppExtensionTargetEnum!
+  app: App!
+
+  """JWT token used to authenticate by thridparty app extension."""
+  accessToken: String
+}
+
+"""All places where app extension can be mounted."""
+enum AppExtensionMountEnum {
+  CUSTOMER_OVERVIEW_CREATE
+  CUSTOMER_OVERVIEW_MORE_ACTIONS
+  CUSTOMER_DETAILS_MORE_ACTIONS
+  PRODUCT_OVERVIEW_CREATE
+  PRODUCT_OVERVIEW_MORE_ACTIONS
+  PRODUCT_DETAILS_MORE_ACTIONS
+  NAVIGATION_CATALOG
+  NAVIGATION_ORDERS
+  NAVIGATION_CUSTOMERS
+  NAVIGATION_DISCOUNTS
+  NAVIGATION_TRANSLATIONS
+  NAVIGATION_PAGES
+  ORDER_DETAILS_MORE_ACTIONS
+  ORDER_OVERVIEW_CREATE
+  ORDER_OVERVIEW_MORE_ACTIONS
+}
+
+"""
+All available ways of opening an app extension.
+
+    POPUP - app's extension will be mounted as a popup window
+    APP_PAGE - redirect to app's page
+"""
+enum AppExtensionTargetEnum {
+  POPUP
+  APP_PAGE
+}
+
+type EventDeliveryCountableConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+  edges: [EventDeliveryCountableEdge!]!
+
+  """A total count of items in the collection."""
+  totalCount: Int
+}
+
+"""
+The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
+"""
+type PageInfo {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
+}
+
+type EventDeliveryCountableEdge {
+  """The item at the end of the edge."""
+  node: EventDelivery!
+
+  """A cursor for use in pagination."""
+  cursor: String!
+}
+
+"""Event delivery."""
+type EventDelivery implements Node {
+  id: ID!
+  createdAt: DateTime!
+
+  """Event delivery status."""
+  status: EventDeliveryStatusEnum!
+
+  """Webhook event type."""
+  eventType: WebhookEventTypeEnum!
+
+  """Event delivery attempts."""
+  attempts(
+    """Event delivery sorter"""
+    sortBy: EventDeliveryAttemptSortingInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): EventDeliveryAttemptCountableConnection
+
+  """Event payload."""
+  payload: String
+}
+
+enum EventDeliveryStatusEnum {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+type EventDeliveryAttemptCountableConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+  edges: [EventDeliveryAttemptCountableEdge!]!
+
+  """A total count of items in the collection."""
+  totalCount: Int
+}
+
+type EventDeliveryAttemptCountableEdge {
+  """The item at the end of the edge."""
+  node: EventDeliveryAttempt!
+
+  """A cursor for use in pagination."""
+  cursor: String!
+}
+
+"""Event delivery attempts."""
+type EventDeliveryAttempt implements Node {
+  id: ID!
+
+  """Event delivery creation date and time."""
+  createdAt: DateTime!
+
+  """Task id for delivery attempt."""
+  taskId: String
+
+  """Delivery attempt duration."""
+  duration: Float
+
+  """Delivery attempt response content."""
+  response: String
+
+  """Response headers for delivery attempt."""
+  responseHeaders: String
+
+  """Delivery attempt response status code."""
+  responseStatusCode: Int
+
+  """Request headers for delivery attempt."""
+  requestHeaders: String
+
+  """Event delivery status."""
+  status: EventDeliveryStatusEnum!
+}
+
+input EventDeliveryAttemptSortingInput {
+  """Specifies the direction in which to sort products."""
+  direction: OrderDirection!
+
+  """Sort attempts by the selected field."""
+  field: EventDeliveryAttemptSortField!
+}
+
+enum OrderDirection {
+  """Specifies an ascending sort order."""
+  ASC
+
+  """Specifies a descending sort order."""
+  DESC
+}
+
+enum EventDeliveryAttemptSortField {
+  """Sort event delivery attempts by created at."""
+  CREATED_AT
+}
+
+input EventDeliverySortingInput {
+  """Specifies the direction in which to sort products."""
+  direction: OrderDirection!
+
+  """Sort deliveries by the selected field."""
+  field: EventDeliverySortField!
+}
+
+enum EventDeliverySortField {
+  """Sort event deliveries by created at."""
+  CREATED_AT
+}
+
+input EventDeliveryFilterInput {
+  status: EventDeliveryStatusEnum
+  eventType: WebhookEventTypeEnum
+}
+
+scalar JSONString
+
+"""An enumeration."""
+enum WebhookSampleEventTypeEnum {
+  ADDRESS_CREATED
+  ADDRESS_UPDATED
+  ADDRESS_DELETED
+  APP_INSTALLED
+  APP_UPDATED
+  APP_DELETED
+  APP_STATUS_CHANGED
+  ATTRIBUTE_CREATED
+  ATTRIBUTE_UPDATED
+  ATTRIBUTE_DELETED
+  ATTRIBUTE_VALUE_CREATED
+  ATTRIBUTE_VALUE_UPDATED
+  ATTRIBUTE_VALUE_DELETED
+  CATEGORY_CREATED
+  CATEGORY_UPDATED
+  CATEGORY_DELETED
+  CHANNEL_CREATED
+  CHANNEL_UPDATED
+  CHANNEL_DELETED
+  CHANNEL_STATUS_CHANGED
+  GIFT_CARD_CREATED
+  GIFT_CARD_UPDATED
+  GIFT_CARD_DELETED
+  GIFT_CARD_STATUS_CHANGED
+  GIFT_CARD_METADATA_UPDATED
+  MENU_CREATED
+  MENU_UPDATED
+  MENU_DELETED
+  MENU_ITEM_CREATED
+  MENU_ITEM_UPDATED
+  MENU_ITEM_DELETED
+  ORDER_CREATED
+  ORDER_CONFIRMED
+  ORDER_FULLY_PAID
+  ORDER_UPDATED
+  ORDER_CANCELLED
+  ORDER_FULFILLED
+  ORDER_METADATA_UPDATED
+  DRAFT_ORDER_CREATED
+  DRAFT_ORDER_UPDATED
+  DRAFT_ORDER_DELETED
+  SALE_CREATED
+  SALE_UPDATED
+  SALE_DELETED
+  SALE_TOGGLE
+  INVOICE_REQUESTED
+  INVOICE_DELETED
+  INVOICE_SENT
+  CUSTOMER_CREATED
+  CUSTOMER_UPDATED
+  CUSTOMER_DELETED
+  CUSTOMER_METADATA_UPDATED
+  COLLECTION_CREATED
+  COLLECTION_UPDATED
+  COLLECTION_DELETED
+  COLLECTION_METADATA_UPDATED
+  PRODUCT_CREATED
+  PRODUCT_UPDATED
+  PRODUCT_DELETED
+  PRODUCT_MEDIA_CREATED
+  PRODUCT_MEDIA_UPDATED
+  PRODUCT_MEDIA_DELETED
+  PRODUCT_METADATA_UPDATED
+  PRODUCT_VARIANT_CREATED
+  PRODUCT_VARIANT_UPDATED
+  PRODUCT_VARIANT_DELETED
+  PRODUCT_VARIANT_OUT_OF_STOCK
+  PRODUCT_VARIANT_BACK_IN_STOCK
+  PRODUCT_VARIANT_STOCK_UPDATED
+  PRODUCT_VARIANT_METADATA_UPDATED
+  CHECKOUT_CREATED
+  CHECKOUT_UPDATED
+  CHECKOUT_METADATA_UPDATED
+  FULFILLMENT_CREATED
+  FULFILLMENT_CANCELED
+  FULFILLMENT_APPROVED
+  FULFILLMENT_METADATA_UPDATED
+  NOTIFY_USER
+  PAGE_CREATED
+  PAGE_UPDATED
+  PAGE_DELETED
+  PAGE_TYPE_CREATED
+  PAGE_TYPE_UPDATED
+  PAGE_TYPE_DELETED
+  PERMISSION_GROUP_CREATED
+  PERMISSION_GROUP_UPDATED
+  PERMISSION_GROUP_DELETED
+  SHIPPING_PRICE_CREATED
+  SHIPPING_PRICE_UPDATED
+  SHIPPING_PRICE_DELETED
+  SHIPPING_ZONE_CREATED
+  SHIPPING_ZONE_UPDATED
+  SHIPPING_ZONE_DELETED
+  SHIPPING_ZONE_METADATA_UPDATED
+  STAFF_CREATED
+  STAFF_UPDATED
+  STAFF_DELETED
+  TRANSACTION_ACTION_REQUEST
+  TRANSACTION_ITEM_METADATA_UPDATED
+  TRANSLATION_CREATED
+  TRANSLATION_UPDATED
+  WAREHOUSE_CREATED
+  WAREHOUSE_UPDATED
+  WAREHOUSE_DELETED
+  WAREHOUSE_METADATA_UPDATED
+  VOUCHER_CREATED
+  VOUCHER_UPDATED
+  VOUCHER_DELETED
+  VOUCHER_METADATA_UPDATED
+  OBSERVABILITY
+  THUMBNAIL_CREATED
+}
+
+"""Represents warehouse."""
+type Warehouse implements Node & ObjectWithMetadata {
+  id: ID!
+
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+  name: String!
+  slug: String!
+  email: String!
+  isPrivate: Boolean!
+  address: Address!
+
+  """Warehouse company name."""
+  companyName: String! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `Address.companyName` instead.")
+
+  """
+  Click and collect options: local, all or disabled.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  clickAndCollectOption: WarehouseClickAndCollectOptionEnum!
+  shippingZones(
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): ShippingZoneCountableConnection!
+
+  """
+  External ID of this warehouse. 
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+}
+
+"""Represents user address data."""
+type Address implements Node & ObjectWithMetadata {
+  id: ID!
+
+  """
+  List of private metadata items. Requires staff permissions to access.
+  
+  Added in Saleor 3.10.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.10.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.10.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """
+  List of public metadata items. Can be accessed without permissions.
+  
+  Added in Saleor 3.10.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.10.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.10.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+  firstName: String!
+  lastName: String!
+  companyName: String!
+  streetAddress1: String!
+  streetAddress2: String!
+  city: String!
+  cityArea: String!
+  postalCode: String!
+
+  """Shop's default country."""
+  country: CountryDisplay!
+  countryArea: String!
+  phone: String
+
+  """Address is user's default shipping address."""
+  isDefaultShippingAddress: Boolean
+
+  """Address is user's default billing address."""
+  isDefaultBillingAddress: Boolean
+}
+
+type CountryDisplay {
+  """Country code."""
+  code: String!
+
+  """Country name."""
+  country: String!
+
+  """Country tax."""
+  vat: VAT @deprecated(reason: "This field will be removed in Saleor 4.0. Use `TaxClassCountryRate` type to manage tax rates per country.")
+}
+
+"""Represents a VAT rate for a country."""
+type VAT {
+  """Country code."""
+  countryCode: String!
+
+  """Standard VAT rate in percent."""
+  standardRate: Float
+
+  """Country's VAT rate exceptions for specific types of goods."""
+  reducedRates: [ReducedRate!]!
+}
+
+"""Represents a reduced VAT rate for a particular type of goods."""
+type ReducedRate {
+  """Reduced VAT rate in percent."""
+  rate: Float!
+
+  """A type of goods."""
+  rateType: String!
+}
+
+"""An enumeration."""
+enum WarehouseClickAndCollectOptionEnum {
+  DISABLED
+  LOCAL
+  ALL
+}
+
+type ShippingZoneCountableConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+  edges: [ShippingZoneCountableEdge!]!
+
+  """A total count of items in the collection."""
+  totalCount: Int
+}
+
+type ShippingZoneCountableEdge {
+  """The item at the end of the edge."""
+  node: ShippingZone!
+
+  """A cursor for use in pagination."""
+  cursor: String!
+}
+
+"""
+Represents a shipping zone in the shop. Zones are the concept used only for grouping shipping methods in the dashboard, and are never exposed to the customers directly.
+"""
+type ShippingZone implements Node & ObjectWithMetadata {
+  id: ID!
+
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+  name: String!
+  default: Boolean!
+
+  """Lowest and highest prices for the shipping."""
+  priceRange: MoneyRange
+
+  """List of countries available for the method."""
+  countries: [CountryDisplay!]!
+
+  """
+  List of shipping methods available for orders shipped to countries within this shipping zone.
+  """
+  shippingMethods: [ShippingMethodType!]
+
+  """List of warehouses for shipping zone."""
+  warehouses: [Warehouse!]!
+
+  """List of channels for shipping zone."""
+  channels: [Channel!]!
+
+  """Description of a shipping zone."""
+  description: String
+}
+
+"""Represents a range of amounts of money."""
+type MoneyRange {
+  """Lower bound of a price range."""
+  start: Money
+
+  """Upper bound of a price range."""
+  stop: Money
+}
+
+"""Represents amount of money in specific currency."""
+type Money {
+  """Currency code."""
+  currency: String!
+
+  """Amount of money."""
+  amount: Float!
+}
+
+"""
+Shipping method are the methods you'll use to get customer's orders to them. They are directly exposed to the customers.
+"""
+type ShippingMethodType implements Node & ObjectWithMetadata {
+  """Shipping method ID."""
+  id: ID!
+
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+
+  """Shipping method name."""
+  name: String!
+
+  """
+  Shipping method description.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+
+  """Type of the shipping method."""
+  type: ShippingMethodTypeEnum
+
+  """Returns translated shipping method fields for the given language code."""
+  translation(
+    """A language code to return the translation for shipping method."""
+    languageCode: LanguageCodeEnum!
+  ): ShippingMethodTranslation
+
+  """
+  List of channels available for the method.
+  
+  Requires one of the following permissions: MANAGE_SHIPPING.
+  """
+  channelListings: [ShippingMethodChannelListing!]
+
+  """The price of the cheapest variant (including discounts)."""
+  maximumOrderPrice: Money
+
+  """The price of the cheapest variant (including discounts)."""
+  minimumOrderPrice: Money
+
+  """
+  Postal code ranges rule of exclusion or inclusion of the shipping method.
+  """
+  postalCodeRules: [ShippingMethodPostalCodeRule!]
+
+  """
+  List of excluded products for the shipping method.
+  
+  Requires one of the following permissions: MANAGE_SHIPPING.
+  """
+  excludedProducts(
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): ProductCountableConnection
+
+  """Minimum order weight to use this shipping method."""
+  minimumOrderWeight: Weight
+
+  """Maximum order weight to use this shipping method."""
+  maximumOrderWeight: Weight
+
+  """Maximum number of days for delivery."""
+  maximumDeliveryDays: Int
+
+  """Minimal number of days for delivery."""
+  minimumDeliveryDays: Int
+
+  """
+  Tax class assigned to this shipping method.
+  
+  Requires one of the following permissions: MANAGE_TAXES, MANAGE_SHIPPING.
+  """
+  taxClass: TaxClass
+}
+
+"""An enumeration."""
+enum ShippingMethodTypeEnum {
+  PRICE
+  WEIGHT
+}
+
+type ShippingMethodTranslation implements Node {
+  id: ID!
+
+  """Translation language."""
+  language: LanguageDisplay!
+  name: String
+
+  """
+  Translated description of the shipping method.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+}
+
+type LanguageDisplay {
+  """ISO 639 representation of the language name."""
+  code: LanguageCodeEnum!
+
+  """Full name of the language."""
+  language: String!
+}
+
+"""An enumeration."""
+enum LanguageCodeEnum {
+  AF
+  AF_NA
+  AF_ZA
+  AGQ
+  AGQ_CM
+  AK
+  AK_GH
+  AM
+  AM_ET
+  AR
+  AR_AE
+  AR_BH
+  AR_DJ
+  AR_DZ
+  AR_EG
+  AR_EH
+  AR_ER
+  AR_IL
+  AR_IQ
+  AR_JO
+  AR_KM
+  AR_KW
+  AR_LB
+  AR_LY
+  AR_MA
+  AR_MR
+  AR_OM
+  AR_PS
+  AR_QA
+  AR_SA
+  AR_SD
+  AR_SO
+  AR_SS
+  AR_SY
+  AR_TD
+  AR_TN
+  AR_YE
+  AS
+  AS_IN
+  ASA
+  ASA_TZ
+  AST
+  AST_ES
+  AZ
+  AZ_CYRL
+  AZ_CYRL_AZ
+  AZ_LATN
+  AZ_LATN_AZ
+  BAS
+  BAS_CM
+  BE
+  BE_BY
+  BEM
+  BEM_ZM
+  BEZ
+  BEZ_TZ
+  BG
+  BG_BG
+  BM
+  BM_ML
+  BN
+  BN_BD
+  BN_IN
+  BO
+  BO_CN
+  BO_IN
+  BR
+  BR_FR
+  BRX
+  BRX_IN
+  BS
+  BS_CYRL
+  BS_CYRL_BA
+  BS_LATN
+  BS_LATN_BA
+  CA
+  CA_AD
+  CA_ES
+  CA_ES_VALENCIA
+  CA_FR
+  CA_IT
+  CCP
+  CCP_BD
+  CCP_IN
+  CE
+  CE_RU
+  CEB
+  CEB_PH
+  CGG
+  CGG_UG
+  CHR
+  CHR_US
+  CKB
+  CKB_IQ
+  CKB_IR
+  CS
+  CS_CZ
+  CU
+  CU_RU
+  CY
+  CY_GB
+  DA
+  DA_DK
+  DA_GL
+  DAV
+  DAV_KE
+  DE
+  DE_AT
+  DE_BE
+  DE_CH
+  DE_DE
+  DE_IT
+  DE_LI
+  DE_LU
+  DJE
+  DJE_NE
+  DSB
+  DSB_DE
+  DUA
+  DUA_CM
+  DYO
+  DYO_SN
+  DZ
+  DZ_BT
+  EBU
+  EBU_KE
+  EE
+  EE_GH
+  EE_TG
+  EL
+  EL_CY
+  EL_GR
+  EN
+  EN_AE
+  EN_AG
+  EN_AI
+  EN_AS
+  EN_AT
+  EN_AU
+  EN_BB
+  EN_BE
+  EN_BI
+  EN_BM
+  EN_BS
+  EN_BW
+  EN_BZ
+  EN_CA
+  EN_CC
+  EN_CH
+  EN_CK
+  EN_CM
+  EN_CX
+  EN_CY
+  EN_DE
+  EN_DG
+  EN_DK
+  EN_DM
+  EN_ER
+  EN_FI
+  EN_FJ
+  EN_FK
+  EN_FM
+  EN_GB
+  EN_GD
+  EN_GG
+  EN_GH
+  EN_GI
+  EN_GM
+  EN_GU
+  EN_GY
+  EN_HK
+  EN_IE
+  EN_IL
+  EN_IM
+  EN_IN
+  EN_IO
+  EN_JE
+  EN_JM
+  EN_KE
+  EN_KI
+  EN_KN
+  EN_KY
+  EN_LC
+  EN_LR
+  EN_LS
+  EN_MG
+  EN_MH
+  EN_MO
+  EN_MP
+  EN_MS
+  EN_MT
+  EN_MU
+  EN_MW
+  EN_MY
+  EN_NA
+  EN_NF
+  EN_NG
+  EN_NL
+  EN_NR
+  EN_NU
+  EN_NZ
+  EN_PG
+  EN_PH
+  EN_PK
+  EN_PN
+  EN_PR
+  EN_PW
+  EN_RW
+  EN_SB
+  EN_SC
+  EN_SD
+  EN_SE
+  EN_SG
+  EN_SH
+  EN_SI
+  EN_SL
+  EN_SS
+  EN_SX
+  EN_SZ
+  EN_TC
+  EN_TK
+  EN_TO
+  EN_TT
+  EN_TV
+  EN_TZ
+  EN_UG
+  EN_UM
+  EN_US
+  EN_VC
+  EN_VG
+  EN_VI
+  EN_VU
+  EN_WS
+  EN_ZA
+  EN_ZM
+  EN_ZW
+  EO
+  ES
+  ES_AR
+  ES_BO
+  ES_BR
+  ES_BZ
+  ES_CL
+  ES_CO
+  ES_CR
+  ES_CU
+  ES_DO
+  ES_EA
+  ES_EC
+  ES_ES
+  ES_GQ
+  ES_GT
+  ES_HN
+  ES_IC
+  ES_MX
+  ES_NI
+  ES_PA
+  ES_PE
+  ES_PH
+  ES_PR
+  ES_PY
+  ES_SV
+  ES_US
+  ES_UY
+  ES_VE
+  ET
+  ET_EE
+  EU
+  EU_ES
+  EWO
+  EWO_CM
+  FA
+  FA_AF
+  FA_IR
+  FF
+  FF_ADLM
+  FF_ADLM_BF
+  FF_ADLM_CM
+  FF_ADLM_GH
+  FF_ADLM_GM
+  FF_ADLM_GN
+  FF_ADLM_GW
+  FF_ADLM_LR
+  FF_ADLM_MR
+  FF_ADLM_NE
+  FF_ADLM_NG
+  FF_ADLM_SL
+  FF_ADLM_SN
+  FF_LATN
+  FF_LATN_BF
+  FF_LATN_CM
+  FF_LATN_GH
+  FF_LATN_GM
+  FF_LATN_GN
+  FF_LATN_GW
+  FF_LATN_LR
+  FF_LATN_MR
+  FF_LATN_NE
+  FF_LATN_NG
+  FF_LATN_SL
+  FF_LATN_SN
+  FI
+  FI_FI
+  FIL
+  FIL_PH
+  FO
+  FO_DK
+  FO_FO
+  FR
+  FR_BE
+  FR_BF
+  FR_BI
+  FR_BJ
+  FR_BL
+  FR_CA
+  FR_CD
+  FR_CF
+  FR_CG
+  FR_CH
+  FR_CI
+  FR_CM
+  FR_DJ
+  FR_DZ
+  FR_FR
+  FR_GA
+  FR_GF
+  FR_GN
+  FR_GP
+  FR_GQ
+  FR_HT
+  FR_KM
+  FR_LU
+  FR_MA
+  FR_MC
+  FR_MF
+  FR_MG
+  FR_ML
+  FR_MQ
+  FR_MR
+  FR_MU
+  FR_NC
+  FR_NE
+  FR_PF
+  FR_PM
+  FR_RE
+  FR_RW
+  FR_SC
+  FR_SN
+  FR_SY
+  FR_TD
+  FR_TG
+  FR_TN
+  FR_VU
+  FR_WF
+  FR_YT
+  FUR
+  FUR_IT
+  FY
+  FY_NL
+  GA
+  GA_GB
+  GA_IE
+  GD
+  GD_GB
+  GL
+  GL_ES
+  GSW
+  GSW_CH
+  GSW_FR
+  GSW_LI
+  GU
+  GU_IN
+  GUZ
+  GUZ_KE
+  GV
+  GV_IM
+  HA
+  HA_GH
+  HA_NE
+  HA_NG
+  HAW
+  HAW_US
+  HE
+  HE_IL
+  HI
+  HI_IN
+  HR
+  HR_BA
+  HR_HR
+  HSB
+  HSB_DE
+  HU
+  HU_HU
+  HY
+  HY_AM
+  IA
+  ID
+  ID_ID
+  IG
+  IG_NG
+  II
+  II_CN
+  IS
+  IS_IS
+  IT
+  IT_CH
+  IT_IT
+  IT_SM
+  IT_VA
+  JA
+  JA_JP
+  JGO
+  JGO_CM
+  JMC
+  JMC_TZ
+  JV
+  JV_ID
+  KA
+  KA_GE
+  KAB
+  KAB_DZ
+  KAM
+  KAM_KE
+  KDE
+  KDE_TZ
+  KEA
+  KEA_CV
+  KHQ
+  KHQ_ML
+  KI
+  KI_KE
+  KK
+  KK_KZ
+  KKJ
+  KKJ_CM
+  KL
+  KL_GL
+  KLN
+  KLN_KE
+  KM
+  KM_KH
+  KN
+  KN_IN
+  KO
+  KO_KP
+  KO_KR
+  KOK
+  KOK_IN
+  KS
+  KS_ARAB
+  KS_ARAB_IN
+  KSB
+  KSB_TZ
+  KSF
+  KSF_CM
+  KSH
+  KSH_DE
+  KU
+  KU_TR
+  KW
+  KW_GB
+  KY
+  KY_KG
+  LAG
+  LAG_TZ
+  LB
+  LB_LU
+  LG
+  LG_UG
+  LKT
+  LKT_US
+  LN
+  LN_AO
+  LN_CD
+  LN_CF
+  LN_CG
+  LO
+  LO_LA
+  LRC
+  LRC_IQ
+  LRC_IR
+  LT
+  LT_LT
+  LU
+  LU_CD
+  LUO
+  LUO_KE
+  LUY
+  LUY_KE
+  LV
+  LV_LV
+  MAI
+  MAI_IN
+  MAS
+  MAS_KE
+  MAS_TZ
+  MER
+  MER_KE
+  MFE
+  MFE_MU
+  MG
+  MG_MG
+  MGH
+  MGH_MZ
+  MGO
+  MGO_CM
+  MI
+  MI_NZ
+  MK
+  MK_MK
+  ML
+  ML_IN
+  MN
+  MN_MN
+  MNI
+  MNI_BENG
+  MNI_BENG_IN
+  MR
+  MR_IN
+  MS
+  MS_BN
+  MS_ID
+  MS_MY
+  MS_SG
+  MT
+  MT_MT
+  MUA
+  MUA_CM
+  MY
+  MY_MM
+  MZN
+  MZN_IR
+  NAQ
+  NAQ_NA
+  NB
+  NB_NO
+  NB_SJ
+  ND
+  ND_ZW
+  NDS
+  NDS_DE
+  NDS_NL
+  NE
+  NE_IN
+  NE_NP
+  NL
+  NL_AW
+  NL_BE
+  NL_BQ
+  NL_CW
+  NL_NL
+  NL_SR
+  NL_SX
+  NMG
+  NMG_CM
+  NN
+  NN_NO
+  NNH
+  NNH_CM
+  NUS
+  NUS_SS
+  NYN
+  NYN_UG
+  OM
+  OM_ET
+  OM_KE
+  OR
+  OR_IN
+  OS
+  OS_GE
+  OS_RU
+  PA
+  PA_ARAB
+  PA_ARAB_PK
+  PA_GURU
+  PA_GURU_IN
+  PCM
+  PCM_NG
+  PL
+  PL_PL
+  PRG
+  PS
+  PS_AF
+  PS_PK
+  PT
+  PT_AO
+  PT_BR
+  PT_CH
+  PT_CV
+  PT_GQ
+  PT_GW
+  PT_LU
+  PT_MO
+  PT_MZ
+  PT_PT
+  PT_ST
+  PT_TL
+  QU
+  QU_BO
+  QU_EC
+  QU_PE
+  RM
+  RM_CH
+  RN
+  RN_BI
+  RO
+  RO_MD
+  RO_RO
+  ROF
+  ROF_TZ
+  RU
+  RU_BY
+  RU_KG
+  RU_KZ
+  RU_MD
+  RU_RU
+  RU_UA
+  RW
+  RW_RW
+  RWK
+  RWK_TZ
+  SAH
+  SAH_RU
+  SAQ
+  SAQ_KE
+  SAT
+  SAT_OLCK
+  SAT_OLCK_IN
+  SBP
+  SBP_TZ
+  SD
+  SD_ARAB
+  SD_ARAB_PK
+  SD_DEVA
+  SD_DEVA_IN
+  SE
+  SE_FI
+  SE_NO
+  SE_SE
+  SEH
+  SEH_MZ
+  SES
+  SES_ML
+  SG
+  SG_CF
+  SHI
+  SHI_LATN
+  SHI_LATN_MA
+  SHI_TFNG
+  SHI_TFNG_MA
+  SI
+  SI_LK
+  SK
+  SK_SK
+  SL
+  SL_SI
+  SMN
+  SMN_FI
+  SN
+  SN_ZW
+  SO
+  SO_DJ
+  SO_ET
+  SO_KE
+  SO_SO
+  SQ
+  SQ_AL
+  SQ_MK
+  SQ_XK
+  SR
+  SR_CYRL
+  SR_CYRL_BA
+  SR_CYRL_ME
+  SR_CYRL_RS
+  SR_CYRL_XK
+  SR_LATN
+  SR_LATN_BA
+  SR_LATN_ME
+  SR_LATN_RS
+  SR_LATN_XK
+  SU
+  SU_LATN
+  SU_LATN_ID
+  SV
+  SV_AX
+  SV_FI
+  SV_SE
+  SW
+  SW_CD
+  SW_KE
+  SW_TZ
+  SW_UG
+  TA
+  TA_IN
+  TA_LK
+  TA_MY
+  TA_SG
+  TE
+  TE_IN
+  TEO
+  TEO_KE
+  TEO_UG
+  TG
+  TG_TJ
+  TH
+  TH_TH
+  TI
+  TI_ER
+  TI_ET
+  TK
+  TK_TM
+  TO
+  TO_TO
+  TR
+  TR_CY
+  TR_TR
+  TT
+  TT_RU
+  TWQ
+  TWQ_NE
+  TZM
+  TZM_MA
+  UG
+  UG_CN
+  UK
+  UK_UA
+  UR
+  UR_IN
+  UR_PK
+  UZ
+  UZ_ARAB
+  UZ_ARAB_AF
+  UZ_CYRL
+  UZ_CYRL_UZ
+  UZ_LATN
+  UZ_LATN_UZ
+  VAI
+  VAI_LATN
+  VAI_LATN_LR
+  VAI_VAII
+  VAI_VAII_LR
+  VI
+  VI_VN
+  VO
+  VUN
+  VUN_TZ
+  WAE
+  WAE_CH
+  WO
+  WO_SN
+  XH
+  XH_ZA
+  XOG
+  XOG_UG
+  YAV
+  YAV_CM
+  YI
+  YO
+  YO_BJ
+  YO_NG
+  YUE
+  YUE_HANS
+  YUE_HANS_CN
+  YUE_HANT
+  YUE_HANT_HK
+  ZGH
+  ZGH_MA
+  ZH
+  ZH_HANS
+  ZH_HANS_CN
+  ZH_HANS_HK
+  ZH_HANS_MO
+  ZH_HANS_SG
+  ZH_HANT
+  ZH_HANT_HK
+  ZH_HANT_MO
+  ZH_HANT_TW
+  ZU
+  ZU_ZA
+}
+
+"""Represents shipping method channel listing."""
+type ShippingMethodChannelListing implements Node {
+  id: ID!
+  channel: Channel!
+  maximumOrderPrice: Money
+  minimumOrderPrice: Money
+  price: Money
+}
+
+"""Represents channel."""
+type Channel implements Node {
+  id: ID!
+
+  """Slug of the channel."""
+  slug: String!
+
+  """
+  Name of the channel.
+  
+  Requires one of the following permissions: AUTHENTICATED_APP, AUTHENTICATED_STAFF_USER.
+  """
+  name: String!
+
+  """
+  Whether the channel is active.
+  
+  Requires one of the following permissions: AUTHENTICATED_APP, AUTHENTICATED_STAFF_USER.
+  """
+  isActive: Boolean!
+
+  """
+  A currency that is assigned to the channel.
+  
+  Requires one of the following permissions: AUTHENTICATED_APP, AUTHENTICATED_STAFF_USER.
+  """
+  currencyCode: String!
+
+  """
+  Whether a channel has associated orders.
+  
+  Requires one of the following permissions: MANAGE_CHANNELS.
+  """
+  hasOrders: Boolean!
+
+  """
+  Default country for the channel. Default country can be used in checkout to determine the stock quantities or calculate taxes when the country was not explicitly provided.
+  
+  Added in Saleor 3.1.
+  
+  Requires one of the following permissions: AUTHENTICATED_APP, AUTHENTICATED_STAFF_USER.
+  """
+  defaultCountry: CountryDisplay!
+
+  """
+  List of warehouses assigned to this channel.
+  
+  Added in Saleor 3.5.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  
+  Requires one of the following permissions: AUTHENTICATED_APP, AUTHENTICATED_STAFF_USER.
+  """
+  warehouses: [Warehouse!]!
+
+  """
+  List of shippable countries for the channel.
+  
+  Added in Saleor 3.6.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  countries: [CountryDisplay!]
+
+  """
+  Shipping methods that are available for the channel.
+  
+  Added in Saleor 3.6.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  availableShippingMethodsPerCountry(countries: [CountryCode!]): [ShippingMethodsPerCountry!]
+
+  """
+  Define the stock setting for this channel.
+  
+  Added in Saleor 3.7.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  
+  Requires one of the following permissions: AUTHENTICATED_APP, AUTHENTICATED_STAFF_USER.
+  """
+  stockSettings: StockSettings!
+
+  """
+  Channel-specific order settings.
+  
+  Added in Saleor 3.12.
+  
+  Requires one of the following permissions: MANAGE_CHANNELS, MANAGE_ORDERS.
+  """
+  orderSettings: OrderSettings!
+}
+
+"""
+List of shipping methods available for the country.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ShippingMethodsPerCountry {
+  """The country code."""
+  countryCode: CountryCode!
+
+  """List of available shipping methods."""
+  shippingMethods: [ShippingMethod!]
+}
+
+"""An enumeration."""
+enum CountryCode {
+  AF
+  AX
+  AL
+  DZ
+  AS
+  AD
+  AO
+  AI
+  AQ
+  AG
+  AR
+  AM
+  AW
+  AU
+  AT
+  AZ
+  BS
+  BH
+  BD
+  BB
+  BY
+  BE
+  BZ
+  BJ
+  BM
+  BT
+  BO
+  BQ
+  BA
+  BW
+  BV
+  BR
+  IO
+  BN
+  BG
+  BF
+  BI
+  CV
+  KH
+  CM
+  CA
+  KY
+  CF
+  TD
+  CL
+  CN
+  CX
+  CC
+  CO
+  KM
+  CG
+  CD
+  CK
+  CR
+  CI
+  HR
+  CU
+  CW
+  CY
+  CZ
+  DK
+  DJ
+  DM
+  DO
+  EC
+  EG
+  SV
+  GQ
+  ER
+  EE
+  SZ
+  ET
+  EU
+  FK
+  FO
+  FJ
+  FI
+  FR
+  GF
+  PF
+  TF
+  GA
+  GM
+  GE
+  DE
+  GH
+  GI
+  GR
+  GL
+  GD
+  GP
+  GU
+  GT
+  GG
+  GN
+  GW
+  GY
+  HT
+  HM
+  VA
+  HN
+  HK
+  HU
+  IS
+  IN
+  ID
+  IR
+  IQ
+  IE
+  IM
+  IL
+  IT
+  JM
+  JP
+  JE
+  JO
+  KZ
+  KE
+  KI
+  KW
+  KG
+  LA
+  LV
+  LB
+  LS
+  LR
+  LY
+  LI
+  LT
+  LU
+  MO
+  MG
+  MW
+  MY
+  MV
+  ML
+  MT
+  MH
+  MQ
+  MR
+  MU
+  YT
+  MX
+  FM
+  MD
+  MC
+  MN
+  ME
+  MS
+  MA
+  MZ
+  MM
+  NA
+  NR
+  NP
+  NL
+  NC
+  NZ
+  NI
+  NE
+  NG
+  NU
+  NF
+  KP
+  MK
+  MP
+  NO
+  OM
+  PK
+  PW
+  PS
+  PA
+  PG
+  PY
+  PE
+  PH
+  PN
+  PL
+  PT
+  PR
+  QA
+  RE
+  RO
+  RU
+  RW
+  BL
+  SH
+  KN
+  LC
+  MF
+  PM
+  VC
+  WS
+  SM
+  ST
+  SA
+  SN
+  RS
+  SC
+  SL
+  SG
+  SX
+  SK
+  SI
+  SB
+  SO
+  ZA
+  GS
+  KR
+  SS
+  ES
+  LK
+  SD
+  SR
+  SJ
+  SE
+  CH
+  SY
+  TW
+  TJ
+  TZ
+  TH
+  TL
+  TG
+  TK
+  TO
+  TT
+  TN
+  TR
+  TM
+  TC
+  TV
+  UG
+  UA
+  AE
+  GB
+  UM
+  US
+  UY
+  UZ
+  VU
+  VE
+  VN
+  VG
+  VI
+  WF
+  EH
+  YE
+  ZM
+  ZW
+}
+
+"""
+Shipping methods that can be used as means of shipping for orders and checkouts.
+"""
+type ShippingMethod implements Node & ObjectWithMetadata {
+  """Unique ID of ShippingMethod available for Order."""
+  id: ID!
+
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  """
+  metafields(keys: [String!]): Metadata
+
+  """Type of the shipping method."""
+  type: ShippingMethodTypeEnum @deprecated(reason: "This field will be removed in Saleor 4.0.")
+
+  """Shipping method name."""
+  name: String!
+
+  """
+  Shipping method description.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+
+  """Maximum delivery days for this shipping method."""
+  maximumDeliveryDays: Int
+
+  """Minimum delivery days for this shipping method."""
+  minimumDeliveryDays: Int
+
+  """Maximum order weight for this shipping method."""
+  maximumOrderWeight: Weight @deprecated(reason: "This field will be removed in Saleor 4.0.")
+
+  """Minimum order weight for this shipping method."""
+  minimumOrderWeight: Weight @deprecated(reason: "This field will be removed in Saleor 4.0.")
+
+  """Returns translated shipping method fields for the given language code."""
+  translation(
+    """A language code to return the translation for shipping method."""
+    languageCode: LanguageCodeEnum!
+  ): ShippingMethodTranslation
+
+  """The price of selected shipping method."""
+  price: Money!
+
+  """Maximum order price for this shipping method."""
+  maximumOrderPrice: Money
+
+  """Minimal order price for this shipping method."""
+  minimumOrderPrice: Money
+
+  """Describes if this shipping method is active and can be selected."""
+  active: Boolean!
+
+  """Message connected to this shipping method."""
+  message: String
+}
+
+"""Represents weight value in a specific weight unit."""
+type Weight {
+  """Weight unit."""
+  unit: WeightUnitsEnum!
+
+  """Weight value."""
+  value: Float!
+}
+
+"""An enumeration."""
+enum WeightUnitsEnum {
+  G
+  LB
+  OZ
+  KG
+  TONNE
+}
+
+"""
+Represents the channel stock settings.
+
+Added in Saleor 3.7.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type StockSettings {
+  """
+  Allocation strategy defines the preference of warehouses for allocations and reservations.
+  """
+  allocationStrategy: AllocationStrategyEnum!
+}
+
+"""
+Determine the allocation strategy for the channel.
+
+    PRIORITIZE_SORTING_ORDER - allocate stocks according to the warehouses' order
+    within the channel
+
+    PRIORITIZE_HIGH_STOCK - allocate stock in a warehouse with the most stock
+"""
+enum AllocationStrategyEnum {
+  PRIORITIZE_SORTING_ORDER
+  PRIORITIZE_HIGH_STOCK
+}
+
+"""Represents the channel-specific order settings."""
+type OrderSettings {
+  """
+  When disabled, all new orders from checkout will be marked as unconfirmed. When enabled orders from checkout will become unfulfilled immediately.
+  """
+  automaticallyConfirmAllNewOrders: Boolean!
+
+  """
+  When enabled, all non-shippable gift card orders will be fulfilled automatically.
+  """
+  automaticallyFulfillNonShippableGiftCard: Boolean!
+}
+
+"""Represents shipping method postal code rule."""
+type ShippingMethodPostalCodeRule implements Node {
+  """The ID of the object."""
+  id: ID!
+
+  """Start address range."""
+  start: String
+
+  """End address range."""
+  end: String
+
+  """Inclusion type of the postal code rule."""
+  inclusionType: PostalCodeRuleInclusionTypeEnum
+}
+
+"""An enumeration."""
+enum PostalCodeRuleInclusionTypeEnum {
+  INCLUDE
+  EXCLUDE
+}
+
+type ProductCountableConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+  edges: [ProductCountableEdge!]!
+
+  """A total count of items in the collection."""
+  totalCount: Int
+}
+
+type ProductCountableEdge {
+  """The item at the end of the edge."""
+  node: Product!
+
+  """A cursor for use in pagination."""
+  cursor: String!
+}
+
+"""Represents an individual item for sale in the storefront."""
+type Product implements Node & ObjectWithMetadata {
+  id: ID!
+
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+  seoTitle: String
+  seoDescription: String
+  name: String!
+
+  """
+  Description of the product.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+  productType: ProductType!
+  slug: String!
+  category: Category
+  created: DateTime!
+  updatedAt: DateTime!
+  chargeTaxes: Boolean! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `Channel.taxConfiguration` field to determine whether tax collection is enabled.")
+  weight: Weight
+  defaultVariant: ProductVariant
+  rating: Float
+
+  """
+  Channel given to retrieve this product. Also used by federation gateway to resolve this object in a federated query.
+  """
+  channel: String
+
+  """
+  Description of the product.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  descriptionJson: JSONString @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `description` field instead.")
+  thumbnail(
+    """
+    Desired longest side the image in pixels. Defaults to 4096. Images are never cropped. Pass 0 to retrieve the original size (not recommended).
+    """
+    size: Int
+
+    """
+    The format of the image. When not provided, format of the original image will be used.
+    
+    Added in Saleor 3.6.
+    
+    Note: this API is currently in Feature Preview and can be subject to changes at later point.
+    """
+    format: ThumbnailFormatEnum = ORIGINAL
+  ): Image
+
+  """
+  Lists the storefront product's pricing, the current price and discounts, only meant for displaying.
+  """
+  pricing(
+    """
+    Destination address used to find warehouses where stock availability for this product is checked. If address is empty, uses `Shop.companyAddress` or fallbacks to server's `settings.DEFAULT_COUNTRY` configuration.
+    """
+    address: AddressInput
+  ): ProductPricingInfo
+
+  """Whether the product is in stock and visible or not."""
+  isAvailable(
+    """
+    Destination address used to find warehouses where stock availability for this product is checked. If address is empty, uses `Shop.companyAddress` or fallbacks to server's `settings.DEFAULT_COUNTRY` configuration.
+    """
+    address: AddressInput
+  ): Boolean
+
+  """A type of tax. Assigned by enabled tax gateway"""
+  taxType: TaxType @deprecated(reason: "This field will be removed in Saleor 4.0. Use `taxClass` field instead.")
+
+  """
+  Get a single attribute attached to product by attribute slug.
+  
+  Added in Saleor 3.9.
+  """
+  attribute(
+    """Slug of the attribute"""
+    slug: String!
+  ): SelectedAttribute
+
+  """List of attributes assigned to this product."""
+  attributes: [SelectedAttribute!]!
+
+  """
+  List of availability in channels for the product.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  channelListings: [ProductChannelListing!]
+
+  """Get a single product media by ID."""
+  mediaById(
+    """ID of a product media."""
+    id: ID
+  ): ProductMedia
+
+  """Get a single product image by ID."""
+  imageById(
+    """ID of a product image."""
+    id: ID
+  ): ProductImage @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `mediaById` field instead.")
+
+  """
+  Get a single variant by SKU or ID. 
+  
+  Added in Saleor 3.9.
+  """
+  variant(
+    """ID of the variant."""
+    id: ID
+
+    """SKU of the variant."""
+    sku: String
+  ): ProductVariant @deprecated(reason: "This field will be removed in Saleor 4.0. Use top-level `variant` query.")
+
+  """
+  List of variants for the product. Requires the following permissions to include the unpublished items: MANAGE_ORDERS, MANAGE_DISCOUNTS, MANAGE_PRODUCTS.
+  """
+  variants: [ProductVariant!]
+
+  """List of media for the product."""
+  media(
+    """
+    Sort media. 
+    
+    Added in Saleor 3.9.
+    """
+    sortBy: MediaSortingInput
+  ): [ProductMedia!]
+
+  """List of images for the product."""
+  images: [ProductImage!] @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `media` field instead.")
+
+  """
+  List of collections for the product. Requires the following permissions to include the unpublished items: MANAGE_ORDERS, MANAGE_DISCOUNTS, MANAGE_PRODUCTS.
+  """
+  collections: [Collection!]
+
+  """Returns translated product fields for the given language code."""
+  translation(
+    """A language code to return the translation for product."""
+    languageCode: LanguageCodeEnum!
+  ): ProductTranslation
+
+  """Date when product is available for purchase."""
+  availableForPurchase: Date @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `availableForPurchaseAt` field to fetch the available for purchase date.")
+
+  """Date when product is available for purchase."""
+  availableForPurchaseAt: DateTime
+
+  """Whether the product is available for purchase."""
+  isAvailableForPurchase: Boolean
+
+  """
+  Tax class assigned to this product type. All products of this product type use this tax class, unless it's overridden in the `Product` type.
+  
+  Requires one of the following permissions: AUTHENTICATED_STAFF_USER.
+  """
+  taxClass: TaxClass
+
+  """
+  External ID of this product. 
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+}
+
+"""
+Represents a type of product. It defines what attributes are available to products of this type.
+"""
+type ProductType implements Node & ObjectWithMetadata {
+  id: ID!
+
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+  name: String!
+  slug: String!
+  hasVariants: Boolean!
+  isShippingRequired: Boolean!
+  isDigital: Boolean!
+  weight: Weight
+
+  """The product type kind."""
+  kind: ProductTypeKindEnum!
+
+  """List of products of this type."""
+  products(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): ProductCountableConnection @deprecated(reason: "This field will be removed in Saleor 4.0. Use the top-level `products` query with the `productTypes` filter.")
+
+  """A type of tax. Assigned by enabled tax gateway"""
+  taxType: TaxType @deprecated(reason: "This field will be removed in Saleor 4.0. Use `taxClass` field instead.")
+
+  """
+  Tax class assigned to this product type. All products of this product type use this tax class, unless it's overridden in the `Product` type.
+  
+  Requires one of the following permissions: AUTHENTICATED_STAFF_USER.
+  """
+  taxClass: TaxClass
+
+  """Variant attributes of that product type."""
+  variantAttributes(
+    """Define scope of returned attributes."""
+    variantSelection: VariantAttributeScope
+  ): [Attribute!] @deprecated(reason: "This field will be removed in Saleor 4.0. Use `assignedVariantAttributes` instead.")
+
+  """
+  Variant attributes of that product type with attached variant selection.
+  
+  Added in Saleor 3.1.
+  """
+  assignedVariantAttributes(
+    """Define scope of returned attributes."""
+    variantSelection: VariantAttributeScope
+  ): [AssignedVariantAttribute!]
+
+  """Product attributes of that product type."""
+  productAttributes: [Attribute!]
+
+  """
+  List of attributes which can be assigned to this product type.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  availableAttributes(
+    filter: AttributeFilterInput
+    where: AttributeWhereInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): AttributeCountableConnection
+}
+
+"""An enumeration."""
+enum ProductTypeKindEnum {
+  NORMAL
+  GIFT_CARD
+}
+
+"""Representation of tax types fetched from tax gateway."""
+type TaxType {
+  """Description of the tax type."""
+  description: String
+
+  """External tax code used to identify given tax group."""
+  taxCode: String
+}
+
+"""
+Tax class is a named object used to define tax rates per country. Tax class can be assigned to product types, products and shipping methods to define their tax rates.
+
+Added in Saleor 3.9.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type TaxClass implements Node & ObjectWithMetadata {
+  """The ID of the object."""
+  id: ID!
+
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+
+  """Name of the tax class."""
+  name: String!
+
+  """Country-specific tax rates for this tax class."""
+  countries: [TaxClassCountryRate!]!
+}
+
+"""
+Tax rate for a country. When tax class is null, it represents the default tax rate for that country; otherwise it's a country tax rate specific to the given tax class.
+
+Added in Saleor 3.9.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type TaxClassCountryRate {
+  """Country in which this tax rate applies."""
+  country: CountryDisplay!
+
+  """Tax rate value."""
+  rate: Float!
+
+  """Related tax class."""
+  taxClass: TaxClass
+}
+
+"""
+Custom attribute of a product. Attributes can be assigned to products and variants at the product type level.
+"""
+type Attribute implements Node & ObjectWithMetadata {
+  id: ID!
+
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+
+  """The input type to use for entering attribute values in the dashboard."""
+  inputType: AttributeInputTypeEnum
+
+  """The entity type which can be used as a reference."""
+  entityType: AttributeEntityTypeEnum
+
+  """Name of an attribute displayed in the interface."""
+  name: String
+
+  """Internal representation of an attribute name."""
+  slug: String
+
+  """The attribute type."""
+  type: AttributeTypeEnum
+
+  """The unit of attribute values."""
+  unit: MeasurementUnitsEnum
+
+  """List of attribute's values."""
+  choices(
+    """Sort attribute choices."""
+    sortBy: AttributeChoicesSortingInput
+
+    """Filtering options for attribute choices."""
+    filter: AttributeValueFilterInput
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): AttributeValueCountableConnection
+
+  """
+  Whether the attribute requires values to be passed or not. Requires one of the following permissions: MANAGE_PAGES, MANAGE_PAGE_TYPES_AND_ATTRIBUTES, MANAGE_PRODUCTS, MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+  """
+  valueRequired: Boolean!
+
+  """
+  Whether the attribute should be visible or not in storefront. Requires one of the following permissions: MANAGE_PAGES, MANAGE_PAGE_TYPES_AND_ATTRIBUTES, MANAGE_PRODUCTS, MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+  """
+  visibleInStorefront: Boolean!
+
+  """
+  Whether the attribute can be filtered in storefront. Requires one of the following permissions: MANAGE_PAGES, MANAGE_PAGE_TYPES_AND_ATTRIBUTES, MANAGE_PRODUCTS, MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+  """
+  filterableInStorefront: Boolean! @deprecated(reason: "This field will be removed in Saleor 4.0.")
+
+  """
+  Whether the attribute can be filtered in dashboard. Requires one of the following permissions: MANAGE_PAGES, MANAGE_PAGE_TYPES_AND_ATTRIBUTES, MANAGE_PRODUCTS, MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+  """
+  filterableInDashboard: Boolean!
+
+  """
+  Whether the attribute can be displayed in the admin product list. Requires one of the following permissions: MANAGE_PAGES, MANAGE_PAGE_TYPES_AND_ATTRIBUTES, MANAGE_PRODUCTS, MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+  """
+  availableInGrid: Boolean! @deprecated(reason: "This field will be removed in Saleor 4.0.")
+
+  """
+  The position of the attribute in the storefront navigation (0 by default). Requires one of the following permissions: MANAGE_PAGES, MANAGE_PAGE_TYPES_AND_ATTRIBUTES, MANAGE_PRODUCTS, MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+  """
+  storefrontSearchPosition: Int! @deprecated(reason: "This field will be removed in Saleor 4.0.")
+
+  """Returns translated attribute fields for the given language code."""
+  translation(
+    """A language code to return the translation for attribute."""
+    languageCode: LanguageCodeEnum!
+  ): AttributeTranslation
+
+  """Flag indicating that attribute has predefined choices."""
+  withChoices: Boolean!
+  productTypes(
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): ProductTypeCountableConnection!
+  productVariantTypes(
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): ProductTypeCountableConnection!
+
+  """
+  External ID of this attribute. 
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+}
+
+"""An enumeration."""
+enum AttributeInputTypeEnum {
+  DROPDOWN
+  MULTISELECT
+  FILE
+  REFERENCE
+  NUMERIC
+  RICH_TEXT
+  PLAIN_TEXT
+  SWATCH
+  BOOLEAN
+  DATE
+  DATE_TIME
+}
+
+"""An enumeration."""
+enum AttributeEntityTypeEnum {
+  PAGE
+  PRODUCT
+  PRODUCT_VARIANT
+}
+
+"""An enumeration."""
+enum AttributeTypeEnum {
+  PRODUCT_TYPE
+  PAGE_TYPE
+}
+
+"""An enumeration."""
+enum MeasurementUnitsEnum {
+  CM
+  M
+  KM
+  FT
+  YD
+  INCH
+  SQ_CM
+  SQ_M
+  SQ_KM
+  SQ_FT
+  SQ_YD
+  SQ_INCH
+  CUBIC_MILLIMETER
+  CUBIC_CENTIMETER
+  CUBIC_DECIMETER
+  CUBIC_METER
+  LITER
+  CUBIC_FOOT
+  CUBIC_INCH
+  CUBIC_YARD
+  QT
+  PINT
+  FL_OZ
+  ACRE_IN
+  ACRE_FT
+  G
+  LB
+  OZ
+  KG
+  TONNE
+}
+
+type AttributeValueCountableConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+  edges: [AttributeValueCountableEdge!]!
+
+  """A total count of items in the collection."""
+  totalCount: Int
+}
+
+type AttributeValueCountableEdge {
+  """The item at the end of the edge."""
+  node: AttributeValue!
+
+  """A cursor for use in pagination."""
+  cursor: String!
+}
+
+"""Represents a value of an attribute."""
+type AttributeValue implements Node {
+  id: ID!
+
+  """Name of a value displayed in the interface."""
+  name: String
+
+  """Internal representation of a value (unique per attribute)."""
+  slug: String
+
+  """
+  Represent value of the attribute value (e.g. color values for swatch attributes).
+  """
+  value: String
+
+  """Returns translated attribute value fields for the given language code."""
+  translation(
+    """A language code to return the translation for attribute value."""
+    languageCode: LanguageCodeEnum!
+  ): AttributeValueTranslation
+
+  """The input type to use for entering attribute values in the dashboard."""
+  inputType: AttributeInputTypeEnum
+
+  """The ID of the attribute reference."""
+  reference: ID
+
+  """Represents file URL and content type (if attribute value is a file)."""
+  file: File
+
+  """
+  Represents the text of the attribute value, includes formatting.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  richText: JSONString
+
+  """
+  Represents the text of the attribute value, plain text without formating.
+  """
+  plainText: String
+
+  """Represents the boolean value of the attribute value."""
+  boolean: Boolean
+
+  """Represents the date value of the attribute value."""
+  date: Date
+
+  """Represents the date/time value of the attribute value."""
+  dateTime: DateTime
+
+  """
+  External ID of this attribute value. 
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+}
+
+type AttributeValueTranslation implements Node {
+  id: ID!
+
+  """Translation language."""
+  language: LanguageDisplay!
+  name: String!
+
+  """
+  Attribute value.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  richText: JSONString
+
+  """Attribute plain text value."""
+  plainText: String
+}
+
+type File {
+  """The URL of the file."""
+  url: String!
+
+  """Content type of the file."""
+  contentType: String
+}
+
+"""
+The `Date` scalar type represents a Date
+value as specified by
+[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
+"""
+scalar Date
+
+input AttributeChoicesSortingInput {
+  """Specifies the direction in which to sort products."""
+  direction: OrderDirection!
+
+  """Sort attribute choices by the selected field."""
+  field: AttributeChoicesSortField!
+}
+
+enum AttributeChoicesSortField {
+  """Sort attribute choice by name."""
+  NAME
+
+  """Sort attribute choice by slug."""
+  SLUG
+}
+
+input AttributeValueFilterInput {
+  search: String
+  ids: [ID!]
+}
+
+type AttributeTranslation implements Node {
+  id: ID!
+
+  """Translation language."""
+  language: LanguageDisplay!
+  name: String!
+}
+
+type ProductTypeCountableConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+  edges: [ProductTypeCountableEdge!]!
+
+  """A total count of items in the collection."""
+  totalCount: Int
+}
+
+type ProductTypeCountableEdge {
+  """The item at the end of the edge."""
+  node: ProductType!
+
+  """A cursor for use in pagination."""
+  cursor: String!
+}
+
+enum VariantAttributeScope {
+  ALL
+  VARIANT_SELECTION
+  NOT_VARIANT_SELECTION
+}
+
+"""
+Represents assigned attribute to variant with variant selection attached.
+
+Added in Saleor 3.1.
+"""
+type AssignedVariantAttribute {
+  """Attribute assigned to variant."""
+  attribute: Attribute!
+
+  """
+  Determines, whether assigned attribute is allowed for variant selection. Supported variant types for variant selection are: ['dropdown', 'boolean', 'swatch', 'numeric']
+  """
+  variantSelection: Boolean!
+}
+
+type AttributeCountableConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+  edges: [AttributeCountableEdge!]!
+
+  """A total count of items in the collection."""
+  totalCount: Int
+}
+
+type AttributeCountableEdge {
+  """The item at the end of the edge."""
+  node: Attribute!
+
+  """A cursor for use in pagination."""
+  cursor: String!
+}
+
+input AttributeFilterInput {
+  valueRequired: Boolean
+  isVariantOnly: Boolean
+  visibleInStorefront: Boolean
+  filterableInStorefront: Boolean
+  filterableInDashboard: Boolean
+  availableInGrid: Boolean
+  metadata: [MetadataFilter!]
+  search: String
+  ids: [ID!]
+  type: AttributeTypeEnum
+  inCollection: ID
+  inCategory: ID
+  slugs: [String!]
+
+  """
+  Specifies the channel by which the data should be filtered. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use root-level channel argument instead.
+  """
+  channel: String
+}
+
+input MetadataFilter {
+  """Key of a metadata item."""
+  key: String!
+
+  """Value of a metadata item."""
+  value: String
+}
+
+"""
+Where filtering options.
+
+Added in Saleor 3.11.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+input AttributeWhereInput {
+  valueRequired: Boolean
+  visibleInStorefront: Boolean
+  filterableInDashboard: Boolean
+  metadata: [MetadataFilter!]
+  ids: [ID!]
+  name: StringFilterInput
+  slug: StringFilterInput
+  withChoices: Boolean
+  inputType: AttributeInputTypeEnumFilterInput
+  entityType: AttributeEntityTypeEnumFilterInput
+  type: AttributeTypeEnumFilterInput
+  unit: MeasurementUnitsEnumFilterInput
+  inCollection: ID
+  inCategory: ID
+
+  """List of conditions that must be met."""
+  AND: [AttributeWhereInput!]
+
+  """A list of conditions of which at least one must be met."""
+  OR: [AttributeWhereInput!]
+}
+
+"""
+Define the filtering options for string fields.
+
+Added in Saleor 3.11.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+input StringFilterInput {
+  """The value equal to."""
+  eq: String
+
+  """The value included in."""
+  oneOf: [String!]
+}
+
+input AttributeInputTypeEnumFilterInput {
+  """The value equal to."""
+  eq: AttributeInputTypeEnum
+
+  """The value included in."""
+  oneOf: [AttributeInputTypeEnum!]
+}
+
+input AttributeEntityTypeEnumFilterInput {
+  """The value equal to."""
+  eq: AttributeEntityTypeEnum
+
+  """The value included in."""
+  oneOf: [AttributeEntityTypeEnum!]
+}
+
+input AttributeTypeEnumFilterInput {
+  """The value equal to."""
+  eq: AttributeTypeEnum
+
+  """The value included in."""
+  oneOf: [AttributeTypeEnum!]
+}
+
+input MeasurementUnitsEnumFilterInput {
+  """The value equal to."""
+  eq: MeasurementUnitsEnum
+
+  """The value included in."""
+  oneOf: [MeasurementUnitsEnum!]
+}
+
+"""
+Represents a single category of products. Categories allow to organize products in a tree-hierarchies which can be used for navigation in the storefront.
+"""
+type Category implements Node & ObjectWithMetadata {
+  id: ID!
+
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+  seoTitle: String
+  seoDescription: String
+  name: String!
+
+  """
+  Description of the category.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+  slug: String!
+  parent: Category
+  level: Int!
+
+  """
+  Description of the category.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  descriptionJson: JSONString @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `description` field instead.")
+
+  """List of ancestors of the category."""
+  ancestors(
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): CategoryCountableConnection
+
+  """
+  List of products in the category. Requires the following permissions to include the unpublished items: MANAGE_ORDERS, MANAGE_DISCOUNTS, MANAGE_PRODUCTS.
+  """
+  products(
+    """
+    Filtering options for products.
+    
+    Added in Saleor 3.10.
+    """
+    filter: ProductFilterInput
+
+    """
+    Sort products.
+    
+    Added in Saleor 3.10.
+    """
+    sortBy: ProductOrder
+
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): ProductCountableConnection
+
+  """List of children of the category."""
+  children(
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): CategoryCountableConnection
+  backgroundImage(
+    """
+    Desired longest side the image in pixels. Defaults to 4096. Images are never cropped. Pass 0 to retrieve the original size (not recommended).
+    """
+    size: Int
+
+    """
+    The format of the image. When not provided, format of the original image will be used.
+    
+    Added in Saleor 3.6.
+    
+    Note: this API is currently in Feature Preview and can be subject to changes at later point.
+    """
+    format: ThumbnailFormatEnum = ORIGINAL
+  ): Image
+
+  """Returns translated category fields for the given language code."""
+  translation(
+    """A language code to return the translation for category."""
+    languageCode: LanguageCodeEnum!
+  ): CategoryTranslation
+}
+
+type CategoryCountableConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+  edges: [CategoryCountableEdge!]!
+
+  """A total count of items in the collection."""
+  totalCount: Int
+}
+
+type CategoryCountableEdge {
+  """The item at the end of the edge."""
+  node: Category!
+
+  """A cursor for use in pagination."""
+  cursor: String!
+}
+
+input ProductFilterInput {
+  isPublished: Boolean
+  collections: [ID!]
+  categories: [ID!]
+  hasCategory: Boolean
+  attributes: [AttributeInput!]
+
+  """Filter by variants having specific stock status."""
+  stockAvailability: StockAvailability
+  stocks: ProductStockFilterInput
+  search: String
+  metadata: [MetadataFilter!]
+
+  """
+  Filter by the publication date. 
+  
+  Added in Saleor 3.8.
+  """
+  publishedFrom: DateTime
+
+  """
+  Filter by availability for purchase. 
+  
+  Added in Saleor 3.8.
+  """
+  isAvailable: Boolean
+
+  """
+  Filter by the date of availability for purchase. 
+  
+  Added in Saleor 3.8.
+  """
+  availableFrom: DateTime
+
+  """
+  Filter by visibility in product listings. 
+  
+  Added in Saleor 3.8.
+  """
+  isVisibleInListing: Boolean
+  price: PriceRangeInput
+
+  """Filter by the lowest variant price after discounts."""
+  minimalPrice: PriceRangeInput
+
+  """Filter by when was the most recent update."""
+  updatedAt: DateTimeRangeInput
+  productTypes: [ID!]
+
+  """Filter on whether product is a gift card or not."""
+  giftCard: Boolean
+  ids: [ID!]
+  hasPreorderedVariants: Boolean
+  slugs: [String!]
+
+  """
+  Specifies the channel by which the data should be filtered. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use root-level channel argument instead.
+  """
+  channel: String
+}
+
+input AttributeInput {
+  """Internal representation of an attribute name."""
+  slug: String!
+
+  """Internal representation of a value (unique per attribute)."""
+  values: [String!]
+
+  """The range that the returned values should be in."""
+  valuesRange: IntRangeInput
+
+  """The date/time range that the returned values should be in."""
+  dateTime: DateTimeRangeInput
+
+  """
+  The date range that the returned values should be in. In case of date/time attributes, the UTC midnight of the given date is used.
+  """
+  date: DateRangeInput
+
+  """The boolean value of the attribute."""
+  boolean: Boolean
+}
+
+input IntRangeInput {
+  """Value greater than or equal to."""
+  gte: Int
+
+  """Value less than or equal to."""
+  lte: Int
+}
+
+input DateTimeRangeInput {
+  """Start date."""
+  gte: DateTime
+
+  """End date."""
+  lte: DateTime
+}
+
+input DateRangeInput {
+  """Start date."""
+  gte: Date
+
+  """End date."""
+  lte: Date
+}
+
+enum StockAvailability {
+  IN_STOCK
+  OUT_OF_STOCK
+}
+
+input ProductStockFilterInput {
+  warehouseIds: [ID!]
+  quantity: IntRangeInput
+}
+
+input PriceRangeInput {
+  """Price greater than or equal to."""
+  gte: Float
+
+  """Price less than or equal to."""
+  lte: Float
+}
+
+input ProductOrder {
+  """Specifies the direction in which to sort products."""
+  direction: OrderDirection!
+
+  """
+  Specifies the channel in which to sort the data.
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use root-level channel argument instead.
+  """
+  channel: String
+
+  """
+  Sort product by the selected attribute's values.
+  Note: this doesn't take translations into account yet.
+  """
+  attributeId: ID
+
+  """Sort products by the selected field."""
+  field: ProductOrderField
+}
+
+enum ProductOrderField {
+  """Sort products by name."""
+  NAME
+
+  """
+  Sort products by rank. Note: This option is available only with the `search` filter.
+  """
+  RANK
+
+  """
+  Sort products by price.
+  
+  This option requires a channel filter to work as the values can vary between channels.
+  """
+  PRICE
+
+  """
+  Sort products by a minimal price of a product's variant.
+  
+  This option requires a channel filter to work as the values can vary between channels.
+  """
+  MINIMAL_PRICE
+
+  """Sort products by update date."""
+  LAST_MODIFIED
+
+  """Sort products by update date."""
+  DATE
+
+  """Sort products by type."""
+  TYPE
+
+  """
+  Sort products by publication status.
+  
+  This option requires a channel filter to work as the values can vary between channels.
+  """
+  PUBLISHED
+
+  """
+  Sort products by publication date.
+  
+  This option requires a channel filter to work as the values can vary between channels.
+  """
+  PUBLICATION_DATE
+
+  """
+  Sort products by publication date.
+  
+  This option requires a channel filter to work as the values can vary between channels.
+  """
+  PUBLISHED_AT
+
+  """Sort products by update date."""
+  LAST_MODIFIED_AT
+
+  """
+  Sort products by collection. Note: This option is available only for the `Collection.products` query.
+  
+  This option requires a channel filter to work as the values can vary between channels.
+  """
+  COLLECTION
+
+  """Sort products by rating."""
+  RATING
+
+  """
+  Sort products by creation date.
+  
+  Added in Saleor 3.8.
+  """
+  CREATED_AT
+}
+
+"""Represents an image."""
+type Image {
+  """The URL of the image."""
+  url: String!
+
+  """Alt text for an image."""
+  alt: String
+}
+
+"""An enumeration."""
+enum ThumbnailFormatEnum {
+  ORIGINAL
+  AVIF
+  WEBP
+}
+
+type CategoryTranslation implements Node {
+  id: ID!
+
+  """Translation language."""
+  language: LanguageDisplay!
+  seoTitle: String
+  seoDescription: String
+  name: String
+
+  """
+  Translated description of the category.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+
+  """
+  Translated description of the category.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  descriptionJson: JSONString @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `description` field instead.")
+}
+
+"""Represents a version of a product such as different size or color."""
+type ProductVariant implements Node & ObjectWithMetadata {
+  id: ID!
+
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+  name: String!
+  sku: String
+  product: Product!
+  trackInventory: Boolean!
+  quantityLimitPerCustomer: Int
+  weight: Weight
+
+  """
+  Channel given to retrieve this product variant. Also used by federation gateway to resolve this object in a federated query.
+  """
+  channel: String
+
+  """
+  List of price information in channels for the product.
+  
+  Requires one of the following permissions: AUTHENTICATED_APP, AUTHENTICATED_STAFF_USER.
+  """
+  channelListings: [ProductVariantChannelListing!]
+
+  """
+  Lists the storefront variant's pricing, the current price and discounts, only meant for displaying.
+  """
+  pricing(
+    """
+    Destination address used to find warehouses where stock availability for this product is checked. If address is empty, uses `Shop.companyAddress` or fallbacks to server's `settings.DEFAULT_COUNTRY` configuration.
+    """
+    address: AddressInput
+  ): VariantPricingInfo
+
+  """List of attributes assigned to this variant."""
+  attributes(
+    """Define scope of returned attributes."""
+    variantSelection: VariantAttributeScope
+  ): [SelectedAttribute!]!
+
+  """Gross margin percentage value."""
+  margin: Int
+
+  """
+  Total quantity ordered.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  quantityOrdered: Int
+
+  """
+  Total revenue generated by a variant in given period of time. Note: this field should be queried using `reportProductSales` query as it uses optimizations suitable for such calculations.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  revenue(period: ReportingPeriod): TaxedMoney
+
+  """List of images for the product variant."""
+  images: [ProductImage!] @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `media` field instead.")
+
+  """List of media for the product variant."""
+  media: [ProductMedia!]
+
+  """Returns translated product variant fields for the given language code."""
+  translation(
+    """A language code to return the translation for product variant."""
+    languageCode: LanguageCodeEnum!
+  ): ProductVariantTranslation
+
+  """
+  Digital content for the product variant.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  digitalContent: DigitalContent
+
+  """
+  Stocks for the product variant.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS, MANAGE_ORDERS.
+  """
+  stocks(
+    """
+    Destination address used to find warehouses where stock availability for this product is checked. If address is empty, uses `Shop.companyAddress` or fallbacks to server's `settings.DEFAULT_COUNTRY` configuration.
+    """
+    address: AddressInput
+
+    """
+    Two-letter ISO 3166-1 country code. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `address` argument instead.
+    """
+    countryCode: CountryCode
+  ): [Stock!]
+
+  """
+  Quantity of a product available for sale in one checkout. Field value will be `null` when no `limitQuantityPerCheckout` in global settings has been set, and `productVariant` stocks are not tracked.
+  """
+  quantityAvailable(
+    """
+    Destination address used to find warehouses where stock availability for this product is checked. If address is empty, uses `Shop.companyAddress` or fallbacks to server's `settings.DEFAULT_COUNTRY` configuration.
+    """
+    address: AddressInput
+
+    """
+    Two-letter ISO 3166-1 country code. When provided, the exact quantity from a warehouse operating in shipping zones that contain this country will be returned. Otherwise, it will return the maximum quantity from all shipping zones. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `address` argument instead.
+    """
+    countryCode: CountryCode
+  ): Int
+
+  """
+  Preorder data for product variant.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  preorder: PreorderData
+  created: DateTime!
+  updatedAt: DateTime!
+
+  """
+  External ID of this product. 
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+}
+
+"""Represents product varaint channel listing."""
+type ProductVariantChannelListing implements Node {
+  id: ID!
+  channel: Channel!
+  price: Money
+
+  """Cost price of the variant."""
+  costPrice: Money
+
+  """
+  Gross margin percentage value.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  margin: Int
+
+  """
+  Preorder variant data.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  preorderThreshold: PreorderThreshold
+}
+
+"""Represents preorder variant data for channel."""
+type PreorderThreshold {
+  """Preorder threshold for product variant in this channel."""
+  quantity: Int
+
+  """Number of sold product variant in this channel."""
+  soldUnits: Int!
+}
+
+"""Represents availability of a variant in the storefront."""
+type VariantPricingInfo {
+  """Whether it is in sale or not."""
+  onSale: Boolean
+
+  """The discount amount if in sale (null otherwise)."""
+  discount: TaxedMoney
+
+  """The discount amount in the local currency."""
+  discountLocalCurrency: TaxedMoney
+
+  """The price, with any discount subtracted."""
+  price: TaxedMoney
+
+  """The price without any discount."""
+  priceUndiscounted: TaxedMoney
+
+  """The discounted price in the local currency."""
+  priceLocalCurrency: TaxedMoney
+}
+
+"""
+Represents a monetary value with taxes. In cases where taxes were not applied, net and gross values will be equal.
+"""
+type TaxedMoney {
+  """Currency code."""
+  currency: String!
+
+  """Amount of money including taxes."""
+  gross: Money!
+
+  """Amount of money without taxes."""
+  net: Money!
+
+  """Amount of taxes."""
+  tax: Money!
+}
+
+input AddressInput {
+  """Given name."""
+  firstName: String
+
+  """Family name."""
+  lastName: String
+
+  """Company or organization."""
+  companyName: String
+
+  """Address."""
+  streetAddress1: String
+
+  """Address."""
+  streetAddress2: String
+
+  """City."""
+  city: String
+
+  """District."""
+  cityArea: String
+
+  """Postal code."""
+  postalCode: String
+
+  """Country."""
+  country: CountryCode
+
+  """State or province."""
+  countryArea: String
+
+  """Phone number."""
+  phone: String
+}
+
+"""Represents a custom attribute."""
+type SelectedAttribute {
+  """Name of an attribute displayed in the interface."""
+  attribute: Attribute!
+
+  """Values of an attribute."""
+  values: [AttributeValue!]!
+}
+
+enum ReportingPeriod {
+  TODAY
+  THIS_MONTH
+}
+
+"""Represents a product image."""
+type ProductImage {
+  """The ID of the image."""
+  id: ID!
+
+  """The alt text of the image."""
+  alt: String
+
+  """
+  The new relative sorting position of the item (from -inf to +inf). 1 moves the item one position forward, -1 moves the item one position backward, 0 leaves the item unchanged.
+  """
+  sortOrder: Int
+  url(
+    """
+    Desired longest side the image in pixels. Defaults to 4096. Images are never cropped. Pass 0 to retrieve the original size (not recommended).
+    """
+    size: Int
+
+    """
+    The format of the image. When not provided, format of the original image will be used.
+    
+    Added in Saleor 3.6.
+    
+    Note: this API is currently in Feature Preview and can be subject to changes at later point.
+    """
+    format: ThumbnailFormatEnum = ORIGINAL
+  ): String!
+}
+
+"""Represents a product media."""
+type ProductMedia implements Node & ObjectWithMetadata {
+  id: ID!
+
+  """
+  List of private metadata items. Requires staff permissions to access.
+  
+  Added in Saleor 3.12.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.12.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.12.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """
+  List of public metadata items. Can be accessed without permissions.
+  
+  Added in Saleor 3.12.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.12.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.12.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+  sortOrder: Int
+  alt: String!
+  type: ProductMediaType!
+  oembedData: JSONString!
+  url(
+    """
+    Desired longest side the image in pixels. Defaults to 4096. Images are never cropped. Pass 0 to retrieve the original size (not recommended).
+    """
+    size: Int
+
+    """
+    The format of the image. When not provided, format of the original image will be used.
+    
+    Added in Saleor 3.6.
+    
+    Note: this API is currently in Feature Preview and can be subject to changes at later point.
+    """
+    format: ThumbnailFormatEnum = ORIGINAL
+  ): String!
+
+  """
+  Product id the media refers to.
+  
+  Added in Saleor 3.12.
+  """
+  productId: ID
+}
+
+"""An enumeration."""
+enum ProductMediaType {
+  IMAGE
+  VIDEO
+}
+
+type ProductVariantTranslation implements Node {
+  id: ID!
+
+  """Translation language."""
+  language: LanguageDisplay!
+  name: String!
+}
+
+type DigitalContent implements Node & ObjectWithMetadata {
+  id: ID!
+
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+  useDefaultSettings: Boolean!
+  automaticFulfillment: Boolean!
+  contentFile: String!
+  maxDownloads: Int
+  urlValidDays: Int
+
+  """List of URLs for the digital variant."""
+  urls: [DigitalContentUrl!]
+
+  """Product variant assigned to digital content."""
+  productVariant: ProductVariant!
+}
+
+type DigitalContentUrl implements Node {
+  id: ID!
+  content: DigitalContent!
+  created: DateTime!
+  downloadNum: Int!
+
+  """URL for digital content."""
+  url: String
+
+  """UUID of digital content."""
+  token: UUID!
+}
+
+scalar UUID
+
+"""Represents stock."""
+type Stock implements Node {
+  id: ID!
+  warehouse: Warehouse!
+  productVariant: ProductVariant!
+
+  """
+  Quantity of a product in the warehouse's possession, including the allocated stock that is waiting for shipment.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS, MANAGE_ORDERS.
+  """
+  quantity: Int!
+
+  """
+  Quantity allocated for orders.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS, MANAGE_ORDERS.
+  """
+  quantityAllocated: Int!
+
+  """
+  Quantity reserved for checkouts.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS, MANAGE_ORDERS.
+  """
+  quantityReserved: Int!
+}
+
+"""Represents preorder settings for product variant."""
+type PreorderData {
+  """
+  The global preorder threshold for product variant.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  globalThreshold: Int
+
+  """
+  Total number of sold product variant during preorder.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  globalSoldUnits: Int!
+
+  """Preorder end date."""
+  endDate: DateTime
+}
+
+"""Represents availability of a product in the storefront."""
+type ProductPricingInfo {
+  """Whether it is in sale or not."""
+  onSale: Boolean
+
+  """The discount amount if in sale (null otherwise)."""
+  discount: TaxedMoney
+
+  """The discount amount in the local currency."""
+  discountLocalCurrency: TaxedMoney
+
+  """The discounted price range of the product variants."""
+  priceRange: TaxedMoneyRange
+
+  """The undiscounted price range of the product variants."""
+  priceRangeUndiscounted: TaxedMoneyRange
+
+  """
+  The discounted price range of the product variants in the local currency.
+  """
+  priceRangeLocalCurrency: TaxedMoneyRange
+
+  """
+  Determines whether this product's price displayed in a storefront should include taxes.
+  
+  Added in Saleor 3.9.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  displayGrossPrices: Boolean!
+}
+
+"""Represents a range of monetary values."""
+type TaxedMoneyRange {
+  """Lower bound of a price range."""
+  start: TaxedMoney
+
+  """Upper bound of a price range."""
+  stop: TaxedMoney
+}
+
+"""Represents product channel listing."""
+type ProductChannelListing implements Node {
+  id: ID!
+  publicationDate: Date @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `publishedAt` field to fetch the publication date.")
+
+  """
+  The product publication date time.
+  
+  Added in Saleor 3.3.
+  """
+  publishedAt: DateTime
+  isPublished: Boolean!
+  channel: Channel!
+  visibleInListings: Boolean!
+  availableForPurchase: Date @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `availableForPurchaseAt` field to fetch the available for purchase date.")
+
+  """
+  The product available for purchase date time.
+  
+  Added in Saleor 3.3.
+  """
+  availableForPurchaseAt: DateTime
+
+  """The price of the cheapest variant (including discounts)."""
+  discountedPrice: Money
+
+  """
+  Purchase cost of product.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  purchaseCost: MoneyRange
+
+  """
+  Range of margin percentage value.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  margin: Margin
+
+  """Whether the product is available for purchase."""
+  isAvailableForPurchase: Boolean
+
+  """
+  Lists the storefront product's pricing, the current price and discounts, only meant for displaying.
+  """
+  pricing(
+    """
+    Destination address used to find warehouses where stock availability for this product is checked. If address is empty, uses `Shop.companyAddress` or fallbacks to server's `settings.DEFAULT_COUNTRY` configuration.
+    """
+    address: AddressInput
+  ): ProductPricingInfo
+}
+
+type Margin {
+  start: Int
+  stop: Int
+}
+
+input MediaSortingInput {
+  """Specifies the direction in which to sort products."""
+  direction: OrderDirection!
+
+  """Sort media by the selected field."""
+  field: MediaChoicesSortField!
+}
+
+enum MediaChoicesSortField {
+  """Sort media by ID."""
+  ID
+}
+
+"""Represents a collection of products."""
+type Collection implements Node & ObjectWithMetadata {
+  id: ID!
+
+  """List of private metadata items. Requires staff permissions to access."""
+  privateMetadata: [MetadataItem!]!
+
+  """
+  A single key from private metadata. Requires staff permissions to access.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafield(key: String!): String
+
+  """
+  Private metadata. Requires staff permissions to access. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  privateMetafields(keys: [String!]): Metadata
+
+  """List of public metadata items. Can be accessed without permissions."""
+  metadata: [MetadataItem!]!
+
+  """
+  A single key from public metadata.
+  
+  Tip: Use GraphQL aliases to fetch multiple keys.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafield(key: String!): String
+
+  """
+  Public metadata. Use `keys` to control which fields you want to include. The default is to include everything.
+  
+  Added in Saleor 3.3.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  metafields(keys: [String!]): Metadata
+  seoTitle: String
+  seoDescription: String
+  name: String!
+
+  """
+  Description of the collection.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+  slug: String!
+
+  """
+  Channel given to retrieve this collection. Also used by federation gateway to resolve this object in a federated query.
+  """
+  channel: String
+
+  """
+  Description of the collection.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  descriptionJson: JSONString @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `description` field instead.")
+
+  """List of products in this collection."""
+  products(
+    """Filtering options for products."""
+    filter: ProductFilterInput
+
+    """Sort products."""
+    sortBy: ProductOrder
+
+    """Return the elements in the list that come before the specified cursor."""
+    before: String
+
+    """Return the elements in the list that come after the specified cursor."""
+    after: String
+
+    """Return the first n elements from the list."""
+    first: Int
+
+    """Return the last n elements from the list."""
+    last: Int
+  ): ProductCountableConnection
+  backgroundImage(
+    """
+    Desired longest side the image in pixels. Defaults to 4096. Images are never cropped. Pass 0 to retrieve the original size (not recommended).
+    """
+    size: Int
+
+    """
+    The format of the image. When not provided, format of the original image will be used.
+    
+    Added in Saleor 3.6.
+    
+    Note: this API is currently in Feature Preview and can be subject to changes at later point.
+    """
+    format: ThumbnailFormatEnum = ORIGINAL
+  ): Image
+
+  """Returns translated collection fields for the given language code."""
+  translation(
+    """A language code to return the translation for collection."""
+    languageCode: LanguageCodeEnum!
+  ): CollectionTranslation
+
+  """
+  List of channels in which the collection is available.
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  channelListings: [CollectionChannelListing!]
+}
+
+type CollectionTranslation implements Node {
+  id: ID!
+
+  """Translation language."""
+  language: LanguageDisplay!
+  seoTitle: String
+  seoDescription: String
+  name: String
+
+  """
+  Translated description of the collection.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+
+  """
+  Translated description of the collection.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  descriptionJson: JSONString @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `description` field instead.")
+}
+
+"""Represents collection channel listing."""
+type CollectionChannelListing implements Node {
+  id: ID!
+  publicationDate: Date @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `publishedAt` field to fetch the publication date.")
+
+  """
+  The collection publication date.
+  
+  Added in Saleor 3.3.
+  """
+  publishedAt: DateTime
+  isPublished: Boolean!
+  channel: Channel!
+}
+
+type ProductTranslation implements Node {
+  id: ID!
+
+  """Translation language."""
+  language: LanguageDisplay!
+  seoTitle: String
+  seoDescription: String
+  name: String
+
+  """
+  Translated description of the product.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+
+  """
+  Translated description of the product.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  descriptionJson: JSONString @deprecated(reason: "This field will be removed in Saleor 4.0. Use the `description` field instead.")
+}
+
+type WarehouseCountableConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+  edges: [WarehouseCountableEdge!]!
+
+  """A total count of items in the collection."""
+  totalCount: Int
+}
+
+type WarehouseCountableEdge {
+  """The item at the end of the edge."""
+  node: Warehouse!
+
+  """A cursor for use in pagination."""
+  cursor: String!
+}
+
+input WarehouseFilterInput {
+  clickAndCollectOption: WarehouseClickAndCollectOptionEnum
+  search: String
+  ids: [ID!]
