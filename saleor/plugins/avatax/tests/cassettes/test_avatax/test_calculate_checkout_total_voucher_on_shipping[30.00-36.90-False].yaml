@@ -41,4 +41,34 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-  
+      - Thu, 16 Feb 2023 12:53:40 GMT
+      Location:
+      - /api/v2/companies/7799660/transactions/0
+      ServerDuration:
+      - '00:00:00.0206733'
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      api-supported-versions:
+      - '2.0'
+      cache-control:
+      - private, no-cache, no-store
+      referrer-policy:
+      - same-origin
+      strict-transport-security:
+      - max-age=31536000; includeSubdomains
+      x-avalara-uid:
+      - ae06b1e3-8718-45fe-9148-73673f0259e6
+      x-correlation-id:
+      - ae06b1e3-8718-45fe-9148-73673f0259e6
+      x-frame-options:
+      - sameorigin
+      x-permitted-cross-domain-policies:
+      - none
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 201
+      message: Created
+version: 1
