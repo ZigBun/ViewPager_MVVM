@@ -14879,3 +14879,7785 @@ type Mutation {
     """
     token: UUID
   ): CheckoutCustomerAttach
+
+  """
+  Removes the user assigned as the owner of the checkout. 
+  
+  Requires one of the following permissions: AUTHENTICATED_APP, AUTHENTICATED_USER.
+  """
+  checkoutCustomerDetach(
+    """
+    The ID of the checkout. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    checkoutId: ID
+
+    """
+    The checkout's ID.
+    
+    Added in Saleor 3.4.
+    """
+    id: ID
+
+    """
+    Checkout token.
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    token: UUID
+  ): CheckoutCustomerDetach
+
+  """Updates email address in the existing checkout object."""
+  checkoutEmailUpdate(
+    """
+    The ID of the checkout. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    checkoutId: ID
+
+    """email."""
+    email: String!
+
+    """
+    The checkout's ID.
+    
+    Added in Saleor 3.4.
+    """
+    id: ID
+
+    """
+    Checkout token.
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    token: UUID
+  ): CheckoutEmailUpdate
+
+  """Deletes a CheckoutLine."""
+  checkoutLineDelete(
+    """
+    The ID of the checkout. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    checkoutId: ID
+
+    """
+    The checkout's ID.
+    
+    Added in Saleor 3.4.
+    """
+    id: ID
+
+    """ID of the checkout line to delete."""
+    lineId: ID
+
+    """
+    Checkout token.
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    token: UUID
+  ): CheckoutLineDelete @deprecated(reason: "This field will be removed in Saleor 4.0. Use `checkoutLinesDelete` instead.")
+
+  """Deletes checkout lines."""
+  checkoutLinesDelete(
+    """
+    The checkout's ID.
+    
+    Added in Saleor 3.4.
+    """
+    id: ID
+
+    """A list of checkout lines."""
+    linesIds: [ID!]!
+
+    """
+    Checkout token.
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    token: UUID
+  ): CheckoutLinesDelete
+
+  """
+  Adds a checkout line to the existing checkout.If line was already in checkout, its quantity will be increased.
+  """
+  checkoutLinesAdd(
+    """
+    The ID of the checkout. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    checkoutId: ID
+
+    """
+    The checkout's ID.
+    
+    Added in Saleor 3.4.
+    """
+    id: ID
+
+    """
+    A list of checkout lines, each containing information about an item in the checkout.
+    """
+    lines: [CheckoutLineInput!]!
+
+    """
+    Checkout token.
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    token: UUID
+  ): CheckoutLinesAdd
+
+  """Updates checkout line in the existing checkout."""
+  checkoutLinesUpdate(
+    """
+    The ID of the checkout. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    checkoutId: ID
+
+    """
+    The checkout's ID.
+    
+    Added in Saleor 3.4.
+    """
+    id: ID
+
+    """
+    A list of checkout lines, each containing information about an item in the checkout.
+    """
+    lines: [CheckoutLineUpdateInput!]!
+
+    """
+    Checkout token.
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    token: UUID
+  ): CheckoutLinesUpdate
+
+  """Remove a gift card or a voucher from a checkout."""
+  checkoutRemovePromoCode(
+    """
+    The ID of the checkout. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    checkoutId: ID
+
+    """
+    The checkout's ID.
+    
+    Added in Saleor 3.4.
+    """
+    id: ID
+
+    """Gift card code or voucher code."""
+    promoCode: String
+
+    """Gift card or voucher ID."""
+    promoCodeId: ID
+
+    """
+    Checkout token.
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    token: UUID
+  ): CheckoutRemovePromoCode
+
+  """Create a new payment for given checkout."""
+  checkoutPaymentCreate(
+    """
+    The ID of the checkout. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    checkoutId: ID
+
+    """
+    The checkout's ID.
+    
+    Added in Saleor 3.4.
+    """
+    id: ID
+
+    """Data required to create a new payment."""
+    input: PaymentInput!
+
+    """
+    Checkout token.
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    token: UUID
+  ): CheckoutPaymentCreate
+
+  """Update shipping address in the existing checkout."""
+  checkoutShippingAddressUpdate(
+    """
+    The ID of the checkout. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    checkoutId: ID
+
+    """
+    The checkout's ID.
+    
+    Added in Saleor 3.4.
+    """
+    id: ID
+
+    """The mailing address to where the checkout will be shipped."""
+    shippingAddress: AddressInput!
+
+    """
+    Checkout token.
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    token: UUID
+
+    """
+    The rules for changing validation for received shipping address data.
+    
+    Added in Saleor 3.5.
+    
+    Note: this API is currently in Feature Preview and can be subject to changes at later point.
+    """
+    validationRules: CheckoutAddressValidationRules
+  ): CheckoutShippingAddressUpdate
+
+  """Updates the shipping method of the checkout."""
+  checkoutShippingMethodUpdate(
+    """
+    The ID of the checkout. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    checkoutId: ID
+
+    """
+    The checkout's ID.
+    
+    Added in Saleor 3.4.
+    """
+    id: ID
+
+    """Shipping method."""
+    shippingMethodId: ID!
+
+    """
+    Checkout token.
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    token: UUID
+  ): CheckoutShippingMethodUpdate @deprecated(reason: "This field will be removed in Saleor 4.0. Use `checkoutDeliveryMethodUpdate` instead.")
+
+  """
+  Updates the delivery method (shipping method or pick up point) of the checkout.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  checkoutDeliveryMethodUpdate(
+    """Delivery Method ID (`Warehouse` ID or `ShippingMethod` ID)."""
+    deliveryMethodId: ID
+
+    """
+    The checkout's ID.
+    
+    Added in Saleor 3.4.
+    """
+    id: ID
+
+    """
+    Checkout token.
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    token: UUID
+  ): CheckoutDeliveryMethodUpdate
+
+  """Update language code in the existing checkout."""
+  checkoutLanguageCodeUpdate(
+    """
+    The ID of the checkout. 
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    checkoutId: ID
+
+    """
+    The checkout's ID.
+    
+    Added in Saleor 3.4.
+    """
+    id: ID
+
+    """New language code."""
+    languageCode: LanguageCodeEnum!
+
+    """
+    Checkout token.
+    
+    DEPRECATED: this field will be removed in Saleor 4.0. Use `id` instead.
+    """
+    token: UUID
+  ): CheckoutLanguageCodeUpdate
+
+  """
+  Create new order from existing checkout. Requires the following permissions: AUTHENTICATED_APP and HANDLE_CHECKOUTS.
+  
+  Added in Saleor 3.2.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  orderCreateFromCheckout(
+    """ID of a checkout that will be converted to an order."""
+    id: ID!
+
+    """
+    Fields required to update the checkout metadata.
+    
+    Added in Saleor 3.8.
+    """
+    metadata: [MetadataInput!]
+
+    """
+    Fields required to update the checkout private metadata.
+    
+    Added in Saleor 3.8.
+    """
+    privateMetadata: [MetadataInput!]
+
+    """
+    Determines if checkout should be removed after creating an order. Default true.
+    """
+    removeCheckout: Boolean = true
+  ): OrderCreateFromCheckout
+
+  """
+  Creates new channel. 
+  
+  Requires one of the following permissions: MANAGE_CHANNELS.
+  """
+  channelCreate(
+    """Fields required to create channel."""
+    input: ChannelCreateInput!
+  ): ChannelCreate
+
+  """
+  Update a channel.
+  
+  Requires one of the following permissions: MANAGE_CHANNELS.
+  Requires one of the following permissions when updating only orderSettings field: MANAGE_CHANNELS, MANAGE_ORDERS.
+  """
+  channelUpdate(
+    """ID of a channel to update."""
+    id: ID!
+
+    """Fields required to update a channel."""
+    input: ChannelUpdateInput!
+  ): ChannelUpdate
+
+  """
+  Delete a channel. Orders associated with the deleted channel will be moved to the target channel. Checkouts, product availability, and pricing will be removed. 
+  
+  Requires one of the following permissions: MANAGE_CHANNELS.
+  """
+  channelDelete(
+    """ID of a channel to delete."""
+    id: ID!
+
+    """Fields required to delete a channel."""
+    input: ChannelDeleteInput
+  ): ChannelDelete
+
+  """
+  Activate a channel. 
+  
+  Requires one of the following permissions: MANAGE_CHANNELS.
+  """
+  channelActivate(
+    """ID of the channel to activate."""
+    id: ID!
+  ): ChannelActivate
+
+  """
+  Deactivate a channel. 
+  
+  Requires one of the following permissions: MANAGE_CHANNELS.
+  """
+  channelDeactivate(
+    """ID of the channel to deactivate."""
+    id: ID!
+  ): ChannelDeactivate
+
+  """
+  Reorder the warehouses of a channel.
+  
+  Added in Saleor 3.7.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+  
+  Requires one of the following permissions: MANAGE_CHANNELS.
+  """
+  channelReorderWarehouses(
+    """ID of a channel."""
+    channelId: ID!
+
+    """The list of reordering operations for the given channel warehouses."""
+    moves: [ReorderInput!]!
+  ): ChannelReorderWarehouses
+
+  """Creates an attribute."""
+  attributeCreate(
+    """Fields required to create an attribute."""
+    input: AttributeCreateInput!
+  ): AttributeCreate
+
+  """
+  Deletes an attribute. 
+  
+  Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+  """
+  attributeDelete(
+    """
+    External ID of an attribute to delete. 
+    
+    Added in Saleor 3.10.
+    """
+    externalReference: String
+
+    """ID of an attribute to delete."""
+    id: ID
+  ): AttributeDelete
+
+  """
+  Updates attribute. 
+  
+  Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+  """
+  attributeUpdate(
+    """
+    External ID of an attribute to update. 
+    
+    Added in Saleor 3.10.
+    """
+    externalReference: String
+
+    """ID of an attribute to update."""
+    id: ID
+
+    """Fields required to update an attribute."""
+    input: AttributeUpdateInput!
+  ): AttributeUpdate
+
+  """
+  Creates/updates translations for an attribute. 
+  
+  Requires one of the following permissions: MANAGE_TRANSLATIONS.
+  """
+  attributeTranslate(
+    """Attribute ID or AttributeTranslatableContent ID."""
+    id: ID!
+    input: NameTranslationInput!
+
+    """Translation language code."""
+    languageCode: LanguageCodeEnum!
+  ): AttributeTranslate
+
+  """
+  Deletes attributes. 
+  
+  Requires one of the following permissions: MANAGE_PAGE_TYPES_AND_ATTRIBUTES.
+  """
+  attributeBulkDelete(
+    """List of attribute IDs to delete."""
+    ids: [ID!]!
+  ): AttributeBulkDelete
+
+  """
+  Deletes values of attributes. 
+  
+  Requires one of the following permissions: MANAGE_PAGE_TYPES_AND_ATTRIBUTES.
+  """
+  attributeValueBulkDelete(
+    """List of attribute value IDs to delete."""
+    ids: [ID!]!
+  ): AttributeValueBulkDelete
+
+  """
+  Creates a value for an attribute. 
+  
+  Requires one of the following permissions: MANAGE_PRODUCTS.
+  """
+  attributeValueCreate(
+    """Attribute to which value will be assigned."""
+    attribute: ID!
+
+    """Fields required to create an AttributeValue."""
+    input: AttributeValueCreateInput!
+  ): AttributeValueCreate
+
+  """
+  Deletes a value of an attribute. 
+  
+  Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+  """
+  attributeValueDelete(
+    """
+    External ID of a value to delete. 
+    
+    Added in Saleor 3.10.
+    """
+    externalReference: String
+
+    """ID of a value to delete."""
+    id: ID
+  ): AttributeValueDelete
+
+  """
+  Updates value of an attribute. 
+  
+  Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+  """
+  attributeValueUpdate(
+    """
+    External ID of an AttributeValue to update. 
+    
+    Added in Saleor 3.10.
+    """
+    externalReference: String
+
+    """ID of an AttributeValue to update."""
+    id: ID
+
+    """Fields required to update an AttributeValue."""
+    input: AttributeValueUpdateInput!
+  ): AttributeValueUpdate
+
+  """
+  Creates/updates translations for an attribute value. 
+  
+  Requires one of the following permissions: MANAGE_TRANSLATIONS.
+  """
+  attributeValueTranslate(
+    """AttributeValue ID or AttributeValueTranslatableContent ID."""
+    id: ID!
+    input: AttributeValueTranslationInput!
+
+    """Translation language code."""
+    languageCode: LanguageCodeEnum!
+  ): AttributeValueTranslate
+
+  """
+  Reorder the values of an attribute. 
+  
+  Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+  """
+  attributeReorderValues(
+    """ID of an attribute."""
+    attributeId: ID!
+
+    """The list of reordering operations for given attribute values."""
+    moves: [ReorderInput!]!
+  ): AttributeReorderValues
+
+  """
+  Creates a new app. Requires the following permissions: AUTHENTICATED_STAFF_USER and MANAGE_APPS.
+  """
+  appCreate(
+    """Fields required to create a new app."""
+    input: AppInput!
+  ): AppCreate
+
+  """
+  Updates an existing app. 
+  
+  Requires one of the following permissions: MANAGE_APPS.
+  """
+  appUpdate(
+    """ID of an app to update."""
+    id: ID!
+
+    """Fields required to update an existing app."""
+    input: AppInput!
+  ): AppUpdate
+
+  """
+  Deletes an app. 
+  
+  Requires one of the following permissions: MANAGE_APPS.
+  """
+  appDelete(
+    """ID of an app to delete."""
+    id: ID!
+  ): AppDelete
+
+  """
+  Creates a new token. 
+  
+  Requires one of the following permissions: MANAGE_APPS.
+  """
+  appTokenCreate(
+    """Fields required to create a new auth token."""
+    input: AppTokenInput!
+  ): AppTokenCreate
+
+  """
+  Deletes an authentication token assigned to app. 
+  
+  Requires one of the following permissions: MANAGE_APPS.
+  """
+  appTokenDelete(
+    """ID of an auth token to delete."""
+    id: ID!
+  ): AppTokenDelete
+
+  """Verify provided app token."""
+  appTokenVerify(
+    """App token to verify."""
+    token: String!
+  ): AppTokenVerify
+
+  """
+  Install new app by using app manifest. Requires the following permissions: AUTHENTICATED_STAFF_USER and MANAGE_APPS.
+  """
+  appInstall(
+    """Fields required to install a new app."""
+    input: AppInstallInput!
+  ): AppInstall
+
+  """
+  Retry failed installation of new app. 
+  
+  Requires one of the following permissions: MANAGE_APPS.
+  """
+  appRetryInstall(
+    """Determine if app will be set active or not."""
+    activateAfterInstallation: Boolean = true
+
+    """ID of failed installation."""
+    id: ID!
+  ): AppRetryInstall
+
+  """
+  Delete failed installation. 
+  
+  Requires one of the following permissions: MANAGE_APPS.
+  """
+  appDeleteFailedInstallation(
+    """ID of failed installation to delete."""
+    id: ID!
+  ): AppDeleteFailedInstallation
+
+  """
+  Fetch and validate manifest. 
+  
+  Requires one of the following permissions: MANAGE_APPS.
+  """
+  appFetchManifest(manifestUrl: String!): AppFetchManifest
+
+  """
+  Activate the app. 
+  
+  Requires one of the following permissions: MANAGE_APPS.
+  """
+  appActivate(
+    """ID of app to activate."""
+    id: ID!
+  ): AppActivate
+
+  """
+  Deactivate the app. 
+  
+  Requires one of the following permissions: MANAGE_APPS.
+  """
+  appDeactivate(
+    """ID of app to deactivate."""
+    id: ID!
+  ): AppDeactivate
+
+  """Create JWT token."""
+  tokenCreate(
+    """
+    The audience that will be included to JWT tokens with prefix `custom:`.
+    
+    Added in Saleor 3.8.
+    
+    Note: this API is currently in Feature Preview and can be subject to changes at later point.
+    """
+    audience: String
+
+    """Email of a user."""
+    email: String!
+
+    """Password of a user."""
+    password: String!
+  ): CreateToken
+
+  """
+  Refresh JWT token. Mutation tries to take refreshToken from the input.If it fails it will try to take refreshToken from the http-only cookie -refreshToken. csrfToken is required when refreshToken is provided as a cookie.
+  """
+  tokenRefresh(
+    """
+    CSRF token required to refresh token. This argument is required when refreshToken is provided as a cookie.
+    """
+    csrfToken: String
+
+    """Refresh token."""
+    refreshToken: String
+  ): RefreshToken
+
+  """Verify JWT token."""
+  tokenVerify(
+    """JWT token to validate."""
+    token: String!
+  ): VerifyToken
+
+  """
+  Deactivate all JWT tokens of the currently authenticated user. 
+  
+  Requires one of the following permissions: AUTHENTICATED_USER.
+  """
+  tokensDeactivateAll: DeactivateAllUserTokens
+
+  """Prepare external authentication url for user by custom plugin."""
+  externalAuthenticationUrl(
+    """The data required by plugin to create external authentication url."""
+    input: JSONString!
+
+    """The ID of the authentication plugin."""
+    pluginId: String!
+  ): ExternalAuthenticationUrl
+
+  """Obtain external access tokens for user by custom plugin."""
+  externalObtainAccessTokens(
+    """The data required by plugin to create authentication data."""
+    input: JSONString!
+
+    """The ID of the authentication plugin."""
+    pluginId: String!
+  ): ExternalObtainAccessTokens
+
+  """Refresh user's access by custom plugin."""
+  externalRefresh(
+    """The data required by plugin to proceed the refresh process."""
+    input: JSONString!
+
+    """The ID of the authentication plugin."""
+    pluginId: String!
+  ): ExternalRefresh
+
+  """Logout user by custom plugin."""
+  externalLogout(
+    """The data required by plugin to proceed the logout process."""
+    input: JSONString!
+
+    """The ID of the authentication plugin."""
+    pluginId: String!
+  ): ExternalLogout
+
+  """Verify external authentication data by plugin."""
+  externalVerify(
+    """The data required by plugin to proceed the verification."""
+    input: JSONString!
+
+    """The ID of the authentication plugin."""
+    pluginId: String!
+  ): ExternalVerify
+
+  """Sends an email with the account password modification link."""
+  requestPasswordReset(
+    """
+    Slug of a channel which will be used for notify user. Optional when only one channel exists.
+    """
+    channel: String
+
+    """Email of the user that will be used for password recovery."""
+    email: String!
+
+    """
+    URL of a view where users should be redirected to reset the password. URL in RFC 1808 format.
+    """
+    redirectUrl: String!
+  ): RequestPasswordReset
+
+  """Confirm user account with token sent by email during registration."""
+  confirmAccount(
+    """E-mail of the user performing account confirmation."""
+    email: String!
+
+    """A one-time token required to confirm the account."""
+    token: String!
+  ): ConfirmAccount
+
+  """
+  Sets the user's password from the token sent by email using the RequestPasswordReset mutation.
+  """
+  setPassword(
+    """Email of a user."""
+    email: String!
+
+    """Password of a user."""
+    password: String!
+
+    """A one-time token required to set the password."""
+    token: String!
+  ): SetPassword
+
+  """
+  Change the password of the logged in user. 
+  
+  Requires one of the following permissions: AUTHENTICATED_USER.
+  """
+  passwordChange(
+    """New user password."""
+    newPassword: String!
+
+    """Current user password."""
+    oldPassword: String
+  ): PasswordChange
+
+  """
+  Request email change of the logged in user. 
+  
+  Requires one of the following permissions: AUTHENTICATED_USER.
+  """
+  requestEmailChange(
+    """
+    Slug of a channel which will be used to notify users. Optional when only one channel exists.
+    """
+    channel: String
+
+    """New user email."""
+    newEmail: String!
+
+    """User password."""
+    password: String!
+
+    """
+    URL of a view where users should be redirected to update the email address. URL in RFC 1808 format.
+    """
+    redirectUrl: String!
+  ): RequestEmailChange
+
+  """
+  Confirm the email change of the logged-in user. 
+  
+  Requires one of the following permissions: AUTHENTICATED_USER.
+  """
+  confirmEmailChange(
+    """
+    Slug of a channel which will be used to notify users. Optional when only one channel exists.
+    """
+    channel: String
+
+    """A one-time token required to change the email."""
+    token: String!
+  ): ConfirmEmailChange
+
+  """
+  Create a new address for the customer. 
+  
+  Requires one of the following permissions: AUTHENTICATED_USER.
+  """
+  accountAddressCreate(
+    """Fields required to create address."""
+    input: AddressInput!
+
+    """
+    A type of address. If provided, the new address will be automatically assigned as the customer's default address of that type.
+    """
+    type: AddressTypeEnum
+  ): AccountAddressCreate
+
+  """
+  Updates an address of the logged-in user. Requires one of the following permissions: MANAGE_USERS, IS_OWNER.
+  """
+  accountAddressUpdate(
+    """ID of the address to update."""
+    id: ID!
+
+    """Fields required to update the address."""
+    input: AddressInput!
+  ): AccountAddressUpdate
+
+  """
+  Delete an address of the logged-in user. Requires one of the following permissions: MANAGE_USERS, IS_OWNER.
+  """
+  accountAddressDelete(
+    """ID of the address to delete."""
+    id: ID!
+  ): AccountAddressDelete
+
+  """
+  Sets a default address for the authenticated user. 
+  
+  Requires one of the following permissions: AUTHENTICATED_USER.
+  """
+  accountSetDefaultAddress(
+    """ID of the address to set as default."""
+    id: ID!
+
+    """The type of address."""
+    type: AddressTypeEnum!
+  ): AccountSetDefaultAddress
+
+  """Register a new user."""
+  accountRegister(
+    """Fields required to create a user."""
+    input: AccountRegisterInput!
+  ): AccountRegister
+
+  """
+  Updates the account of the logged-in user. 
+  
+  Requires one of the following permissions: AUTHENTICATED_USER.
+  """
+  accountUpdate(
+    """Fields required to update the account of the logged-in user."""
+    input: AccountInput!
+  ): AccountUpdate
+
+  """
+  Sends an email with the account removal link for the logged-in user. 
+  
+  Requires one of the following permissions: AUTHENTICATED_USER.
+  """
+  accountRequestDeletion(
+    """
+    Slug of a channel which will be used to notify users. Optional when only one channel exists.
+    """
+    channel: String
+
+    """
+    URL of a view where users should be redirected to delete their account. URL in RFC 1808 format.
+    """
+    redirectUrl: String!
+  ): AccountRequestDeletion
+
+  """
+  Remove user account. 
+  
+  Requires one of the following permissions: AUTHENTICATED_USER.
+  """
+  accountDelete(
+    """
+    A one-time token required to remove account. Sent by email using AccountRequestDeletion mutation.
+    """
+    token: String!
+  ): AccountDelete
+
+  """
+  Creates user address. 
+  
+  Requires one of the following permissions: MANAGE_USERS.
+  """
+  addressCreate(
+    """Fields required to create address."""
+    input: AddressInput!
+
+    """ID of a user to create address for."""
+    userId: ID!
+  ): AddressCreate
+
+  """
+  Updates an address. 
+  
+  Requires one of the following permissions: MANAGE_USERS.
+  """
+  addressUpdate(
+    """ID of the address to update."""
+    id: ID!
+
+    """Fields required to update the address."""
+    input: AddressInput!
+  ): AddressUpdate
+
+  """
+  Deletes an address. 
+  
+  Requires one of the following permissions: MANAGE_USERS.
+  """
+  addressDelete(
+    """ID of the address to delete."""
+    id: ID!
+  ): AddressDelete
+
+  """
+  Sets a default address for the given user. 
+  
+  Requires one of the following permissions: MANAGE_USERS.
+  """
+  addressSetDefault(
+    """ID of the address."""
+    addressId: ID!
+
+    """The type of address."""
+    type: AddressTypeEnum!
+
+    """ID of the user to change the address for."""
+    userId: ID!
+  ): AddressSetDefault
+
+  """
+  Creates a new customer. 
+  
+  Requires one of the following permissions: MANAGE_USERS.
+  """
+  customerCreate(
+    """Fields required to create a customer."""
+    input: UserCreateInput!
+  ): CustomerCreate
+
+  """
+  Updates an existing customer. 
+  
+  Requires one of the following permissions: MANAGE_USERS.
+  """
+  customerUpdate(
+    """
+    External ID of a customer to update. 
+    
+    Added in Saleor 3.10.
+    """
+    externalReference: String
+
+    """ID of a customer to update."""
+    id: ID
+
+    """Fields required to update a customer."""
+    input: CustomerInput!
+  ): CustomerUpdate
+
+  """
+  Deletes a customer. 
+  
+  Requires one of the following permissions: MANAGE_USERS.
+  """
+  customerDelete(
+    """
+    External ID of a customer to update. 
+    
+    Added in Saleor 3.10.
+    """
+    externalReference: String
+
+    """ID of a customer to delete."""
+    id: ID
+  ): CustomerDelete
+
+  """
+  Deletes customers. 
+  
+  Requires one of the following permissions: MANAGE_USERS.
+  """
+  customerBulkDelete(
+    """List of user IDs to delete."""
+    ids: [ID!]!
+  ): CustomerBulkDelete
+
+  """
+  Creates a new staff user. Apps are not allowed to perform this mutation. 
+  
+  Requires one of the following permissions: MANAGE_STAFF.
+  """
+  staffCreate(
+    """Fields required to create a staff user."""
+    input: StaffCreateInput!
+  ): StaffCreate
+
+  """
+  Updates an existing staff user. Apps are not allowed to perform this mutation. 
+  
+  Requires one of the following permissions: MANAGE_STAFF.
+  """
+  staffUpdate(
+    """ID of a staff user to update."""
+    id: ID!
+
+    """Fields required to update a staff user."""
+    input: StaffUpdateInput!
+  ): StaffUpdate
+
+  """
+  Deletes a staff user. Apps are not allowed to perform this mutation. 
+  
+  Requires one of the following permissions: MANAGE_STAFF.
+  """
+  staffDelete(
+    """ID of a staff user to delete."""
+    id: ID!
+  ): StaffDelete
+
+  """
+  Deletes staff users. Apps are not allowed to perform this mutation. 
+  
+  Requires one of the following permissions: MANAGE_STAFF.
+  """
+  staffBulkDelete(
+    """List of user IDs to delete."""
+    ids: [ID!]!
+  ): StaffBulkDelete
+
+  """
+  Create a user avatar. Only for staff members. This mutation must be sent as a `multipart` request. More detailed specs of the upload format can be found here: https://github.com/jaydenseric/graphql-multipart-request-spec 
+  
+  Requires one of the following permissions: AUTHENTICATED_STAFF_USER.
+  """
+  userAvatarUpdate(
+    """Represents an image file in a multipart request."""
+    image: Upload!
+  ): UserAvatarUpdate
+
+  """
+  Deletes a user avatar. Only for staff members. 
+  
+  Requires one of the following permissions: AUTHENTICATED_STAFF_USER.
+  """
+  userAvatarDelete: UserAvatarDelete
+
+  """
+  Activate or deactivate users. 
+  
+  Requires one of the following permissions: MANAGE_USERS.
+  """
+  userBulkSetActive(
+    """List of user IDs to (de)activate)."""
+    ids: [ID!]!
+
+    """Determine if users will be set active or not."""
+    isActive: Boolean!
+  ): UserBulkSetActive
+
+  """
+  Create new permission group. Apps are not allowed to perform this mutation. 
+  
+  Requires one of the following permissions: MANAGE_STAFF.
+  """
+  permissionGroupCreate(
+    """Input fields to create permission group."""
+    input: PermissionGroupCreateInput!
+  ): PermissionGroupCreate
+
+  """
+  Update permission group. Apps are not allowed to perform this mutation. 
+  
+  Requires one of the following permissions: MANAGE_STAFF.
+  """
+  permissionGroupUpdate(
+    """ID of the group to update."""
+    id: ID!
+
+    """Input fields to create permission group."""
+    input: PermissionGroupUpdateInput!
+  ): PermissionGroupUpdate
+
+  """
+  Delete permission group. Apps are not allowed to perform this mutation. 
+  
+  Requires one of the following permissions: MANAGE_STAFF.
+  """
+  permissionGroupDelete(
+    """ID of the group to delete."""
+    id: ID!
+  ): PermissionGroupDelete
+}
+
+"""
+Creates a new webhook subscription. 
+
+Requires one of the following permissions: MANAGE_APPS, AUTHENTICATED_APP.
+"""
+type WebhookCreate {
+  webhookErrors: [WebhookError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [WebhookError!]!
+  webhook: Webhook
+}
+
+type WebhookError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: WebhookErrorCode!
+}
+
+"""An enumeration."""
+enum WebhookErrorCode {
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+  DELETE_FAILED
+  SYNTAX
+  MISSING_SUBSCRIPTION
+  UNABLE_TO_PARSE
+  MISSING_EVENT
+  INVALID_CUSTOM_HEADERS
+}
+
+input WebhookCreateInput {
+  """The name of the webhook."""
+  name: String
+
+  """The url to receive the payload."""
+  targetUrl: String
+
+  """
+  The events that webhook wants to subscribe. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `asyncEvents` or `syncEvents` instead.
+  """
+  events: [WebhookEventTypeEnum!]
+
+  """The asynchronous events that webhook wants to subscribe."""
+  asyncEvents: [WebhookEventTypeAsyncEnum!]
+
+  """The synchronous events that webhook wants to subscribe."""
+  syncEvents: [WebhookEventTypeSyncEnum!]
+
+  """ID of the app to which webhook belongs."""
+  app: ID
+
+  """Determine if webhook will be set active or not."""
+  isActive: Boolean
+
+  """
+  The secret key used to create a hash signature with each payload.
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. As of Saleor 3.5, webhook payloads default to signing using a verifiable JWS.
+  """
+  secretKey: String
+
+  """
+  Subscription query used to define a webhook payload.
+  
+  Added in Saleor 3.2.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  query: String
+
+  """
+  Custom headers, which will be added to HTTP request. There is a limitation of 5 headers per webhook and 998 characters per header.Only "X-*" and "Authorization*" keys are allowed.
+  
+  Added in Saleor 3.12.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  customHeaders: JSONString
+}
+
+"""
+Delete a webhook. Before the deletion, the webhook is deactivated to pause any deliveries that are already scheduled. The deletion might fail if delivery is in progress. In such a case, the webhook is not deleted but remains deactivated. 
+
+Requires one of the following permissions: MANAGE_APPS, AUTHENTICATED_APP.
+"""
+type WebhookDelete {
+  webhookErrors: [WebhookError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [WebhookError!]!
+  webhook: Webhook
+}
+
+"""
+Updates a webhook subscription. 
+
+Requires one of the following permissions: MANAGE_APPS.
+"""
+type WebhookUpdate {
+  webhookErrors: [WebhookError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [WebhookError!]!
+  webhook: Webhook
+}
+
+input WebhookUpdateInput {
+  """The new name of the webhook."""
+  name: String
+
+  """The url to receive the payload."""
+  targetUrl: String
+
+  """
+  The events that webhook wants to subscribe. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `asyncEvents` or `syncEvents` instead.
+  """
+  events: [WebhookEventTypeEnum!]
+
+  """The asynchronous events that webhook wants to subscribe."""
+  asyncEvents: [WebhookEventTypeAsyncEnum!]
+
+  """The synchronous events that webhook wants to subscribe."""
+  syncEvents: [WebhookEventTypeSyncEnum!]
+
+  """ID of the app to which webhook belongs."""
+  app: ID
+
+  """Determine if webhook will be set active or not."""
+  isActive: Boolean
+
+  """
+  Use to create a hash signature with each payload.
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. As of Saleor 3.5, webhook payloads default to signing using a verifiable JWS.
+  """
+  secretKey: String
+
+  """
+  Subscription query used to define a webhook payload.
+  
+  Added in Saleor 3.2.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  query: String
+
+  """
+  Custom headers, which will be added to HTTP request. There is a limitation of 5 headers per webhook and 998 characters per header.Only "X-*" and "Authorization*" keys are allowed.
+  
+  Added in Saleor 3.12.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  customHeaders: JSONString
+}
+
+"""
+Retries event delivery. 
+
+Requires one of the following permissions: MANAGE_APPS.
+"""
+type EventDeliveryRetry {
+  """Event delivery."""
+  delivery: EventDelivery
+  errors: [WebhookError!]!
+}
+
+"""
+Performs a dry run of a webhook event. Supports a single event (the first, if multiple provided in the `query`). Requires permission relevant to processed event.
+
+Added in Saleor 3.11.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: AUTHENTICATED_STAFF_USER.
+"""
+type WebhookDryRun {
+  """JSON payload, that would be sent out to webhook's target URL."""
+  payload: JSONString
+  errors: [WebhookDryRunError!]!
+}
+
+type WebhookDryRunError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: WebhookDryRunErrorCode!
+}
+
+"""An enumeration."""
+enum WebhookDryRunErrorCode {
+  GRAPHQL_ERROR
+  NOT_FOUND
+  INVALID_ID
+  MISSING_PERMISSION
+  TYPE_NOT_SUPPORTED
+  SYNTAX
+  MISSING_SUBSCRIPTION
+  UNABLE_TO_PARSE
+  MISSING_EVENT
+}
+
+"""
+Trigger a webhook event. Supports a single event (the first, if multiple provided in the `webhook.subscription_query`). Requires permission relevant to processed event. Successfully delivered webhook returns `delivery` with status='PENDING' and empty payload.
+
+Added in Saleor 3.11.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: AUTHENTICATED_STAFF_USER.
+"""
+type WebhookTrigger {
+  delivery: EventDelivery
+  errors: [WebhookTriggerError!]!
+}
+
+type WebhookTriggerError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: WebhookTriggerErrorCode!
+}
+
+"""An enumeration."""
+enum WebhookTriggerErrorCode {
+  GRAPHQL_ERROR
+  NOT_FOUND
+  INVALID_ID
+  MISSING_PERMISSION
+  TYPE_NOT_SUPPORTED
+  SYNTAX
+  MISSING_SUBSCRIPTION
+  UNABLE_TO_PARSE
+  MISSING_QUERY
+  MISSING_EVENT
+}
+
+"""
+Creates new warehouse. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type WarehouseCreate {
+  warehouseErrors: [WarehouseError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [WarehouseError!]!
+  warehouse: Warehouse
+}
+
+type WarehouseError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: WarehouseErrorCode!
+
+  """List of shipping zones IDs which causes the error."""
+  shippingZones: [ID!]
+}
+
+"""An enumeration."""
+enum WarehouseErrorCode {
+  ALREADY_EXISTS
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+}
+
+input WarehouseCreateInput {
+  """Warehouse slug."""
+  slug: String
+
+  """The email address of the warehouse."""
+  email: String
+
+  """
+  External ID of the warehouse.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+
+  """Warehouse name."""
+  name: String!
+
+  """Address of the warehouse."""
+  address: AddressInput!
+
+  """
+  Shipping zones supported by the warehouse.
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Providing the zone ids will raise a ValidationError.
+  """
+  shippingZones: [ID!]
+}
+
+"""
+Updates given warehouse. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type WarehouseUpdate {
+  warehouseErrors: [WarehouseError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [WarehouseError!]!
+  warehouse: Warehouse
+}
+
+input WarehouseUpdateInput {
+  """Warehouse slug."""
+  slug: String
+
+  """The email address of the warehouse."""
+  email: String
+
+  """
+  External ID of the warehouse.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+
+  """Warehouse name."""
+  name: String
+
+  """Address of the warehouse."""
+  address: AddressInput
+
+  """
+  Click and collect options: local, all or disabled.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  clickAndCollectOption: WarehouseClickAndCollectOptionEnum
+
+  """
+  Visibility of warehouse stocks.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  isPrivate: Boolean
+}
+
+"""
+Deletes selected warehouse. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type WarehouseDelete {
+  warehouseErrors: [WarehouseError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [WarehouseError!]!
+  warehouse: Warehouse
+}
+
+"""
+Add shipping zone to given warehouse. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type WarehouseShippingZoneAssign {
+  warehouseErrors: [WarehouseError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [WarehouseError!]!
+  warehouse: Warehouse
+}
+
+"""
+Remove shipping zone from given warehouse. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type WarehouseShippingZoneUnassign {
+  warehouseErrors: [WarehouseError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [WarehouseError!]!
+  warehouse: Warehouse
+}
+
+"""
+Create a tax class.
+
+Added in Saleor 3.9.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_TAXES.
+"""
+type TaxClassCreate {
+  errors: [TaxClassCreateError!]!
+  taxClass: TaxClass
+}
+
+type TaxClassCreateError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: TaxClassCreateErrorCode!
+
+  """List of country codes for which the configuration is invalid."""
+  countryCodes: [String!]!
+}
+
+"""An enumeration."""
+enum TaxClassCreateErrorCode {
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+}
+
+input TaxClassCreateInput {
+  """Name of the tax class."""
+  name: String!
+
+  """List of country-specific tax rates to create for this tax class."""
+  createCountryRates: [CountryRateInput!]
+}
+
+input CountryRateInput {
+  """Country in which this rate applies."""
+  countryCode: CountryCode!
+
+  """
+  Tax rate value provided as percentage. Example: provide `23` to represent `23%` tax rate.
+  """
+  rate: Float!
+}
+
+"""
+Delete a tax class. After deleting the tax class any products, product types or shipping methods using it are updated to use the default tax class.
+
+Added in Saleor 3.9.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_TAXES.
+"""
+type TaxClassDelete {
+  errors: [TaxClassDeleteError!]!
+  taxClass: TaxClass
+}
+
+type TaxClassDeleteError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: TaxClassDeleteErrorCode!
+}
+
+"""An enumeration."""
+enum TaxClassDeleteErrorCode {
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+}
+
+"""
+Update a tax class.
+
+Added in Saleor 3.9.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_TAXES.
+"""
+type TaxClassUpdate {
+  errors: [TaxClassUpdateError!]!
+  taxClass: TaxClass
+}
+
+type TaxClassUpdateError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: TaxClassUpdateErrorCode!
+
+  """List of country codes for which the configuration is invalid."""
+  countryCodes: [String!]!
+}
+
+"""An enumeration."""
+enum TaxClassUpdateErrorCode {
+  DUPLICATED_INPUT_ITEM
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+}
+
+input TaxClassUpdateInput {
+  """Name of the tax class."""
+  name: String
+
+  """
+  List of country-specific tax rates to create or update for this tax class.
+  """
+  updateCountryRates: [CountryRateUpdateInput!]
+
+  """
+  List of country codes for which to remove the tax class rates. Note: It removes all rates for given country code.
+  """
+  removeCountryRates: [CountryCode!]
+}
+
+input CountryRateUpdateInput {
+  """Country in which this rate applies."""
+  countryCode: CountryCode!
+
+  """
+  Tax rate value provided as percentage. Example: provide `23` to represent `23%` tax rate. Provide `null` to remove the particular rate.
+  """
+  rate: Float
+}
+
+"""
+Update tax configuration for a channel.
+
+Added in Saleor 3.9.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_TAXES.
+"""
+type TaxConfigurationUpdate {
+  errors: [TaxConfigurationUpdateError!]!
+  taxConfiguration: TaxConfiguration
+}
+
+type TaxConfigurationUpdateError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: TaxConfigurationUpdateErrorCode!
+
+  """List of country codes for which the configuration is invalid."""
+  countryCodes: [String!]!
+}
+
+"""An enumeration."""
+enum TaxConfigurationUpdateErrorCode {
+  DUPLICATED_INPUT_ITEM
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+}
+
+input TaxConfigurationUpdateInput {
+  """Determines whether taxes are charged in the given channel."""
+  chargeTaxes: Boolean
+
+  """
+  The default strategy to use for tax calculation in the given channel. Taxes can be calculated either using user-defined flat rates or with a tax app. Empty value means that no method is selected and taxes are not calculated.
+  """
+  taxCalculationStrategy: TaxCalculationStrategy
+
+  """
+  Determines whether prices displayed in a storefront should include taxes.
+  """
+  displayGrossPrices: Boolean
+
+  """Determines whether prices are entered with the tax included."""
+  pricesEnteredWithTax: Boolean
+
+  """
+  List of tax country configurations to create or update (identified by a country code).
+  """
+  updateCountriesConfiguration: [TaxConfigurationPerCountryInput!]
+
+  """List of country codes for which to remove the tax configuration."""
+  removeCountriesConfiguration: [CountryCode!]
+}
+
+input TaxConfigurationPerCountryInput {
+  """Country in which this configuration applies."""
+  countryCode: CountryCode!
+
+  """Determines whether taxes are charged in this country."""
+  chargeTaxes: Boolean!
+
+  """
+  A country-specific strategy to use for tax calculation. Taxes can be calculated either using user-defined flat rates or with a tax app. If not provided, use the value from the channel's tax configuration.
+  """
+  taxCalculationStrategy: TaxCalculationStrategy
+
+  """
+  Determines whether prices displayed in a storefront should include taxes for this country.
+  """
+  displayGrossPrices: Boolean!
+}
+
+"""
+Update tax class rates for a specific country.
+
+Added in Saleor 3.9.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_TAXES.
+"""
+type TaxCountryConfigurationUpdate {
+  """Updated tax class rates grouped by a country."""
+  taxCountryConfiguration: TaxCountryConfiguration
+  errors: [TaxCountryConfigurationUpdateError!]!
+}
+
+type TaxCountryConfigurationUpdateError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: TaxCountryConfigurationUpdateErrorCode!
+
+  """List of tax class IDs for which the update failed."""
+  taxClassIds: [String!]!
+}
+
+"""An enumeration."""
+enum TaxCountryConfigurationUpdateErrorCode {
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  ONLY_ONE_DEFAULT_COUNTRY_RATE_ALLOWED
+  CANNOT_CREATE_NEGATIVE_RATE
+}
+
+input TaxClassRateInput {
+  """ID of a tax class for which to update the tax rate"""
+  taxClassId: ID
+
+  """Tax rate value."""
+  rate: Float
+}
+
+"""
+Remove all tax class rates for a specific country.
+
+Added in Saleor 3.9.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_TAXES.
+"""
+type TaxCountryConfigurationDelete {
+  """Updated tax class rates grouped by a country."""
+  taxCountryConfiguration: TaxCountryConfiguration
+  errors: [TaxCountryConfigurationDeleteError!]!
+}
+
+type TaxCountryConfigurationDeleteError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: TaxCountryConfigurationDeleteErrorCode!
+}
+
+"""An enumeration."""
+enum TaxCountryConfigurationDeleteErrorCode {
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+}
+
+"""
+Exempt checkout or order from charging the taxes. When tax exemption is enabled, taxes won't be charged for the checkout or order. Taxes may still be calculated in cases when product prices are entered with the tax included and the net price needs to be known.
+
+Added in Saleor 3.8.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_TAXES.
+"""
+type TaxExemptionManage {
+  taxableObject: TaxSourceObject
+  errors: [TaxExemptionManageError!]!
+}
+
+union TaxSourceObject = Checkout | Order
+
+type TaxExemptionManageError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: TaxExemptionManageErrorCode!
+}
+
+"""An enumeration."""
+enum TaxExemptionManageErrorCode {
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  NOT_EDITABLE_ORDER
+}
+
+"""
+Updates stocks for a given variant and warehouse.
+
+Added in Saleor 3.13.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type StockBulkUpdate {
+  """Returns how many objects were updated."""
+  count: Int!
+
+  """List of the updated stocks."""
+  results: [StockBulkResult!]!
+  errors: [StockBulkUpdateError!]!
+}
+
+type StockBulkResult {
+  """Stock data."""
+  stock: Stock
+
+  """List of errors occurred on create or update attempt."""
+  errors: [StockBulkUpdateError!]
+}
+
+type StockBulkUpdateError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: StockBulkUpdateErrorCode!
+}
+
+"""An enumeration."""
+enum StockBulkUpdateErrorCode {
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+}
+
+enum ErrorPolicyEnum {
+  """
+  Save what is possible within a single row. If there are errors in an input data row, try to save it partially and skip the invalid part.
+  """
+  IGNORE_FAILED
+
+  """Reject all rows if there is at least one error in any of them."""
+  REJECT_EVERYTHING
+
+  """Reject rows with errors."""
+  REJECT_FAILED_ROWS
+}
+
+input StockBulkUpdateInput {
+  """Variant ID."""
+  variantId: ID
+
+  """Variant external reference."""
+  variantExternalReference: String
+
+  """Warehouse ID."""
+  warehouseId: ID
+
+  """Warehouse external reference."""
+  warehouseExternalReference: String
+
+  """Quantity of items available for sell."""
+  quantity: Int!
+}
+
+"""
+Creates a new staff notification recipient. 
+
+Requires one of the following permissions: MANAGE_SETTINGS.
+"""
+type StaffNotificationRecipientCreate {
+  shopErrors: [ShopError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShopError!]!
+  staffNotificationRecipient: StaffNotificationRecipient
+}
+
+type ShopError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: ShopErrorCode!
+}
+
+"""An enumeration."""
+enum ShopErrorCode {
+  ALREADY_EXISTS
+  CANNOT_FETCH_TAX_RATES
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+}
+
+input StaffNotificationRecipientInput {
+  """The ID of the user subscribed to email notifications.."""
+  user: ID
+
+  """Email address of a user subscribed to email notifications."""
+  email: String
+
+  """Determines if a notification active."""
+  active: Boolean
+}
+
+"""
+Updates a staff notification recipient. 
+
+Requires one of the following permissions: MANAGE_SETTINGS.
+"""
+type StaffNotificationRecipientUpdate {
+  shopErrors: [ShopError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShopError!]!
+  staffNotificationRecipient: StaffNotificationRecipient
+}
+
+"""
+Delete staff notification recipient. 
+
+Requires one of the following permissions: MANAGE_SETTINGS.
+"""
+type StaffNotificationRecipientDelete {
+  shopErrors: [ShopError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShopError!]!
+  staffNotificationRecipient: StaffNotificationRecipient
+}
+
+"""
+Updates site domain of the shop. 
+
+Requires one of the following permissions: MANAGE_SETTINGS.
+"""
+type ShopDomainUpdate {
+  """Updated shop."""
+  shop: Shop
+  shopErrors: [ShopError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShopError!]!
+}
+
+input SiteDomainInput {
+  """Domain name for shop."""
+  domain: String
+
+  """Shop site name."""
+  name: String
+}
+
+"""
+Updates shop settings. 
+
+Requires one of the following permissions: MANAGE_SETTINGS.
+"""
+type ShopSettingsUpdate {
+  """Updated shop."""
+  shop: Shop
+  shopErrors: [ShopError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShopError!]!
+}
+
+input ShopSettingsInput {
+  """Header text."""
+  headerText: String
+
+  """SEO description."""
+  description: String
+
+  """Enable inventory tracking."""
+  trackInventoryByDefault: Boolean
+
+  """Default weight unit."""
+  defaultWeightUnit: WeightUnitsEnum
+
+  """Enable automatic fulfillment for all digital products."""
+  automaticFulfillmentDigitalProducts: Boolean
+
+  """
+  Enable automatic approval of all new fulfillments.
+  
+  Added in Saleor 3.1.
+  """
+  fulfillmentAutoApprove: Boolean
+
+  """
+  Enable ability to approve fulfillments which are unpaid.
+  
+  Added in Saleor 3.1.
+  """
+  fulfillmentAllowUnpaid: Boolean
+
+  """Default number of max downloads per digital content URL."""
+  defaultDigitalMaxDownloads: Int
+
+  """Default number of days which digital content URL will be valid."""
+  defaultDigitalUrlValidDays: Int
+
+  """Default email sender's name."""
+  defaultMailSenderName: String
+
+  """Default email sender's address."""
+  defaultMailSenderAddress: String
+
+  """URL of a view where customers can set their password."""
+  customerSetPasswordUrl: String
+
+  """
+  Default number of minutes stock will be reserved for anonymous checkout. Enter 0 or null to disable.
+  
+  Added in Saleor 3.1.
+  """
+  reserveStockDurationAnonymousUser: Int
+
+  """
+  Default number of minutes stock will be reserved for authenticated checkout. Enter 0 or null to disable.
+  
+  Added in Saleor 3.1.
+  """
+  reserveStockDurationAuthenticatedUser: Int
+
+  """
+  Default number of maximum line quantity in single checkout. Minimum possible value is 1, default value is 50.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  limitQuantityPerCheckout: Int
+
+  """
+  Include taxes in prices. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `taxConfigurationUpdate` mutation to configure this setting per channel or country.
+  """
+  includeTaxesInPrices: Boolean
+
+  """
+  Display prices with tax in store. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `taxConfigurationUpdate` mutation to configure this setting per channel or country.
+  """
+  displayGrossPrices: Boolean
+
+  """
+  Charge taxes on shipping. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. To enable taxes for a shipping method, assign a tax class to the shipping method with `shippingPriceCreate` or `shippingPriceUpdate` mutations.
+  """
+  chargeTaxesOnShipping: Boolean
+}
+
+"""
+Fetch tax rates. 
+
+Requires one of the following permissions: MANAGE_SETTINGS.
+"""
+type ShopFetchTaxRates {
+  """Updated shop."""
+  shop: Shop
+  shopErrors: [ShopError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShopError!]!
+}
+
+"""
+Creates/updates translations for shop settings. 
+
+Requires one of the following permissions: MANAGE_TRANSLATIONS.
+"""
+type ShopSettingsTranslate {
+  """Updated shop settings."""
+  shop: Shop
+  translationErrors: [TranslationError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [TranslationError!]!
+}
+
+type TranslationError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: TranslationErrorCode!
+}
+
+"""An enumeration."""
+enum TranslationErrorCode {
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+}
+
+input ShopSettingsTranslationInput {
+  headerText: String
+  description: String
+}
+
+"""
+Update the shop's address. If the `null` value is passed, the currently selected address will be deleted. 
+
+Requires one of the following permissions: MANAGE_SETTINGS.
+"""
+type ShopAddressUpdate {
+  """Updated shop."""
+  shop: Shop
+  shopErrors: [ShopError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShopError!]!
+}
+
+"""
+Update shop order settings across all channels. Returns `orderSettings` for the first `channel` in alphabetical order.  
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderSettingsUpdate {
+  """Order settings."""
+  orderSettings: OrderSettings
+  orderSettingsErrors: [OrderSettingsError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderSettingsError!]!
+}
+
+type OrderSettingsError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: OrderSettingsErrorCode!
+}
+
+"""An enumeration."""
+enum OrderSettingsErrorCode {
+  INVALID
+}
+
+input OrderSettingsUpdateInput {
+  """
+  When disabled, all new orders from checkout will be marked as unconfirmed. When enabled orders from checkout will become unfulfilled immediately. By default set to True
+  """
+  automaticallyConfirmAllNewOrders: Boolean
+
+  """
+  When enabled, all non-shippable gift card orders will be fulfilled automatically. By defualt set to True.
+  """
+  automaticallyFulfillNonShippableGiftCard: Boolean
+}
+
+"""
+Update gift card settings. 
+
+Requires one of the following permissions: MANAGE_GIFT_CARD.
+"""
+type GiftCardSettingsUpdate {
+  """Gift card settings."""
+  giftCardSettings: GiftCardSettings
+  errors: [GiftCardSettingsError!]!
+}
+
+type GiftCardSettingsError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: GiftCardSettingsErrorCode!
+}
+
+"""An enumeration."""
+enum GiftCardSettingsErrorCode {
+  INVALID
+  REQUIRED
+  GRAPHQL_ERROR
+}
+
+input GiftCardSettingsUpdateInput {
+  """Defines gift card default expiry settings."""
+  expiryType: GiftCardSettingsExpiryTypeEnum
+
+  """Defines gift card expiry period."""
+  expiryPeriod: TimePeriodInputType
+}
+
+input TimePeriodInputType {
+  """The length of the period."""
+  amount: Int!
+
+  """The type of the period."""
+  type: TimePeriodTypeEnum!
+}
+
+"""
+Manage shipping method's availability in channels. 
+
+Requires one of the following permissions: MANAGE_SHIPPING.
+"""
+type ShippingMethodChannelListingUpdate {
+  """An updated shipping method instance."""
+  shippingMethod: ShippingMethodType
+  shippingErrors: [ShippingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShippingError!]!
+}
+
+type ShippingError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: ShippingErrorCode!
+
+  """List of warehouse IDs which causes the error."""
+  warehouses: [ID!]
+
+  """List of channels IDs which causes the error."""
+  channels: [ID!]
+}
+
+"""An enumeration."""
+enum ShippingErrorCode {
+  ALREADY_EXISTS
+  GRAPHQL_ERROR
+  INVALID
+  MAX_LESS_THAN_MIN
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+  DUPLICATED_INPUT_ITEM
+}
+
+input ShippingMethodChannelListingInput {
+  """List of channels to which the shipping method should be assigned."""
+  addChannels: [ShippingMethodChannelListingAddInput!]
+
+  """List of channels from which the shipping method should be unassigned."""
+  removeChannels: [ID!]
+}
+
+input ShippingMethodChannelListingAddInput {
+  """ID of a channel."""
+  channelId: ID!
+
+  """Shipping price of the shipping method in this channel."""
+  price: PositiveDecimal
+
+  """Minimum order price to use this shipping method."""
+  minimumOrderPrice: PositiveDecimal
+
+  """Maximum order price to use this shipping method."""
+  maximumOrderPrice: PositiveDecimal
+}
+
+"""
+Creates a new shipping price. 
+
+Requires one of the following permissions: MANAGE_SHIPPING.
+"""
+type ShippingPriceCreate {
+  """A shipping zone to which the shipping method belongs."""
+  shippingZone: ShippingZone
+  shippingMethod: ShippingMethodType
+  shippingErrors: [ShippingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShippingError!]!
+}
+
+input ShippingPriceInput {
+  """Name of the shipping method."""
+  name: String
+
+  """Shipping method description."""
+  description: JSONString
+
+  """Minimum order weight to use this shipping method."""
+  minimumOrderWeight: WeightScalar
+
+  """Maximum order weight to use this shipping method."""
+  maximumOrderWeight: WeightScalar
+
+  """Maximum number of days for delivery."""
+  maximumDeliveryDays: Int
+
+  """Minimal number of days for delivery."""
+  minimumDeliveryDays: Int
+
+  """Shipping type: price or weight based."""
+  type: ShippingMethodTypeEnum
+
+  """Shipping zone this method belongs to."""
+  shippingZone: ID
+
+  """Postal code rules to add."""
+  addPostalCodeRules: [ShippingPostalCodeRulesCreateInputRange!]
+
+  """Postal code rules to delete."""
+  deletePostalCodeRules: [ID!]
+
+  """Inclusion type for currently assigned postal code rules."""
+  inclusionType: PostalCodeRuleInclusionTypeEnum
+
+  """
+  ID of a tax class to assign to this shipping method. If not provided, the default tax class will be used.
+  """
+  taxClass: ID
+}
+
+scalar WeightScalar
+
+input ShippingPostalCodeRulesCreateInputRange {
+  """Start range of the postal code."""
+  start: String!
+
+  """End range of the postal code."""
+  end: String
+}
+
+"""
+Deletes a shipping price. 
+
+Requires one of the following permissions: MANAGE_SHIPPING.
+"""
+type ShippingPriceDelete {
+  """A shipping method to delete."""
+  shippingMethod: ShippingMethodType
+
+  """A shipping zone to which the shipping method belongs."""
+  shippingZone: ShippingZone
+  shippingErrors: [ShippingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShippingError!]!
+}
+
+"""
+Deletes shipping prices. 
+
+Requires one of the following permissions: MANAGE_SHIPPING.
+"""
+type ShippingPriceBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  shippingErrors: [ShippingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShippingError!]!
+}
+
+"""
+Updates a new shipping price. 
+
+Requires one of the following permissions: MANAGE_SHIPPING.
+"""
+type ShippingPriceUpdate {
+  """A shipping zone to which the shipping method belongs."""
+  shippingZone: ShippingZone
+  shippingMethod: ShippingMethodType
+  shippingErrors: [ShippingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShippingError!]!
+}
+
+"""
+Creates/updates translations for a shipping method. 
+
+Requires one of the following permissions: MANAGE_TRANSLATIONS.
+"""
+type ShippingPriceTranslate {
+  translationErrors: [TranslationError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [TranslationError!]!
+  shippingMethod: ShippingMethodType
+}
+
+input ShippingPriceTranslationInput {
+  name: String
+
+  """
+  Translated shipping method description.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+}
+
+"""
+Exclude products from shipping price. 
+
+Requires one of the following permissions: MANAGE_SHIPPING.
+"""
+type ShippingPriceExcludeProducts {
+  """A shipping method with new list of excluded products."""
+  shippingMethod: ShippingMethodType
+  shippingErrors: [ShippingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShippingError!]!
+}
+
+input ShippingPriceExcludeProductsInput {
+  """List of products which will be excluded."""
+  products: [ID!]!
+}
+
+"""
+Remove product from excluded list for shipping price. 
+
+Requires one of the following permissions: MANAGE_SHIPPING.
+"""
+type ShippingPriceRemoveProductFromExclude {
+  """A shipping method with new list of excluded products."""
+  shippingMethod: ShippingMethodType
+  shippingErrors: [ShippingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShippingError!]!
+}
+
+"""
+Creates a new shipping zone. 
+
+Requires one of the following permissions: MANAGE_SHIPPING.
+"""
+type ShippingZoneCreate {
+  shippingErrors: [ShippingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShippingError!]!
+  shippingZone: ShippingZone
+}
+
+input ShippingZoneCreateInput {
+  """Shipping zone's name. Visible only to the staff."""
+  name: String
+
+  """Description of the shipping zone."""
+  description: String
+
+  """List of countries in this shipping zone."""
+  countries: [String!]
+
+  """
+  Default shipping zone will be used for countries not covered by other zones.
+  """
+  default: Boolean
+
+  """List of warehouses to assign to a shipping zone"""
+  addWarehouses: [ID!]
+
+  """List of channels to assign to the shipping zone."""
+  addChannels: [ID!]
+}
+
+"""
+Deletes a shipping zone. 
+
+Requires one of the following permissions: MANAGE_SHIPPING.
+"""
+type ShippingZoneDelete {
+  shippingErrors: [ShippingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShippingError!]!
+  shippingZone: ShippingZone
+}
+
+"""
+Deletes shipping zones. 
+
+Requires one of the following permissions: MANAGE_SHIPPING.
+"""
+type ShippingZoneBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  shippingErrors: [ShippingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShippingError!]!
+}
+
+"""
+Updates a new shipping zone. 
+
+Requires one of the following permissions: MANAGE_SHIPPING.
+"""
+type ShippingZoneUpdate {
+  shippingErrors: [ShippingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShippingError!]!
+  shippingZone: ShippingZone
+}
+
+input ShippingZoneUpdateInput {
+  """Shipping zone's name. Visible only to the staff."""
+  name: String
+
+  """Description of the shipping zone."""
+  description: String
+
+  """List of countries in this shipping zone."""
+  countries: [String!]
+
+  """
+  Default shipping zone will be used for countries not covered by other zones.
+  """
+  default: Boolean
+
+  """List of warehouses to assign to a shipping zone"""
+  addWarehouses: [ID!]
+
+  """List of channels to assign to the shipping zone."""
+  addChannels: [ID!]
+
+  """List of warehouses to unassign from a shipping zone"""
+  removeWarehouses: [ID!]
+
+  """List of channels to unassign from the shipping zone."""
+  removeChannels: [ID!]
+}
+
+"""
+Assign attributes to a given product type. 
+
+Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+"""
+type ProductAttributeAssign {
+  """The updated product type."""
+  productType: ProductType
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+type ProductError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: ProductErrorCode!
+
+  """List of attributes IDs which causes the error."""
+  attributes: [ID!]
+
+  """List of attribute values IDs which causes the error."""
+  values: [ID!]
+}
+
+"""An enumeration."""
+enum ProductErrorCode {
+  ALREADY_EXISTS
+  ATTRIBUTE_ALREADY_ASSIGNED
+  ATTRIBUTE_CANNOT_BE_ASSIGNED
+  ATTRIBUTE_VARIANTS_DISABLED
+  MEDIA_ALREADY_ASSIGNED
+  DUPLICATED_INPUT_ITEM
+  GRAPHQL_ERROR
+  INVALID
+  INVALID_PRICE
+  PRODUCT_WITHOUT_CATEGORY
+  NOT_PRODUCTS_IMAGE
+  NOT_PRODUCTS_VARIANT
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+  VARIANT_NO_DIGITAL_CONTENT
+  CANNOT_MANAGE_PRODUCT_WITHOUT_VARIANT
+  PRODUCT_NOT_ASSIGNED_TO_CHANNEL
+  UNSUPPORTED_MEDIA_PROVIDER
+  PREORDER_VARIANT_CANNOT_BE_DEACTIVATED
+}
+
+input ProductAttributeAssignInput {
+  """The ID of the attribute to assign."""
+  id: ID!
+
+  """The attribute type to be assigned as."""
+  type: ProductAttributeType!
+
+  """
+  Whether attribute is allowed in variant selection. Allowed types are: ['dropdown', 'boolean', 'swatch', 'numeric'].
+  
+  Added in Saleor 3.1.
+  """
+  variantSelection: Boolean
+}
+
+enum ProductAttributeType {
+  PRODUCT
+  VARIANT
+}
+
+"""
+Update attributes assigned to product variant for given product type.
+
+Added in Saleor 3.1. 
+
+Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+"""
+type ProductAttributeAssignmentUpdate {
+  """The updated product type."""
+  productType: ProductType
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+input ProductAttributeAssignmentUpdateInput {
+  """The ID of the attribute to assign."""
+  id: ID!
+
+  """
+  Whether attribute is allowed in variant selection. Allowed types are: ['dropdown', 'boolean', 'swatch', 'numeric'].
+  
+  Added in Saleor 3.1.
+  """
+  variantSelection: Boolean!
+}
+
+"""
+Un-assign attributes from a given product type. 
+
+Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+"""
+type ProductAttributeUnassign {
+  """The updated product type."""
+  productType: ProductType
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Creates a new category. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type CategoryCreate {
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+  category: Category
+}
+
+input CategoryInput {
+  """
+  Category description.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+
+  """Category name."""
+  name: String
+
+  """Category slug."""
+  slug: String
+
+  """Search engine optimization fields."""
+  seo: SeoInput
+
+  """Background image file."""
+  backgroundImage: Upload
+
+  """Alt text for a product media."""
+  backgroundImageAlt: String
+
+  """
+  Fields required to update the category metadata.
+  
+  Added in Saleor 3.8.
+  """
+  metadata: [MetadataInput!]
+
+  """
+  Fields required to update the category private metadata.
+  
+  Added in Saleor 3.8.
+  """
+  privateMetadata: [MetadataInput!]
+}
+
+input SeoInput {
+  """SEO title."""
+  title: String
+
+  """SEO description."""
+  description: String
+}
+
+"""
+Variables of this type must be set to null in mutations. They will be replaced with a filename from a following multipart part containing a binary file. See: https://github.com/jaydenseric/graphql-multipart-request-spec.
+"""
+scalar Upload
+
+input MetadataInput {
+  """Key of a metadata item."""
+  key: String!
+
+  """Value of a metadata item."""
+  value: String!
+}
+
+"""
+Deletes a category. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type CategoryDelete {
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+  category: Category
+}
+
+"""
+Deletes categories. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type CategoryBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Updates a category. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type CategoryUpdate {
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+  category: Category
+}
+
+"""
+Creates/updates translations for a category. 
+
+Requires one of the following permissions: MANAGE_TRANSLATIONS.
+"""
+type CategoryTranslate {
+  translationErrors: [TranslationError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [TranslationError!]!
+  category: Category
+}
+
+input TranslationInput {
+  seoTitle: String
+  seoDescription: String
+  name: String
+
+  """
+  Translated description.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+}
+
+"""
+Adds products to a collection. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type CollectionAddProducts {
+  """Collection to which products will be added."""
+  collection: Collection
+  collectionErrors: [CollectionError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CollectionError!]!
+}
+
+type CollectionError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """List of products IDs which causes the error."""
+  products: [ID!]
+
+  """The error code."""
+  code: CollectionErrorCode!
+}
+
+"""An enumeration."""
+enum CollectionErrorCode {
+  DUPLICATED_INPUT_ITEM
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+  CANNOT_MANAGE_PRODUCT_WITHOUT_VARIANT
+}
+
+"""
+Creates a new collection. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type CollectionCreate {
+  collectionErrors: [CollectionError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CollectionError!]!
+  collection: Collection
+}
+
+input CollectionCreateInput {
+  """Informs whether a collection is published."""
+  isPublished: Boolean
+
+  """Name of the collection."""
+  name: String
+
+  """Slug of the collection."""
+  slug: String
+
+  """
+  Description of the collection.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+
+  """Background image file."""
+  backgroundImage: Upload
+
+  """Alt text for an image."""
+  backgroundImageAlt: String
+
+  """Search engine optimization fields."""
+  seo: SeoInput
+
+  """
+  Publication date. ISO 8601 standard. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.
+  """
+  publicationDate: Date
+
+  """
+  Fields required to update the collection metadata.
+  
+  Added in Saleor 3.8.
+  """
+  metadata: [MetadataInput!]
+
+  """
+  Fields required to update the collection private metadata.
+  
+  Added in Saleor 3.8.
+  """
+  privateMetadata: [MetadataInput!]
+
+  """List of products to be added to the collection."""
+  products: [ID!]
+}
+
+"""
+Deletes a collection. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type CollectionDelete {
+  collectionErrors: [CollectionError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CollectionError!]!
+  collection: Collection
+}
+
+"""
+Reorder the products of a collection. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type CollectionReorderProducts {
+  """Collection from which products are reordered."""
+  collection: Collection
+  collectionErrors: [CollectionError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CollectionError!]!
+}
+
+input MoveProductInput {
+  """The ID of the product to move."""
+  productId: ID!
+
+  """
+  The relative sorting position of the product (from -inf to +inf) starting from the first given product's actual position.1 moves the item one position forward, -1 moves the item one position backward, 0 leaves the item unchanged.
+  """
+  sortOrder: Int
+}
+
+"""
+Deletes collections. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type CollectionBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  collectionErrors: [CollectionError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CollectionError!]!
+}
+
+"""
+Remove products from a collection. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type CollectionRemoveProducts {
+  """Collection from which products will be removed."""
+  collection: Collection
+  collectionErrors: [CollectionError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CollectionError!]!
+}
+
+"""
+Updates a collection. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type CollectionUpdate {
+  collectionErrors: [CollectionError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CollectionError!]!
+  collection: Collection
+}
+
+input CollectionInput {
+  """Informs whether a collection is published."""
+  isPublished: Boolean
+
+  """Name of the collection."""
+  name: String
+
+  """Slug of the collection."""
+  slug: String
+
+  """
+  Description of the collection.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+
+  """Background image file."""
+  backgroundImage: Upload
+
+  """Alt text for an image."""
+  backgroundImageAlt: String
+
+  """Search engine optimization fields."""
+  seo: SeoInput
+
+  """
+  Publication date. ISO 8601 standard. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.
+  """
+  publicationDate: Date
+
+  """
+  Fields required to update the collection metadata.
+  
+  Added in Saleor 3.8.
+  """
+  metadata: [MetadataInput!]
+
+  """
+  Fields required to update the collection private metadata.
+  
+  Added in Saleor 3.8.
+  """
+  privateMetadata: [MetadataInput!]
+}
+
+"""
+Creates/updates translations for a collection. 
+
+Requires one of the following permissions: MANAGE_TRANSLATIONS.
+"""
+type CollectionTranslate {
+  translationErrors: [TranslationError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [TranslationError!]!
+  collection: Collection
+}
+
+"""
+Manage collection's availability in channels. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type CollectionChannelListingUpdate {
+  """An updated collection instance."""
+  collection: Collection
+  collectionChannelListingErrors: [CollectionChannelListingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CollectionChannelListingError!]!
+}
+
+type CollectionChannelListingError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: ProductErrorCode!
+
+  """List of attributes IDs which causes the error."""
+  attributes: [ID!]
+
+  """List of attribute values IDs which causes the error."""
+  values: [ID!]
+
+  """List of channels IDs which causes the error."""
+  channels: [ID!]
+}
+
+input CollectionChannelListingUpdateInput {
+  """List of channels to which the collection should be assigned."""
+  addChannels: [PublishableChannelListingInput!]
+
+  """List of channels from which the collection should be unassigned."""
+  removeChannels: [ID!]
+}
+
+input PublishableChannelListingInput {
+  """ID of a channel."""
+  channelId: ID!
+
+  """Determines if object is visible to customers."""
+  isPublished: Boolean
+
+  """
+  Publication date. ISO 8601 standard. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `publishedAt` field instead.
+  """
+  publicationDate: Date
+
+  """
+  Publication date time. ISO 8601 standard.
+  
+  Added in Saleor 3.3.
+  """
+  publishedAt: DateTime
+}
+
+"""
+Creates a new product. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductCreate {
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+  product: Product
+}
+
+input ProductCreateInput {
+  """List of attributes."""
+  attributes: [AttributeValueInput!]
+
+  """ID of the product's category."""
+  category: ID
+
+  """
+  Determine if taxes are being charged for the product. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `Channel.taxConfiguration` to configure whether tax collection is enabled.
+  """
+  chargeTaxes: Boolean
+
+  """List of IDs of collections that the product belongs to."""
+  collections: [ID!]
+
+  """
+  Product description.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+
+  """Product name."""
+  name: String
+
+  """Product slug."""
+  slug: String
+
+  """
+  ID of a tax class to assign to this product. If not provided, product will use the tax class which is assigned to the product type.
+  """
+  taxClass: ID
+
+  """
+  Tax rate for enabled tax gateway. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use tax classes to control the tax calculation for a product.
+  """
+  taxCode: String
+
+  """Search engine optimization fields."""
+  seo: SeoInput
+
+  """Weight of the Product."""
+  weight: WeightScalar
+
+  """Defines the product rating value."""
+  rating: Float
+
+  """
+  Fields required to update the product metadata.
+  
+  Added in Saleor 3.8.
+  """
+  metadata: [MetadataInput!]
+
+  """
+  Fields required to update the product private metadata.
+  
+  Added in Saleor 3.8.
+  """
+  privateMetadata: [MetadataInput!]
+
+  """
+  External ID of this product.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+
+  """ID of the type that product belongs to."""
+  productType: ID!
+}
+
+input AttributeValueInput {
+  """ID of the selected attribute."""
+  id: ID
+
+  """
+  The value or slug of an attribute to resolve. If the passed value is non-existent, it will be created. This field will be removed in Saleor 4.0.
+  """
+  values: [String!]
+
+  """
+  Attribute value ID.
+  
+  Added in Saleor 3.9.
+  """
+  dropdown: AttributeValueSelectableTypeInput
+
+  """
+  Attribute value ID.
+  
+  Added in Saleor 3.9.
+  """
+  swatch: AttributeValueSelectableTypeInput
+
+  """
+  List of attribute value IDs.
+  
+  Added in Saleor 3.9.
+  """
+  multiselect: [AttributeValueSelectableTypeInput!]
+
+  """
+  Numeric value of an attribute.
+  
+  Added in Saleor 3.9.
+  """
+  numeric: String
+
+  """URL of the file attribute. Every time, a new value is created."""
+  file: String
+
+  """File content type."""
+  contentType: String
+
+  """List of entity IDs that will be used as references."""
+  references: [ID!]
+
+  """Text content in JSON format."""
+  richText: JSONString
+
+  """Plain text content."""
+  plainText: String
+
+  """Represents the boolean value of the attribute value."""
+  boolean: Boolean
+
+  """Represents the date value of the attribute value."""
+  date: Date
+
+  """Represents the date/time value of the attribute value."""
+  dateTime: DateTime
+}
+
+"""
+Represents attribute value. If no ID provided, value will be resolved. 
+
+Added in Saleor 3.9.
+"""
+input AttributeValueSelectableTypeInput {
+  """ID of an attribute value."""
+  id: ID
+
+  """
+  The value or slug of an attribute to resolve. If the passed value is non-existent, it will be created.
+  """
+  value: String
+}
+
+"""
+Deletes a product. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductDelete {
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+  product: Product
+}
+
+"""
+Deletes products. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Updates an existing product. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductUpdate {
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+  product: Product
+}
+
+input ProductInput {
+  """List of attributes."""
+  attributes: [AttributeValueInput!]
+
+  """ID of the product's category."""
+  category: ID
+
+  """
+  Determine if taxes are being charged for the product. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `Channel.taxConfiguration` to configure whether tax collection is enabled.
+  """
+  chargeTaxes: Boolean
+
+  """List of IDs of collections that the product belongs to."""
+  collections: [ID!]
+
+  """
+  Product description.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  description: JSONString
+
+  """Product name."""
+  name: String
+
+  """Product slug."""
+  slug: String
+
+  """
+  ID of a tax class to assign to this product. If not provided, product will use the tax class which is assigned to the product type.
+  """
+  taxClass: ID
+
+  """
+  Tax rate for enabled tax gateway. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use tax classes to control the tax calculation for a product.
+  """
+  taxCode: String
+
+  """Search engine optimization fields."""
+  seo: SeoInput
+
+  """Weight of the Product."""
+  weight: WeightScalar
+
+  """Defines the product rating value."""
+  rating: Float
+
+  """
+  Fields required to update the product metadata.
+  
+  Added in Saleor 3.8.
+  """
+  metadata: [MetadataInput!]
+
+  """
+  Fields required to update the product private metadata.
+  
+  Added in Saleor 3.8.
+  """
+  privateMetadata: [MetadataInput!]
+
+  """
+  External ID of this product.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+}
+
+"""
+Creates/updates translations for a product. 
+
+Requires one of the following permissions: MANAGE_TRANSLATIONS.
+"""
+type ProductTranslate {
+  translationErrors: [TranslationError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [TranslationError!]!
+  product: Product
+}
+
+"""
+Manage product's availability in channels. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductChannelListingUpdate {
+  """An updated product instance."""
+  product: Product
+  productChannelListingErrors: [ProductChannelListingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductChannelListingError!]!
+}
+
+type ProductChannelListingError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: ProductErrorCode!
+
+  """List of attributes IDs which causes the error."""
+  attributes: [ID!]
+
+  """List of attribute values IDs which causes the error."""
+  values: [ID!]
+
+  """List of channels IDs which causes the error."""
+  channels: [ID!]
+
+  """List of variants IDs which causes the error."""
+  variants: [ID!]
+}
+
+input ProductChannelListingUpdateInput {
+  """List of channels to which the product should be assigned or updated."""
+  updateChannels: [ProductChannelListingAddInput!]
+
+  """List of channels from which the product should be unassigned."""
+  removeChannels: [ID!]
+}
+
+input ProductChannelListingAddInput {
+  """ID of a channel."""
+  channelId: ID!
+
+  """Determines if object is visible to customers."""
+  isPublished: Boolean
+
+  """
+  Publication date. ISO 8601 standard. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `publishedAt` field instead.
+  """
+  publicationDate: Date
+
+  """
+  Publication date time. ISO 8601 standard.
+  
+  Added in Saleor 3.3.
+  """
+  publishedAt: DateTime
+
+  """
+  Determines if product is visible in product listings (doesn't apply to product collections).
+  """
+  visibleInListings: Boolean
+
+  """Determine if product should be available for purchase."""
+  isAvailableForPurchase: Boolean
+
+  """
+  A start date from which a product will be available for purchase. When not set and isAvailable is set to True, the current day is assumed. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `availableForPurchaseAt` field instead.
+  """
+  availableForPurchaseDate: Date
+
+  """
+  A start date time from which a product will be available for purchase. When not set and `isAvailable` is set to True, the current day is assumed.
+  
+  Added in Saleor 3.3.
+  """
+  availableForPurchaseAt: DateTime
+
+  """List of variants to which the channel should be assigned."""
+  addVariants: [ID!]
+
+  """List of variants from which the channel should be unassigned."""
+  removeVariants: [ID!]
+}
+
+"""
+Create a media object (image or video URL) associated with product. For image, this mutation must be sent as a `multipart` request. More detailed specs of the upload format can be found here: https://github.com/jaydenseric/graphql-multipart-request-spec 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductMediaCreate {
+  product: Product
+  media: ProductMedia
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+input ProductMediaCreateInput {
+  """Alt text for a product media."""
+  alt: String
+
+  """Represents an image file in a multipart request."""
+  image: Upload
+
+  """ID of an product."""
+  product: ID!
+
+  """Represents an URL to an external media."""
+  mediaUrl: String
+}
+
+"""
+Reorder the variants of a product. Mutation updates updated_at on product and triggers PRODUCT_UPDATED webhook. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantReorder {
+  product: Product
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+input ReorderInput {
+  """The ID of the item to move."""
+  id: ID!
+
+  """
+  The new relative sorting position of the item (from -inf to +inf). 1 moves the item one position forward, -1 moves the item one position backward, 0 leaves the item unchanged.
+  """
+  sortOrder: Int
+}
+
+"""
+Deletes a product media. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductMediaDelete {
+  product: Product
+  media: ProductMedia
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Deletes product media. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductMediaBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Changes ordering of the product media. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductMediaReorder {
+  product: Product
+  media: [ProductMedia!]
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Updates a product media. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductMediaUpdate {
+  product: Product
+  media: ProductMedia
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+input ProductMediaUpdateInput {
+  """Alt text for a product media."""
+  alt: String
+}
+
+"""
+Creates a new product type. 
+
+Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+"""
+type ProductTypeCreate {
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+  productType: ProductType
+}
+
+input ProductTypeInput {
+  """Name of the product type."""
+  name: String
+
+  """Product type slug."""
+  slug: String
+
+  """The product type kind."""
+  kind: ProductTypeKindEnum
+
+  """
+  Determines if product of this type has multiple variants. This option mainly simplifies product management in the dashboard. There is always at least one variant created under the hood.
+  """
+  hasVariants: Boolean
+
+  """List of attributes shared among all product variants."""
+  productAttributes: [ID!]
+
+  """
+  List of attributes used to distinguish between different variants of a product.
+  """
+  variantAttributes: [ID!]
+
+  """Determines if shipping is required for products of this variant."""
+  isShippingRequired: Boolean
+
+  """Determines if products are digital."""
+  isDigital: Boolean
+
+  """Weight of the ProductType items."""
+  weight: WeightScalar
+
+  """
+  Tax rate for enabled tax gateway. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.. Use tax classes to control the tax calculation for a product type.
+  """
+  taxCode: String
+
+  """
+  ID of a tax class to assign to this product type. All products of this product type would use this tax class, unless it's overridden in the `Product` type.
+  """
+  taxClass: ID
+}
+
+"""
+Deletes a product type. 
+
+Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+"""
+type ProductTypeDelete {
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+  productType: ProductType
+}
+
+"""
+Deletes product types. 
+
+Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+"""
+type ProductTypeBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Updates an existing product type. 
+
+Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+"""
+type ProductTypeUpdate {
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+  productType: ProductType
+}
+
+"""
+Reorder the attributes of a product type. 
+
+Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+"""
+type ProductTypeReorderAttributes {
+  """Product type from which attributes are reordered."""
+  productType: ProductType
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Reorder product attribute values. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductReorderAttributeValues {
+  """Product from which attribute values are reordered."""
+  product: Product
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Create new digital content. This mutation must be sent as a `multipart` request. More detailed specs of the upload format can be found here: https://github.com/jaydenseric/graphql-multipart-request-spec 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type DigitalContentCreate {
+  variant: ProductVariant
+  content: DigitalContent
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+input DigitalContentUploadInput {
+  """Use default digital content settings for this product."""
+  useDefaultSettings: Boolean!
+
+  """
+  Determines how many times a download link can be accessed by a customer.
+  """
+  maxDownloads: Int
+
+  """
+  Determines for how many days a download link is active since it was generated.
+  """
+  urlValidDays: Int
+
+  """Overwrite default automatic_fulfillment setting for variant."""
+  automaticFulfillment: Boolean
+
+  """
+  Fields required to update the digital content metadata.
+  
+  Added in Saleor 3.8.
+  """
+  metadata: [MetadataInput!]
+
+  """
+  Fields required to update the digital content private metadata.
+  
+  Added in Saleor 3.8.
+  """
+  privateMetadata: [MetadataInput!]
+
+  """Represents an file in a multipart request."""
+  contentFile: Upload!
+}
+
+"""
+Remove digital content assigned to given variant. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type DigitalContentDelete {
+  variant: ProductVariant
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Update digital content. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type DigitalContentUpdate {
+  variant: ProductVariant
+  content: DigitalContent
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+input DigitalContentInput {
+  """Use default digital content settings for this product."""
+  useDefaultSettings: Boolean!
+
+  """
+  Determines how many times a download link can be accessed by a customer.
+  """
+  maxDownloads: Int
+
+  """
+  Determines for how many days a download link is active since it was generated.
+  """
+  urlValidDays: Int
+
+  """Overwrite default automatic_fulfillment setting for variant."""
+  automaticFulfillment: Boolean
+
+  """
+  Fields required to update the digital content metadata.
+  
+  Added in Saleor 3.8.
+  """
+  metadata: [MetadataInput!]
+
+  """
+  Fields required to update the digital content private metadata.
+  
+  Added in Saleor 3.8.
+  """
+  privateMetadata: [MetadataInput!]
+}
+
+"""
+Generate new URL to digital content. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type DigitalContentUrlCreate {
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+  digitalContentUrl: DigitalContentUrl
+}
+
+input DigitalContentUrlCreateInput {
+  """Digital content ID which URL will belong to."""
+  content: ID!
+}
+
+"""
+Creates a new variant for a product. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantCreate {
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+  productVariant: ProductVariant
+}
+
+input ProductVariantCreateInput {
+  """List of attributes specific to this variant."""
+  attributes: [AttributeValueInput!]!
+
+  """Stock keeping unit."""
+  sku: String
+
+  """Variant name."""
+  name: String
+
+  """
+  Determines if the inventory of this variant should be tracked. If false, the quantity won't change when customers buy this item.
+  """
+  trackInventory: Boolean
+
+  """Weight of the Product Variant."""
+  weight: WeightScalar
+
+  """
+  Determines if variant is in preorder.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  preorder: PreorderSettingsInput
+
+  """
+  Determines maximum quantity of `ProductVariant`,that can be bought in a single checkout.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  quantityLimitPerCustomer: Int
+
+  """
+  Fields required to update the product variant metadata.
+  
+  Added in Saleor 3.8.
+  """
+  metadata: [MetadataInput!]
+
+  """
+  Fields required to update the product variant private metadata.
+  
+  Added in Saleor 3.8.
+  """
+  privateMetadata: [MetadataInput!]
+
+  """
+  External ID of this product variant.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+
+  """Product ID of which type is the variant."""
+  product: ID!
+
+  """Stocks of a product available for sale."""
+  stocks: [StockInput!]
+}
+
+input PreorderSettingsInput {
+  """The global threshold for preorder variant."""
+  globalThreshold: Int
+
+  """The end date for preorder."""
+  endDate: DateTime
+}
+
+input StockInput {
+  """Warehouse in which stock is located."""
+  warehouse: ID!
+
+  """Quantity of items available for sell."""
+  quantity: Int!
+}
+
+"""
+Deletes a product variant. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantDelete {
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+  productVariant: ProductVariant
+}
+
+"""
+Creates product variants for a given product. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantBulkCreate {
+  """Returns how many objects were created."""
+  count: Int!
+
+  """List of the created variants.This field will be removed in Saleor 4.0."""
+  productVariants: [ProductVariant!]!
+
+  """
+  List of the created variants.
+  
+  Added in Saleor 3.11.
+  """
+  results: [ProductVariantBulkResult!]!
+  bulkProductErrors: [BulkProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [BulkProductError!]!
+}
+
+type ProductVariantBulkResult {
+  """Product variant data."""
+  productVariant: ProductVariant
+
+  """List of errors occurred on create attempt."""
+  errors: [ProductVariantBulkError!]
+}
+
+type ProductVariantBulkError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: ProductVariantBulkErrorCode!
+
+  """List of attributes IDs which causes the error."""
+  attributes: [ID!]
+
+  """List of attribute values IDs which causes the error."""
+  values: [ID!]
+
+  """List of warehouse IDs which causes the error."""
+  warehouses: [ID!]
+
+  """
+  List of stocks IDs which causes the error.
+  
+  Added in Saleor 3.12.
+  """
+  stocks: [ID!]
+
+  """
+  List of channel IDs which causes the error.
+  
+  Added in Saleor 3.12.
+  """
+  channels: [ID!]
+
+  """List of channel listings IDs which causes the error."""
+  channelListings: [ID!]
+}
+
+"""An enumeration."""
+enum ProductVariantBulkErrorCode {
+  ATTRIBUTE_ALREADY_ASSIGNED
+  ATTRIBUTE_CANNOT_BE_ASSIGNED
+  ATTRIBUTE_VARIANTS_DISABLED
+  DUPLICATED_INPUT_ITEM
+  GRAPHQL_ERROR
+  INVALID
+  INVALID_PRICE
+  NOT_PRODUCTS_VARIANT
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+  PRODUCT_NOT_ASSIGNED_TO_CHANNEL
+}
+
+type BulkProductError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: ProductErrorCode!
+
+  """List of attributes IDs which causes the error."""
+  attributes: [ID!]
+
+  """List of attribute values IDs which causes the error."""
+  values: [ID!]
+
+  """Index of an input list item that caused the error."""
+  index: Int
+
+  """List of warehouse IDs which causes the error."""
+  warehouses: [ID!]
+
+  """List of channel IDs which causes the error."""
+  channels: [ID!]
+}
+
+input ProductVariantBulkCreateInput {
+  """List of attributes specific to this variant."""
+  attributes: [BulkAttributeValueInput!]!
+
+  """Stock keeping unit."""
+  sku: String
+
+  """Variant name."""
+  name: String
+
+  """
+  Determines if the inventory of this variant should be tracked. If false, the quantity won't change when customers buy this item.
+  """
+  trackInventory: Boolean
+
+  """Weight of the Product Variant."""
+  weight: WeightScalar
+
+  """
+  Determines if variant is in preorder.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  preorder: PreorderSettingsInput
+
+  """
+  Determines maximum quantity of `ProductVariant`,that can be bought in a single checkout.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  quantityLimitPerCustomer: Int
+
+  """
+  Fields required to update the product variant metadata.
+  
+  Added in Saleor 3.8.
+  """
+  metadata: [MetadataInput!]
+
+  """
+  Fields required to update the product variant private metadata.
+  
+  Added in Saleor 3.8.
+  """
+  privateMetadata: [MetadataInput!]
+
+  """
+  External ID of this product variant.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+
+  """Stocks of a product available for sale."""
+  stocks: [StockInput!]
+
+  """List of prices assigned to channels."""
+  channelListings: [ProductVariantChannelListingAddInput!]
+}
+
+input BulkAttributeValueInput {
+  """ID of the selected attribute."""
+  id: ID
+
+  """
+  The value or slug of an attribute to resolve. If the passed value is non-existent, it will be created.This field will be removed in Saleor 4.0.
+  """
+  values: [String!]
+
+  """
+  Attribute value ID.
+  
+  Added in Saleor 3.12.
+  """
+  dropdown: AttributeValueSelectableTypeInput
+
+  """
+  Attribute value ID.
+  
+  Added in Saleor 3.12.
+  """
+  swatch: AttributeValueSelectableTypeInput
+
+  """
+  List of attribute value IDs.
+  
+  Added in Saleor 3.12.
+  """
+  multiselect: [AttributeValueSelectableTypeInput!]
+
+  """
+  Numeric value of an attribute.
+  
+  Added in Saleor 3.12.
+  """
+  numeric: String
+
+  """
+  URL of the file attribute. Every time, a new value is created.
+  
+  Added in Saleor 3.12.
+  """
+  file: String
+
+  """
+  File content type.
+  
+  Added in Saleor 3.12.
+  """
+  contentType: String
+
+  """
+  List of entity IDs that will be used as references.
+  
+  Added in Saleor 3.12.
+  """
+  references: [ID!]
+
+  """
+  Text content in JSON format.
+  
+  Added in Saleor 3.12.
+  """
+  richText: JSONString
+
+  """
+  Plain text content.
+  
+  Added in Saleor 3.12.
+  """
+  plainText: String
+
+  """
+  The boolean value of an attribute to resolve. If the passed value is non-existent, it will be created.
+  """
+  boolean: Boolean
+
+  """
+  Represents the date value of the attribute value.
+  
+  Added in Saleor 3.12.
+  """
+  date: Date
+
+  """
+  Represents the date/time value of the attribute value.
+  
+  Added in Saleor 3.12.
+  """
+  dateTime: DateTime
+}
+
+input ProductVariantChannelListingAddInput {
+  """ID of a channel."""
+  channelId: ID!
+
+  """Price of the particular variant in channel."""
+  price: PositiveDecimal!
+
+  """Cost price of the variant in channel."""
+  costPrice: PositiveDecimal
+
+  """
+  The threshold for preorder variant in channel.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  preorderThreshold: Int
+}
+
+"""
+Update multiple product variants.
+
+Added in Saleor 3.11.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantBulkUpdate {
+  """Returns how many objects were updated."""
+  count: Int!
+
+  """List of the updated variants."""
+  results: [ProductVariantBulkResult!]!
+  errors: [ProductVariantBulkError!]!
+}
+
+"""
+Input fields to update product variants.
+
+Added in Saleor 3.11.
+"""
+input ProductVariantBulkUpdateInput {
+  """List of attributes specific to this variant."""
+  attributes: [BulkAttributeValueInput!]
+
+  """Stock keeping unit."""
+  sku: String
+
+  """Variant name."""
+  name: String
+
+  """
+  Determines if the inventory of this variant should be tracked. If false, the quantity won't change when customers buy this item.
+  """
+  trackInventory: Boolean
+
+  """Weight of the Product Variant."""
+  weight: WeightScalar
+
+  """
+  Determines if variant is in preorder.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  preorder: PreorderSettingsInput
+
+  """
+  Determines maximum quantity of `ProductVariant`,that can be bought in a single checkout.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  quantityLimitPerCustomer: Int
+
+  """
+  Fields required to update the product variant metadata.
+  
+  Added in Saleor 3.8.
+  """
+  metadata: [MetadataInput!]
+
+  """
+  Fields required to update the product variant private metadata.
+  
+  Added in Saleor 3.8.
+  """
+  privateMetadata: [MetadataInput!]
+
+  """
+  External ID of this product variant.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+
+  """
+  Stocks input.
+  
+  Added in Saleor 3.12.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  stocks: ProductVariantStocksUpdateInput
+
+  """
+  Channel listings input.
+  
+  Added in Saleor 3.12.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  channelListings: ProductVariantChannelListingUpdateInput
+
+  """ID of the product variant to update."""
+  id: ID!
+}
+
+input ProductVariantStocksUpdateInput {
+  """List of warehouses to create stocks."""
+  create: [StockInput!]
+
+  """List of stocks to update."""
+  update: [StockUpdateInput!]
+
+  """List of stocks to remove."""
+  remove: [ID!]
+}
+
+input StockUpdateInput {
+  """Stock."""
+  stock: ID!
+
+  """Quantity of items available for sell."""
+  quantity: Int!
+}
+
+input ProductVariantChannelListingUpdateInput {
+  """List of channels to create variant channel listings."""
+  create: [ProductVariantChannelListingAddInput!]
+
+  """List of channel listings to update."""
+  update: [ChannelListingUpdateInput!]
+
+  """List of channel listings to remove."""
+  remove: [ID!]
+}
+
+input ChannelListingUpdateInput {
+  """ID of a channel listing."""
+  channelListing: ID!
+
+  """Price of the particular variant in channel."""
+  price: PositiveDecimal
+
+  """Cost price of the variant in channel."""
+  costPrice: PositiveDecimal
+
+  """The threshold for preorder variant in channel."""
+  preorderThreshold: Int
+}
+
+"""
+Deletes product variants. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Creates stocks for product variant. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantStocksCreate {
+  """Updated product variant."""
+  productVariant: ProductVariant
+  bulkStockErrors: [BulkStockError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [BulkStockError!]!
+}
+
+type BulkStockError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: ProductErrorCode!
+
+  """List of attributes IDs which causes the error."""
+  attributes: [ID!]
+
+  """List of attribute values IDs which causes the error."""
+  values: [ID!]
+
+  """Index of an input list item that caused the error."""
+  index: Int
+}
+
+"""
+Delete stocks from product variant. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantStocksDelete {
+  """Updated product variant."""
+  productVariant: ProductVariant
+  stockErrors: [StockError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [StockError!]!
+}
+
+type StockError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: StockErrorCode!
+}
+
+"""An enumeration."""
+enum StockErrorCode {
+  ALREADY_EXISTS
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+}
+
+"""
+Update stocks for product variant. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantStocksUpdate {
+  """Updated product variant."""
+  productVariant: ProductVariant
+  bulkStockErrors: [BulkStockError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [BulkStockError!]!
+}
+
+"""
+Updates an existing variant for product. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantUpdate {
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+  productVariant: ProductVariant
+}
+
+input ProductVariantInput {
+  """List of attributes specific to this variant."""
+  attributes: [AttributeValueInput!]
+
+  """Stock keeping unit."""
+  sku: String
+
+  """Variant name."""
+  name: String
+
+  """
+  Determines if the inventory of this variant should be tracked. If false, the quantity won't change when customers buy this item.
+  """
+  trackInventory: Boolean
+
+  """Weight of the Product Variant."""
+  weight: WeightScalar
+
+  """
+  Determines if variant is in preorder.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  preorder: PreorderSettingsInput
+
+  """
+  Determines maximum quantity of `ProductVariant`,that can be bought in a single checkout.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  quantityLimitPerCustomer: Int
+
+  """
+  Fields required to update the product variant metadata.
+  
+  Added in Saleor 3.8.
+  """
+  metadata: [MetadataInput!]
+
+  """
+  Fields required to update the product variant private metadata.
+  
+  Added in Saleor 3.8.
+  """
+  privateMetadata: [MetadataInput!]
+
+  """
+  External ID of this product variant.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+}
+
+"""
+Set default variant for a product. Mutation triggers PRODUCT_UPDATED webhook. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantSetDefault {
+  product: Product
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Creates/updates translations for a product variant. 
+
+Requires one of the following permissions: MANAGE_TRANSLATIONS.
+"""
+type ProductVariantTranslate {
+  translationErrors: [TranslationError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [TranslationError!]!
+  productVariant: ProductVariant
+}
+
+input NameTranslationInput {
+  name: String
+}
+
+"""
+Manage product variant prices in channels. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantChannelListingUpdate {
+  """An updated product variant instance."""
+  variant: ProductVariant
+  productChannelListingErrors: [ProductChannelListingError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductChannelListingError!]!
+}
+
+"""
+Reorder product variant attribute values. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantReorderAttributeValues {
+  """Product variant from which attribute values are reordered."""
+  productVariant: ProductVariant
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Deactivates product variant preorder. It changes all preorder allocation into regular allocation.
+
+Added in Saleor 3.1.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ProductVariantPreorderDeactivate {
+  """Product variant with ended preorder."""
+  productVariant: ProductVariant
+  errors: [ProductError!]!
+}
+
+"""
+Assign an media to a product variant. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type VariantMediaAssign {
+  productVariant: ProductVariant
+  media: ProductMedia
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Unassign an media from a product variant. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type VariantMediaUnassign {
+  productVariant: ProductVariant
+  media: ProductMedia
+  productErrors: [ProductError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ProductError!]!
+}
+
+"""
+Captures the authorized payment amount. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type PaymentCapture {
+  """Updated payment."""
+  payment: Payment
+  paymentErrors: [PaymentError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PaymentError!]!
+}
+
+type PaymentError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: PaymentErrorCode!
+
+  """List of variant IDs which causes the error."""
+  variants: [ID!]
+}
+
+"""An enumeration."""
+enum PaymentErrorCode {
+  BILLING_ADDRESS_NOT_SET
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+  PARTIAL_PAYMENT_NOT_ALLOWED
+  SHIPPING_ADDRESS_NOT_SET
+  INVALID_SHIPPING_METHOD
+  SHIPPING_METHOD_NOT_SET
+  PAYMENT_ERROR
+  NOT_SUPPORTED_GATEWAY
+  CHANNEL_INACTIVE
+  BALANCE_CHECK_ERROR
+  CHECKOUT_EMAIL_NOT_SET
+  UNAVAILABLE_VARIANT_IN_CHANNEL
+  NO_CHECKOUT_LINES
+}
+
+"""
+Refunds the captured payment amount. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type PaymentRefund {
+  """Updated payment."""
+  payment: Payment
+  paymentErrors: [PaymentError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PaymentError!]!
+}
+
+"""
+Voids the authorized payment. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type PaymentVoid {
+  """Updated payment."""
+  payment: Payment
+  paymentErrors: [PaymentError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PaymentError!]!
+}
+
+"""Initializes payment process when it is required by gateway."""
+type PaymentInitialize {
+  initializedPayment: PaymentInitialized
+  paymentErrors: [PaymentError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PaymentError!]!
+}
+
+"""
+Server-side data generated by a payment gateway. Optional step when the payment provider requires an additional action to initialize payment session.
+"""
+type PaymentInitialized {
+  """ID of a payment gateway."""
+  gateway: String!
+
+  """Payment gateway name."""
+  name: String!
+
+  """Initialized data by gateway."""
+  data: JSONString
+}
+
+"""Check payment balance."""
+type PaymentCheckBalance {
+  """Response from the gateway."""
+  data: JSONString
+  paymentErrors: [PaymentError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PaymentError!]!
+}
+
+input PaymentCheckBalanceInput {
+  """An ID of a payment gateway to check."""
+  gatewayId: String!
+
+  """Payment method name."""
+  method: String!
+
+  """Slug of a channel for which the data should be returned."""
+  channel: String!
+
+  """Information about card."""
+  card: CardInput!
+}
+
+input CardInput {
+  """
+  Payment method nonce, a token returned by the appropriate provider's SDK.
+  """
+  code: String!
+
+  """Card security code."""
+  cvc: String
+
+  """Information about currency and amount."""
+  money: MoneyInput!
+}
+
+input MoneyInput {
+  """Currency code."""
+  currency: String!
+
+  """Amount of money."""
+  amount: PositiveDecimal!
+}
+
+"""
+Create transaction for checkout or order. Requires the following permissions: AUTHENTICATED_APP and HANDLE_PAYMENTS.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type TransactionCreate {
+  transaction: TransactionItem
+  errors: [TransactionCreateError!]!
+}
+
+type TransactionCreateError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: TransactionCreateErrorCode!
+}
+
+"""An enumeration."""
+enum TransactionCreateErrorCode {
+  INVALID
+  GRAPHQL_ERROR
+  NOT_FOUND
+  INCORRECT_CURRENCY
+  METADATA_KEY_REQUIRED
+}
+
+input TransactionCreateInput {
+  """Status of the transaction."""
+  status: String!
+
+  """Payment type used for this transaction."""
+  type: String!
+
+  """Reference of the transaction."""
+  reference: String
+
+  """List of all possible actions for the transaction"""
+  availableActions: [TransactionActionEnum!]
+
+  """Amount authorized by this transaction."""
+  amountAuthorized: MoneyInput
+
+  """Amount charged by this transaction."""
+  amountCharged: MoneyInput
+
+  """Amount refunded by this transaction."""
+  amountRefunded: MoneyInput
+
+  """Amount voided by this transaction."""
+  amountVoided: MoneyInput
+
+  """Payment public metadata."""
+  metadata: [MetadataInput!]
+
+  """Payment private metadata."""
+  privateMetadata: [MetadataInput!]
+}
+
+input TransactionEventInput {
+  """Current status of the payment transaction."""
+  status: TransactionStatus!
+
+  """Reference of the transaction."""
+  reference: String
+
+  """Name of the transaction."""
+  name: String
+}
+
+"""
+Create transaction for checkout or order. Requires the following permissions: AUTHENTICATED_APP and HANDLE_PAYMENTS.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type TransactionUpdate {
+  transaction: TransactionItem
+  errors: [TransactionUpdateError!]!
+}
+
+type TransactionUpdateError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: TransactionUpdateErrorCode!
+}
+
+"""An enumeration."""
+enum TransactionUpdateErrorCode {
+  INVALID
+  GRAPHQL_ERROR
+  NOT_FOUND
+  INCORRECT_CURRENCY
+  METADATA_KEY_REQUIRED
+}
+
+input TransactionUpdateInput {
+  """Status of the transaction."""
+  status: String
+
+  """Payment type used for this transaction."""
+  type: String
+
+  """Reference of the transaction."""
+  reference: String
+
+  """List of all possible actions for the transaction"""
+  availableActions: [TransactionActionEnum!]
+
+  """Amount authorized by this transaction."""
+  amountAuthorized: MoneyInput
+
+  """Amount charged by this transaction."""
+  amountCharged: MoneyInput
+
+  """Amount refunded by this transaction."""
+  amountRefunded: MoneyInput
+
+  """Amount voided by this transaction."""
+  amountVoided: MoneyInput
+
+  """Payment public metadata."""
+  metadata: [MetadataInput!]
+
+  """Payment private metadata."""
+  privateMetadata: [MetadataInput!]
+}
+
+"""
+Request an action for payment transaction.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: HANDLE_PAYMENTS, MANAGE_ORDERS.
+"""
+type TransactionRequestAction {
+  transaction: TransactionItem
+  errors: [TransactionRequestActionError!]!
+}
+
+type TransactionRequestActionError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: TransactionRequestActionErrorCode!
+}
+
+"""An enumeration."""
+enum TransactionRequestActionErrorCode {
+  INVALID
+  GRAPHQL_ERROR
+  NOT_FOUND
+  MISSING_TRANSACTION_ACTION_REQUEST_WEBHOOK
+}
+
+"""
+Creates a new page. 
+
+Requires one of the following permissions: MANAGE_PAGES.
+"""
+type PageCreate {
+  pageErrors: [PageError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PageError!]!
+  page: Page
+}
+
+type PageError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: PageErrorCode!
+
+  """List of attributes IDs which causes the error."""
+  attributes: [ID!]
+
+  """List of attribute values IDs which causes the error."""
+  values: [ID!]
+}
+
+"""An enumeration."""
+enum PageErrorCode {
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+  DUPLICATED_INPUT_ITEM
+  ATTRIBUTE_ALREADY_ASSIGNED
+}
+
+input PageCreateInput {
+  """Page internal name."""
+  slug: String
+
+  """Page title."""
+  title: String
+
+  """
+  Page content.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  content: JSONString
+
+  """List of attributes."""
+  attributes: [AttributeValueInput!]
+
+  """Determines if page is visible in the storefront."""
+  isPublished: Boolean
+
+  """
+  Publication date. ISO 8601 standard. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `publishedAt` field instead.
+  """
+  publicationDate: String
+
+  """
+  Publication date time. ISO 8601 standard.
+  
+  Added in Saleor 3.3.
+  """
+  publishedAt: DateTime
+
+  """Search engine optimization fields."""
+  seo: SeoInput
+
+  """ID of the page type that page belongs to."""
+  pageType: ID!
+}
+
+"""
+Deletes a page. 
+
+Requires one of the following permissions: MANAGE_PAGES.
+"""
+type PageDelete {
+  pageErrors: [PageError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PageError!]!
+  page: Page
+}
+
+"""
+Deletes pages. 
+
+Requires one of the following permissions: MANAGE_PAGES.
+"""
+type PageBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  pageErrors: [PageError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PageError!]!
+}
+
+"""
+Publish pages. 
+
+Requires one of the following permissions: MANAGE_PAGES.
+"""
+type PageBulkPublish {
+  """Returns how many objects were affected."""
+  count: Int!
+  pageErrors: [PageError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PageError!]!
+}
+
+"""
+Updates an existing page. 
+
+Requires one of the following permissions: MANAGE_PAGES.
+"""
+type PageUpdate {
+  pageErrors: [PageError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PageError!]!
+  page: Page
+}
+
+input PageInput {
+  """Page internal name."""
+  slug: String
+
+  """Page title."""
+  title: String
+
+  """
+  Page content.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  content: JSONString
+
+  """List of attributes."""
+  attributes: [AttributeValueInput!]
+
+  """Determines if page is visible in the storefront."""
+  isPublished: Boolean
+
+  """
+  Publication date. ISO 8601 standard. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `publishedAt` field instead.
+  """
+  publicationDate: String
+
+  """
+  Publication date time. ISO 8601 standard.
+  
+  Added in Saleor 3.3.
+  """
+  publishedAt: DateTime
+
+  """Search engine optimization fields."""
+  seo: SeoInput
+}
+
+"""
+Creates/updates translations for a page. 
+
+Requires one of the following permissions: MANAGE_TRANSLATIONS.
+"""
+type PageTranslate {
+  translationErrors: [TranslationError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [TranslationError!]!
+  page: PageTranslatableContent
+}
+
+input PageTranslationInput {
+  seoTitle: String
+  seoDescription: String
+  title: String
+
+  """
+  Translated page content.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  content: JSONString
+}
+
+"""
+Create a new page type. 
+
+Requires one of the following permissions: MANAGE_PAGE_TYPES_AND_ATTRIBUTES.
+"""
+type PageTypeCreate {
+  pageErrors: [PageError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PageError!]!
+  pageType: PageType
+}
+
+input PageTypeCreateInput {
+  """Name of the page type."""
+  name: String
+
+  """Page type slug."""
+  slug: String
+
+  """List of attribute IDs to be assigned to the page type."""
+  addAttributes: [ID!]
+}
+
+"""
+Update page type. 
+
+Requires one of the following permissions: MANAGE_PAGE_TYPES_AND_ATTRIBUTES.
+"""
+type PageTypeUpdate {
+  pageErrors: [PageError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PageError!]!
+  pageType: PageType
+}
+
+input PageTypeUpdateInput {
+  """Name of the page type."""
+  name: String
+
+  """Page type slug."""
+  slug: String
+
+  """List of attribute IDs to be assigned to the page type."""
+  addAttributes: [ID!]
+
+  """List of attribute IDs to be assigned to the page type."""
+  removeAttributes: [ID!]
+}
+
+"""
+Delete a page type. 
+
+Requires one of the following permissions: MANAGE_PAGE_TYPES_AND_ATTRIBUTES.
+"""
+type PageTypeDelete {
+  pageErrors: [PageError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PageError!]!
+  pageType: PageType
+}
+
+"""
+Delete page types. 
+
+Requires one of the following permissions: MANAGE_PAGE_TYPES_AND_ATTRIBUTES.
+"""
+type PageTypeBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  pageErrors: [PageError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PageError!]!
+}
+
+"""
+Assign attributes to a given page type. 
+
+Requires one of the following permissions: MANAGE_PAGE_TYPES_AND_ATTRIBUTES.
+"""
+type PageAttributeAssign {
+  """The updated page type."""
+  pageType: PageType
+  pageErrors: [PageError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PageError!]!
+}
+
+"""
+Unassign attributes from a given page type. 
+
+Requires one of the following permissions: MANAGE_PAGE_TYPES_AND_ATTRIBUTES.
+"""
+type PageAttributeUnassign {
+  """The updated page type."""
+  pageType: PageType
+  pageErrors: [PageError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PageError!]!
+}
+
+"""
+Reorder the attributes of a page type. 
+
+Requires one of the following permissions: MANAGE_PAGE_TYPES_AND_ATTRIBUTES.
+"""
+type PageTypeReorderAttributes {
+  """Page type from which attributes are reordered."""
+  pageType: PageType
+  pageErrors: [PageError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PageError!]!
+}
+
+"""
+Reorder page attribute values. 
+
+Requires one of the following permissions: MANAGE_PAGES.
+"""
+type PageReorderAttributeValues {
+  """Page from which attribute values are reordered."""
+  page: Page
+  pageErrors: [PageError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PageError!]!
+}
+
+"""
+Completes creating an order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type DraftOrderComplete {
+  """Completed order."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Creates a new draft order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type DraftOrderCreate {
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+  order: Order
+}
+
+input DraftOrderCreateInput {
+  """Billing address of the customer."""
+  billingAddress: AddressInput
+
+  """Customer associated with the draft order."""
+  user: ID
+
+  """Email address of the customer."""
+  userEmail: String
+
+  """Discount amount for the order."""
+  discount: PositiveDecimal
+
+  """Shipping address of the customer."""
+  shippingAddress: AddressInput
+
+  """ID of a selected shipping method."""
+  shippingMethod: ID
+
+  """ID of the voucher associated with the order."""
+  voucher: ID
+
+  """A note from a customer. Visible by customers in the order summary."""
+  customerNote: String
+
+  """ID of the channel associated with the order."""
+  channelId: ID
+
+  """
+  URL of a view where users should be redirected to see the order details. URL in RFC 1808 format.
+  """
+  redirectUrl: String
+
+  """
+  External ID of this order.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+
+  """Variant line input consisting of variant ID and quantity of products."""
+  lines: [OrderLineCreateInput!]
+}
+
+input OrderLineCreateInput {
+  """Number of variant items ordered."""
+  quantity: Int!
+
+  """Product variant ID."""
+  variantId: ID!
+
+  """
+  Flag that allow force splitting the same variant into multiple lines by skipping the matching logic. 
+  
+  Added in Saleor 3.6.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  forceNewLine: Boolean = false
+}
+
+"""
+Deletes a draft order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type DraftOrderDelete {
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+  order: Order
+}
+
+"""
+Deletes draft orders. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type DraftOrderBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Deletes order lines. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type DraftOrderLinesBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Updates a draft order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type DraftOrderUpdate {
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+  order: Order
+}
+
+input DraftOrderInput {
+  """Billing address of the customer."""
+  billingAddress: AddressInput
+
+  """Customer associated with the draft order."""
+  user: ID
+
+  """Email address of the customer."""
+  userEmail: String
+
+  """Discount amount for the order."""
+  discount: PositiveDecimal
+
+  """Shipping address of the customer."""
+  shippingAddress: AddressInput
+
+  """ID of a selected shipping method."""
+  shippingMethod: ID
+
+  """ID of the voucher associated with the order."""
+  voucher: ID
+
+  """A note from a customer. Visible by customers in the order summary."""
+  customerNote: String
+
+  """ID of the channel associated with the order."""
+  channelId: ID
+
+  """
+  URL of a view where users should be redirected to see the order details. URL in RFC 1808 format.
+  """
+  redirectUrl: String
+
+  """
+  External ID of this order.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+}
+
+"""
+Adds note to the order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderAddNote {
+  """Order with the note added."""
+  order: Order
+
+  """Order note created."""
+  event: OrderEvent
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+input OrderAddNoteInput {
+  """Note message."""
+  message: String!
+}
+
+"""
+Cancel an order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderCancel {
+  """Canceled order."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Capture an order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderCapture {
+  """Captured order."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Confirms an unconfirmed order by changing status to unfulfilled. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderConfirm {
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Creates new fulfillments for an order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderFulfill {
+  """List of created fulfillments."""
+  fulfillments: [Fulfillment!]
+
+  """Fulfilled order."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+input OrderFulfillInput {
+  """List of items informing how to fulfill the order."""
+  lines: [OrderFulfillLineInput!]!
+
+  """If true, send an email notification to the customer."""
+  notifyCustomer: Boolean
+
+  """If true, then allow proceed fulfillment when stock is exceeded."""
+  allowStockToBeExceeded: Boolean = false
+
+  """
+  Fulfillment tracking number.
+  
+  Added in Saleor 3.6.
+  """
+  trackingNumber: String
+}
+
+input OrderFulfillLineInput {
+  """The ID of the order line."""
+  orderLineId: ID
+
+  """List of stock items to create."""
+  stocks: [OrderFulfillStockInput!]!
+}
+
+input OrderFulfillStockInput {
+  """The number of line items to be fulfilled from given warehouse."""
+  quantity: Int!
+
+  """ID of the warehouse from which the item will be fulfilled."""
+  warehouse: ID!
+}
+
+"""
+Cancels existing fulfillment and optionally restocks items. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type FulfillmentCancel {
+  """A canceled fulfillment."""
+  fulfillment: Fulfillment
+
+  """Order which fulfillment was cancelled."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+input FulfillmentCancelInput {
+  """
+  ID of a warehouse where items will be restocked. Optional when fulfillment is in WAITING_FOR_APPROVAL state.
+  """
+  warehouseId: ID
+}
+
+"""
+Approve existing fulfillment.
+
+Added in Saleor 3.1. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type FulfillmentApprove {
+  """An approved fulfillment."""
+  fulfillment: Fulfillment
+
+  """Order which fulfillment was approved."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Updates a fulfillment for an order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type FulfillmentUpdateTracking {
+  """A fulfillment with updated tracking."""
+  fulfillment: Fulfillment
+
+  """Order for which fulfillment was updated."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+input FulfillmentUpdateTrackingInput {
+  """Fulfillment tracking number."""
+  trackingNumber: String
+
+  """If true, send an email notification to the customer."""
+  notifyCustomer: Boolean = false
+}
+
+"""
+Refund products. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type FulfillmentRefundProducts {
+  """A refunded fulfillment."""
+  fulfillment: Fulfillment
+
+  """Order which fulfillment was refunded."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+input OrderRefundProductsInput {
+  """List of unfulfilled lines to refund."""
+  orderLines: [OrderRefundLineInput!]
+
+  """List of fulfilled lines to refund."""
+  fulfillmentLines: [OrderRefundFulfillmentLineInput!]
+
+  """The total amount of refund when the value is provided manually."""
+  amountToRefund: PositiveDecimal
+
+  """
+  If true, Saleor will refund shipping costs. If amountToRefund is providedincludeShippingCosts will be ignored.
+  """
+  includeShippingCosts: Boolean = false
+}
+
+input OrderRefundLineInput {
+  """The ID of the order line to refund."""
+  orderLineId: ID!
+
+  """The number of items to be refunded."""
+  quantity: Int!
+}
+
+input OrderRefundFulfillmentLineInput {
+  """The ID of the fulfillment line to refund."""
+  fulfillmentLineId: ID!
+
+  """The number of items to be refunded."""
+  quantity: Int!
+}
+
+"""
+Return products. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type FulfillmentReturnProducts {
+  """A return fulfillment."""
+  returnFulfillment: Fulfillment
+
+  """A replace fulfillment."""
+  replaceFulfillment: Fulfillment
+
+  """Order which fulfillment was returned."""
+  order: Order
+
+  """A draft order which was created for products with replace flag."""
+  replaceOrder: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+input OrderReturnProductsInput {
+  """List of unfulfilled lines to return."""
+  orderLines: [OrderReturnLineInput!]
+
+  """List of fulfilled lines to return."""
+  fulfillmentLines: [OrderReturnFulfillmentLineInput!]
+
+  """The total amount of refund when the value is provided manually."""
+  amountToRefund: PositiveDecimal
+
+  """
+  If true, Saleor will refund shipping costs. If amountToRefund is providedincludeShippingCosts will be ignored.
+  """
+  includeShippingCosts: Boolean = false
+
+  """If true, Saleor will call refund action for all lines."""
+  refund: Boolean = false
+}
+
+input OrderReturnLineInput {
+  """The ID of the order line to return."""
+  orderLineId: ID!
+
+  """The number of items to be returned."""
+  quantity: Int!
+
+  """Determines, if the line should be added to replace order."""
+  replace: Boolean = false
+}
+
+input OrderReturnFulfillmentLineInput {
+  """The ID of the fulfillment line to return."""
+  fulfillmentLineId: ID!
+
+  """The number of items to be returned."""
+  quantity: Int!
+
+  """Determines, if the line should be added to replace order."""
+  replace: Boolean = false
+}
+
+"""
+Create order lines for an order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderLinesCreate {
+  """Related order."""
+  order: Order
+
+  """List of added order lines."""
+  orderLines: [OrderLine!]
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Deletes an order line from an order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderLineDelete {
+  """A related order."""
+  order: Order
+
+  """An order line that was deleted."""
+  orderLine: OrderLine
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Updates an order line of an order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderLineUpdate {
+  """Related order."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+  orderLine: OrderLine
+}
+
+input OrderLineInput {
+  """Number of variant items ordered."""
+  quantity: Int!
+}
+
+"""
+Adds discount to the order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderDiscountAdd {
+  """Order which has been discounted."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+input OrderDiscountCommonInput {
+  """Type of the discount: fixed or percent"""
+  valueType: DiscountValueTypeEnum!
+
+  """Value of the discount. Can store fixed value or percent value"""
+  value: PositiveDecimal!
+
+  """Explanation for the applied discount."""
+  reason: String
+}
+
+"""
+Update discount for the order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderDiscountUpdate {
+  """Order which has been discounted."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Remove discount from the order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderDiscountDelete {
+  """Order which has removed discount."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Update discount for the order line. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderLineDiscountUpdate {
+  """Order line which has been discounted."""
+  orderLine: OrderLine
+
+  """Order which is related to the discounted line."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Remove discount applied to the order line. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderLineDiscountRemove {
+  """Order line which has removed discount."""
+  orderLine: OrderLine
+
+  """Order which is related to line which has removed discount."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Mark order as manually paid. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderMarkAsPaid {
+  """Order marked as paid."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Refund an order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderRefund {
+  """A refunded order."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Updates an order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderUpdate {
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+  order: Order
+}
+
+input OrderUpdateInput {
+  """Billing address of the customer."""
+  billingAddress: AddressInput
+
+  """Email address of the customer."""
+  userEmail: String
+
+  """Shipping address of the customer."""
+  shippingAddress: AddressInput
+
+  """
+  External ID of this order.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+}
+
+"""
+Updates a shipping method of the order. Requires shipping method ID to update, when null is passed then currently assigned shipping method is removed. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderUpdateShipping {
+  """Order with updated shipping method."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+input OrderUpdateShippingInput {
+  """
+  ID of the selected shipping method, pass null to remove currently assigned shipping method.
+  """
+  shippingMethod: ID
+}
+
+"""
+Void an order. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderVoid {
+  """A voided order."""
+  order: Order
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Cancels orders. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type OrderBulkCancel {
+  """Returns how many objects were affected."""
+  count: Int!
+  orderErrors: [OrderError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [OrderError!]!
+}
+
+"""
+Delete metadata of an object. To use it, you need to have access to the modified object.
+"""
+type DeleteMetadata {
+  metadataErrors: [MetadataError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MetadataError!]!
+  item: ObjectWithMetadata
+}
+
+type MetadataError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: MetadataErrorCode!
+}
+
+"""An enumeration."""
+enum MetadataErrorCode {
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+  NOT_UPDATED
+}
+
+"""
+Delete object's private metadata. To use it, you need to be an authenticated staff user or an app and have access to the modified object.
+"""
+type DeletePrivateMetadata {
+  metadataErrors: [MetadataError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MetadataError!]!
+  item: ObjectWithMetadata
+}
+
+"""
+Updates metadata of an object. To use it, you need to have access to the modified object.
+"""
+type UpdateMetadata {
+  metadataErrors: [MetadataError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MetadataError!]!
+  item: ObjectWithMetadata
+}
+
+"""
+Updates private metadata of an object. To use it, you need to be an authenticated staff user or an app and have access to the modified object.
+"""
+type UpdatePrivateMetadata {
+  metadataErrors: [MetadataError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MetadataError!]!
+  item: ObjectWithMetadata
+}
+
+"""
+Assigns storefront's navigation menus. 
+
+Requires one of the following permissions: MANAGE_MENUS, MANAGE_SETTINGS.
+"""
+type AssignNavigation {
+  """Assigned navigation menu."""
+  menu: Menu
+  menuErrors: [MenuError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MenuError!]!
+}
+
+type MenuError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: MenuErrorCode!
+}
+
+"""An enumeration."""
+enum MenuErrorCode {
+  CANNOT_ASSIGN_NODE
+  GRAPHQL_ERROR
+  INVALID
+  INVALID_MENU_ITEM
+  NO_MENU_ITEM_PROVIDED
+  NOT_FOUND
+  REQUIRED
+  TOO_MANY_MENU_ITEMS
+  UNIQUE
+}
+
+enum NavigationType {
+  """Main storefront navigation."""
+  MAIN
+
+  """Secondary storefront navigation."""
+  SECONDARY
+}
+
+"""
+Creates a new Menu. 
+
+Requires one of the following permissions: MANAGE_MENUS.
+"""
+type MenuCreate {
+  menuErrors: [MenuError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MenuError!]!
+  menu: Menu
+}
+
+input MenuCreateInput {
+  """Name of the menu."""
+  name: String!
+
+  """Slug of the menu. Will be generated if not provided."""
+  slug: String
+
+  """List of menu items."""
+  items: [MenuItemInput!]
+}
+
+input MenuItemInput {
+  """Name of the menu item."""
+  name: String
+
+  """URL of the pointed item."""
+  url: String
+
+  """Category to which item points."""
+  category: ID
+
+  """Collection to which item points."""
+  collection: ID
+
+  """Page to which item points."""
+  page: ID
+}
+
+"""
+Deletes a menu. 
+
+Requires one of the following permissions: MANAGE_MENUS.
+"""
+type MenuDelete {
+  menuErrors: [MenuError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MenuError!]!
+  menu: Menu
+}
+
+"""
+Deletes menus. 
+
+Requires one of the following permissions: MANAGE_MENUS.
+"""
+type MenuBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  menuErrors: [MenuError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MenuError!]!
+}
+
+"""
+Updates a menu. 
+
+Requires one of the following permissions: MANAGE_MENUS.
+"""
+type MenuUpdate {
+  menuErrors: [MenuError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MenuError!]!
+  menu: Menu
+}
+
+input MenuInput {
+  """Name of the menu."""
+  name: String
+
+  """Slug of the menu."""
+  slug: String
+}
+
+"""
+Creates a new menu item. 
+
+Requires one of the following permissions: MANAGE_MENUS.
+"""
+type MenuItemCreate {
+  menuErrors: [MenuError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MenuError!]!
+  menuItem: MenuItem
+}
+
+input MenuItemCreateInput {
+  """Name of the menu item."""
+  name: String!
+
+  """URL of the pointed item."""
+  url: String
+
+  """Category to which item points."""
+  category: ID
+
+  """Collection to which item points."""
+  collection: ID
+
+  """Page to which item points."""
+  page: ID
+
+  """Menu to which item belongs."""
+  menu: ID!
+
+  """ID of the parent menu. If empty, menu will be top level menu."""
+  parent: ID
+}
+
+"""
+Deletes a menu item. 
+
+Requires one of the following permissions: MANAGE_MENUS.
+"""
+type MenuItemDelete {
+  menuErrors: [MenuError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MenuError!]!
+  menuItem: MenuItem
+}
+
+"""
+Deletes menu items. 
+
+Requires one of the following permissions: MANAGE_MENUS.
+"""
+type MenuItemBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  menuErrors: [MenuError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MenuError!]!
+}
+
+"""
+Updates a menu item. 
+
+Requires one of the following permissions: MANAGE_MENUS.
+"""
+type MenuItemUpdate {
+  menuErrors: [MenuError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MenuError!]!
+  menuItem: MenuItem
+}
+
+"""
+Creates/updates translations for a menu item. 
+
+Requires one of the following permissions: MANAGE_TRANSLATIONS.
+"""
+type MenuItemTranslate {
+  translationErrors: [TranslationError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [TranslationError!]!
+  menuItem: MenuItem
+}
+
+"""
+Moves items of menus. 
+
+Requires one of the following permissions: MANAGE_MENUS.
+"""
+type MenuItemMove {
+  """Assigned menu to move within."""
+  menu: Menu
+  menuErrors: [MenuError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [MenuError!]!
+}
+
+input MenuItemMoveInput {
+  """The menu item ID to move."""
+  itemId: ID!
+
+  """ID of the parent menu. If empty, menu will be top level menu."""
+  parentId: ID
+
+  """
+  The new relative sorting position of the item (from -inf to +inf). 1 moves the item one position forward, -1 moves the item one position backward, 0 leaves the item unchanged.
+  """
+  sortOrder: Int
+}
+
+"""
+Request an invoice for the order using plugin. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type InvoiceRequest {
+  """Order related to an invoice."""
+  order: Order
+  invoiceErrors: [InvoiceError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [InvoiceError!]!
+  invoice: Invoice
+}
+
+type InvoiceError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: InvoiceErrorCode!
+}
+
+"""An enumeration."""
+enum InvoiceErrorCode {
+  REQUIRED
+  NOT_READY
+  URL_NOT_SET
+  EMAIL_NOT_SET
+  NUMBER_NOT_SET
+  NOT_FOUND
+  INVALID_STATUS
+  NO_INVOICE_PLUGIN
+}
+
+"""
+Requests deletion of an invoice. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type InvoiceRequestDelete {
+  invoiceErrors: [InvoiceError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [InvoiceError!]!
+  invoice: Invoice
+}
+
+"""
+Creates a ready to send invoice. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type InvoiceCreate {
+  invoiceErrors: [InvoiceError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [InvoiceError!]!
+  invoice: Invoice
+}
+
+input InvoiceCreateInput {
+  """Invoice number."""
+  number: String!
+
+  """URL of an invoice to download."""
+  url: String!
+}
+
+"""
+Deletes an invoice. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type InvoiceDelete {
+  invoiceErrors: [InvoiceError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [InvoiceError!]!
+  invoice: Invoice
+}
+
+"""
+Updates an invoice. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type InvoiceUpdate {
+  invoiceErrors: [InvoiceError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [InvoiceError!]!
+  invoice: Invoice
+}
+
+input UpdateInvoiceInput {
+  """Invoice number"""
+  number: String
+
+  """URL of an invoice to download."""
+  url: String
+}
+
+"""
+Send an invoice notification to the customer. 
+
+Requires one of the following permissions: MANAGE_ORDERS.
+"""
+type InvoiceSendNotification {
+  invoiceErrors: [InvoiceError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [InvoiceError!]!
+  invoice: Invoice
+}
+
+"""
+Activate a gift card. 
+
+Requires one of the following permissions: MANAGE_GIFT_CARD.
+"""
+type GiftCardActivate {
+  """Activated gift card."""
+  giftCard: GiftCard
+  giftCardErrors: [GiftCardError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [GiftCardError!]!
+}
+
+type GiftCardError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: GiftCardErrorCode!
+
+  """List of tag values that cause the error."""
+  tags: [String!]
+}
+
+"""An enumeration."""
+enum GiftCardErrorCode {
+  ALREADY_EXISTS
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+  EXPIRED_GIFT_CARD
+  DUPLICATED_INPUT_ITEM
+}
+
+"""
+Creates a new gift card. 
+
+Requires one of the following permissions: MANAGE_GIFT_CARD.
+"""
+type GiftCardCreate {
+  giftCardErrors: [GiftCardError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [GiftCardError!]!
+  giftCard: GiftCard
+}
+
+input GiftCardCreateInput {
+  """
+  The gift card tags to add.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  addTags: [String!]
+
+  """
+  The gift card expiry date.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  expiryDate: Date
+
+  """
+  Start date of the gift card in ISO 8601 format. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.
+  """
+  startDate: Date
+
+  """
+  End date of the gift card in ISO 8601 format. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `expiryDate` from `expirySettings` instead.
+  """
+  endDate: Date
+
+  """Balance of the gift card."""
+  balance: PriceInput!
+
+  """Email of the customer to whom gift card will be sent."""
+  userEmail: String
+
+  """
+  Slug of a channel from which the email should be sent.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  channel: String
+
+  """
+  Determine if gift card is active.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  isActive: Boolean!
+
+  """
+  Code to use the gift card. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. The code is now auto generated.
+  """
+  code: String
+
+  """
+  The gift card note from the staff member.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  note: String
+}
+
+input PriceInput {
+  """Currency code."""
+  currency: String!
+
+  """Amount of money."""
+  amount: PositiveDecimal!
+}
+
+"""
+Delete gift card.
+
+Added in Saleor 3.1.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_GIFT_CARD.
+"""
+type GiftCardDelete {
+  giftCardErrors: [GiftCardError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [GiftCardError!]!
+  giftCard: GiftCard
+}
+
+"""
+Deactivate a gift card. 
+
+Requires one of the following permissions: MANAGE_GIFT_CARD.
+"""
+type GiftCardDeactivate {
+  """Deactivated gift card."""
+  giftCard: GiftCard
+  giftCardErrors: [GiftCardError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [GiftCardError!]!
+}
+
+"""
+Update a gift card. 
+
+Requires one of the following permissions: MANAGE_GIFT_CARD.
+"""
+type GiftCardUpdate {
+  giftCardErrors: [GiftCardError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [GiftCardError!]!
+  giftCard: GiftCard
+}
+
+input GiftCardUpdateInput {
+  """
+  The gift card tags to add.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  addTags: [String!]
+
+  """
+  The gift card expiry date.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  expiryDate: Date
+
+  """
+  Start date of the gift card in ISO 8601 format. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.
+  """
+  startDate: Date
+
+  """
+  End date of the gift card in ISO 8601 format. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `expiryDate` from `expirySettings` instead.
+  """
+  endDate: Date
+
+  """
+  The gift card tags to remove.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  removeTags: [String!]
+
+  """
+  The gift card balance amount.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  balanceAmount: PositiveDecimal
+}
+
+"""
+Resend a gift card.
+
+Added in Saleor 3.1.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_GIFT_CARD.
+"""
+type GiftCardResend {
+  """Gift card which has been sent."""
+  giftCard: GiftCard
+  errors: [GiftCardError!]!
+}
+
+input GiftCardResendInput {
+  """ID of a gift card to resend."""
+  id: ID!
+
+  """Email to which gift card should be send."""
+  email: String
+
+  """Slug of a channel from which the email should be sent."""
+  channel: String!
+}
+
+"""
+Adds note to the gift card.
+
+Added in Saleor 3.1.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_GIFT_CARD.
+"""
+type GiftCardAddNote {
+  """Gift card with the note added."""
+  giftCard: GiftCard
+
+  """Gift card note created."""
+  event: GiftCardEvent
+  errors: [GiftCardError!]!
+}
+
+input GiftCardAddNoteInput {
+  """Note message."""
+  message: String!
+}
+
+"""
+Create gift cards.
+
+Added in Saleor 3.1.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_GIFT_CARD.
+"""
+type GiftCardBulkCreate {
+  """Returns how many objects were created."""
+  count: Int!
+
+  """List of created gift cards."""
+  giftCards: [GiftCard!]!
+  errors: [GiftCardError!]!
+}
+
+input GiftCardBulkCreateInput {
+  """The number of cards to issue."""
+  count: Int!
+
+  """Balance of the gift card."""
+  balance: PriceInput!
+
+  """The gift card tags."""
+  tags: [String!]
+
+  """The gift card expiry date."""
+  expiryDate: Date
+
+  """Determine if gift card is active."""
+  isActive: Boolean!
+}
+
+"""
+Delete gift cards.
+
+Added in Saleor 3.1.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_GIFT_CARD.
+"""
+type GiftCardBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  errors: [GiftCardError!]!
+}
+
+"""
+Activate gift cards.
+
+Added in Saleor 3.1.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_GIFT_CARD.
+"""
+type GiftCardBulkActivate {
+  """Returns how many objects were affected."""
+  count: Int!
+  errors: [GiftCardError!]!
+}
+
+"""
+Deactivate gift cards.
+
+Added in Saleor 3.1.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_GIFT_CARD.
+"""
+type GiftCardBulkDeactivate {
+  """Returns how many objects were affected."""
+  count: Int!
+  errors: [GiftCardError!]!
+}
+
+"""
+Update plugin configuration. 
+
+Requires one of the following permissions: MANAGE_PLUGINS.
+"""
+type PluginUpdate {
+  plugin: Plugin
+  pluginsErrors: [PluginError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PluginError!]!
+}
+
+type PluginError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: PluginErrorCode!
+}
+
+"""An enumeration."""
+enum PluginErrorCode {
+  GRAPHQL_ERROR
+  INVALID
+  PLUGIN_MISCONFIGURED
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+}
+
+input PluginUpdateInput {
+  """Indicates whether the plugin should be enabled."""
+  active: Boolean
+
+  """Configuration of the plugin."""
+  configuration: [ConfigurationItemInput!]
+}
+
+input ConfigurationItemInput {
+  """Name of the field to update."""
+  name: String!
+
+  """Value of the given field to update."""
+  value: String
+}
+
+"""
+Trigger sending a notification with the notify plugin method. Serializes nodes provided as ids parameter and includes this data in the notification payload.
+
+Added in Saleor 3.1.
+"""
+type ExternalNotificationTrigger {
+  errors: [ExternalNotificationError!]!
+}
+
+type ExternalNotificationError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: ExternalNotificationErrorCodes!
+}
+
+"""An enumeration."""
+enum ExternalNotificationErrorCodes {
+  REQUIRED
+  INVALID_MODEL_TYPE
+  NOT_FOUND
+  CHANNEL_INACTIVE
+}
+
+input ExternalNotificationTriggerInput {
+  """
+  The list of customers or orders node IDs that will be serialized and included in the notification payload.
+  """
+  ids: [ID!]!
+
+  """
+  Additional payload that will be merged with the one based on the bussines object ID.
+  """
+  extraPayload: JSONString
+
+  """
+  External event type. This field is passed to a plugin as an event type.
+  """
+  externalEventType: String!
+}
+
+"""
+Creates a new sale. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type SaleCreate {
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+  sale: Sale
+}
+
+type DiscountError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """List of products IDs which causes the error."""
+  products: [ID!]
+
+  """The error code."""
+  code: DiscountErrorCode!
+
+  """List of channels IDs which causes the error."""
+  channels: [ID!]
+}
+
+"""An enumeration."""
+enum DiscountErrorCode {
+  ALREADY_EXISTS
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+  CANNOT_MANAGE_PRODUCT_WITHOUT_VARIANT
+  DUPLICATED_INPUT_ITEM
+}
+
+input SaleInput {
+  """Voucher name."""
+  name: String
+
+  """Fixed or percentage."""
+  type: DiscountValueTypeEnum
+
+  """Value of the voucher."""
+  value: PositiveDecimal
+
+  """Products related to the discount."""
+  products: [ID!]
+  variants: [ID!]
+
+  """Categories related to the discount."""
+  categories: [ID!]
+
+  """Collections related to the discount."""
+  collections: [ID!]
+
+  """Start date of the voucher in ISO 8601 format."""
+  startDate: DateTime
+
+  """End date of the voucher in ISO 8601 format."""
+  endDate: DateTime
+}
+
+"""
+Deletes a sale. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type SaleDelete {
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+  sale: Sale
+}
+
+"""
+Deletes sales. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type SaleBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+}
+
+"""
+Updates a sale. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type SaleUpdate {
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+  sale: Sale
+}
+
+"""
+Adds products, categories, collections to a voucher. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type SaleAddCatalogues {
+  """Sale of which catalogue IDs will be modified."""
+  sale: Sale
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+}
+
+input CatalogueInput {
+  """Products related to the discount."""
+  products: [ID!]
+
+  """Categories related to the discount."""
+  categories: [ID!]
+
+  """Collections related to the discount."""
+  collections: [ID!]
+
+  """
+  Product variant related to the discount.
+  
+  Added in Saleor 3.1.
+  """
+  variants: [ID!]
+}
+
+"""
+Removes products, categories, collections from a sale. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type SaleRemoveCatalogues {
+  """Sale of which catalogue IDs will be modified."""
+  sale: Sale
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+}
+
+"""
+Creates/updates translations for a sale. 
+
+Requires one of the following permissions: MANAGE_TRANSLATIONS.
+"""
+type SaleTranslate {
+  translationErrors: [TranslationError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [TranslationError!]!
+  sale: Sale
+}
+
+"""
+Manage sale's availability in channels. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type SaleChannelListingUpdate {
+  """An updated sale instance."""
+  sale: Sale
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+}
+
+input SaleChannelListingInput {
+  """List of channels to which the sale should be assigned."""
+  addChannels: [SaleChannelListingAddInput!]
+
+  """List of channels from which the sale should be unassigned."""
+  removeChannels: [ID!]
+}
+
+input SaleChannelListingAddInput {
+  """ID of a channel."""
+  channelId: ID!
+
+  """The value of the discount."""
+  discountValue: PositiveDecimal!
+}
+
+"""
+Creates a new voucher. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type VoucherCreate {
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+  voucher: Voucher
+}
+
+input VoucherInput {
+  """Voucher type: PRODUCT, CATEGORY SHIPPING or ENTIRE_ORDER."""
+  type: VoucherTypeEnum
+
+  """Voucher name."""
+  name: String
+
+  """Code to use the voucher."""
+  code: String
+
+  """Start date of the voucher in ISO 8601 format."""
+  startDate: DateTime
+
+  """End date of the voucher in ISO 8601 format."""
+  endDate: DateTime
+
+  """Choices: fixed or percentage."""
+  discountValueType: DiscountValueTypeEnum
+
+  """Products discounted by the voucher."""
+  products: [ID!]
+
+  """
+  Variants discounted by the voucher.
+  
+  Added in Saleor 3.1.
+  """
+  variants: [ID!]
+
+  """Collections discounted by the voucher."""
+  collections: [ID!]
+
+  """Categories discounted by the voucher."""
+  categories: [ID!]
+
+  """Minimal quantity of checkout items required to apply the voucher."""
+  minCheckoutItemsQuantity: Int
+
+  """Country codes that can be used with the shipping voucher."""
+  countries: [String!]
+
+  """Voucher should be applied to the cheapest item or entire order."""
+  applyOncePerOrder: Boolean
+
+  """Voucher should be applied once per customer."""
+  applyOncePerCustomer: Boolean
+
+  """Voucher can be used only by staff user."""
+  onlyForStaff: Boolean
+
+  """Limit number of times this voucher can be used in total."""
+  usageLimit: Int
+}
+
+"""
+Deletes a voucher. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type VoucherDelete {
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+  voucher: Voucher
+}
+
+"""
+Deletes vouchers. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type VoucherBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+}
+
+"""
+Updates a voucher. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type VoucherUpdate {
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+  voucher: Voucher
+}
+
+"""
+Adds products, categories, collections to a voucher. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type VoucherAddCatalogues {
+  """Voucher of which catalogue IDs will be modified."""
+  voucher: Voucher
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+}
+
+"""
+Removes products, categories, collections from a voucher. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type VoucherRemoveCatalogues {
+  """Voucher of which catalogue IDs will be modified."""
+  voucher: Voucher
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+}
+
+"""
+Creates/updates translations for a voucher. 
+
+Requires one of the following permissions: MANAGE_TRANSLATIONS.
+"""
+type VoucherTranslate {
+  translationErrors: [TranslationError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [TranslationError!]!
+  voucher: Voucher
+}
+
+"""
+Manage voucher's availability in channels. 
+
+Requires one of the following permissions: MANAGE_DISCOUNTS.
+"""
+type VoucherChannelListingUpdate {
+  """An updated voucher instance."""
+  voucher: Voucher
+  discountErrors: [DiscountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [DiscountError!]!
+}
+
+input VoucherChannelListingInput {
+  """List of channels to which the voucher should be assigned."""
+  addChannels: [VoucherChannelListingAddInput!]
+
+  """List of channels from which the voucher should be unassigned."""
+  removeChannels: [ID!]
+}
+
+input VoucherChannelListingAddInput {
+  """ID of a channel."""
+  channelId: ID!
+
+  """Value of the voucher."""
+  discountValue: PositiveDecimal
+
+  """Min purchase amount required to apply the voucher."""
+  minAmountSpent: PositiveDecimal
+}
+
+"""
+Export products to csv file. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type ExportProducts {
+  """
+  The newly created export file job which is responsible for export data.
+  """
+  exportFile: ExportFile
+  exportErrors: [ExportError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ExportError!]!
+}
+
+type ExportError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: ExportErrorCode!
+}
+
+"""An enumeration."""
+enum ExportErrorCode {
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+}
+
+input ExportProductsInput {
+  """Determine which products should be exported."""
+  scope: ExportScope!
+
+  """Filtering options for products."""
+  filter: ProductFilterInput
+
+  """List of products IDs to export."""
+  ids: [ID!]
+
+  """Input with info about fields which should be exported."""
+  exportInfo: ExportInfoInput
+
+  """Type of exported file."""
+  fileType: FileTypesEnum!
+}
+
+enum ExportScope {
+  """Export all products."""
+  ALL
+
+  """Export products with given ids."""
+  IDS
+
+  """Export the filtered products."""
+  FILTER
+}
+
+input ExportInfoInput {
+  """List of attribute ids witch should be exported."""
+  attributes: [ID!]
+
+  """List of warehouse ids witch should be exported."""
+  warehouses: [ID!]
+
+  """List of channels ids which should be exported."""
+  channels: [ID!]
+
+  """List of product fields witch should be exported."""
+  fields: [ProductFieldEnum!]
+}
+
+enum ProductFieldEnum {
+  NAME
+  DESCRIPTION
+  PRODUCT_TYPE
+  CATEGORY
+  PRODUCT_WEIGHT
+  COLLECTIONS
+  CHARGE_TAXES
+  PRODUCT_MEDIA
+  VARIANT_ID
+  VARIANT_SKU
+  VARIANT_WEIGHT
+  VARIANT_MEDIA
+}
+
+"""An enumeration."""
+enum FileTypesEnum {
+  CSV
+  XLSX
+}
+
+"""
+Export gift cards to csv file.
+
+Added in Saleor 3.1.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_GIFT_CARD.
+"""
+type ExportGiftCards {
+  """
+  The newly created export file job which is responsible for export data.
+  """
+  exportFile: ExportFile
+  errors: [ExportError!]!
+}
+
+input ExportGiftCardsInput {
+  """Determine which gift cards should be exported."""
+  scope: ExportScope!
+
+  """Filtering options for gift cards."""
+  filter: GiftCardFilterInput
+
+  """List of gift cards IDs to export."""
+  ids: [ID!]
+
+  """Type of exported file."""
+  fileType: FileTypesEnum!
+}
+
+"""
+Upload a file. This mutation must be sent as a `multipart` request. More detailed specs of the upload format can be found here: https://github.com/jaydenseric/graphql-multipart-request-spec 
+
+Requires one of the following permissions: AUTHENTICATED_APP, AUTHENTICATED_STAFF_USER.
+"""
+type FileUpload {
+  uploadedFile: File
+  uploadErrors: [UploadError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [UploadError!]!
+}
+
+type UploadError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: UploadErrorCode!
+}
+
+"""An enumeration."""
+enum UploadErrorCode {
+  GRAPHQL_ERROR
+}
+
+"""Adds a gift card or a voucher to a checkout."""
+type CheckoutAddPromoCode {
+  """The checkout with the added gift card or voucher."""
+  checkout: Checkout
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+}
+
+type CheckoutError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: CheckoutErrorCode!
+
+  """List of varint IDs which causes the error."""
+  variants: [ID!]
+
+  """List of line Ids which cause the error."""
+  lines: [ID!]
+
+  """A type of address that causes the error."""
+  addressType: AddressTypeEnum
+}
+
+"""An enumeration."""
+enum CheckoutErrorCode {
+  BILLING_ADDRESS_NOT_SET
+  CHECKOUT_NOT_FULLY_PAID
+  GRAPHQL_ERROR
+  PRODUCT_NOT_PUBLISHED
+  PRODUCT_UNAVAILABLE_FOR_PURCHASE
+  INSUFFICIENT_STOCK
+  INVALID
+  INVALID_SHIPPING_METHOD
+  NOT_FOUND
+  PAYMENT_ERROR
+  QUANTITY_GREATER_THAN_LIMIT
+  REQUIRED
+  SHIPPING_ADDRESS_NOT_SET
+  SHIPPING_METHOD_NOT_APPLICABLE
+  DELIVERY_METHOD_NOT_APPLICABLE
+  SHIPPING_METHOD_NOT_SET
+  SHIPPING_NOT_REQUIRED
+  TAX_ERROR
+  UNIQUE
+  VOUCHER_NOT_APPLICABLE
+  GIFT_CARD_NOT_APPLICABLE
+  ZERO_QUANTITY
+  MISSING_CHANNEL_SLUG
+  CHANNEL_INACTIVE
+  UNAVAILABLE_VARIANT_IN_CHANNEL
+  EMAIL_NOT_SET
+  NO_LINES
+  INACTIVE_PAYMENT
+}
+
+"""Update billing address in the existing checkout."""
+type CheckoutBillingAddressUpdate {
+  """An updated checkout."""
+  checkout: Checkout
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+}
+
+input CheckoutAddressValidationRules {
+  """
+  Determines if an error should be raised when the provided address doesn't have all the required fields. The list of required fields is dynamic and depends on the country code (use the `addressValidationRules` query to fetch them). Note: country code is mandatory for all addresses regardless of the rules provided in this input.
+  """
+  checkRequiredFields: Boolean = true
+
+  """
+  Determines if an error should be raised when the provided address doesn't match the expected format. Example: using letters for postal code when the numbers are expected.
+  """
+  checkFieldsFormat: Boolean = true
+
+  """
+  Determines if Saleor should apply normalization on address fields. Example: converting city field to uppercase letters.
+  """
+  enableFieldsNormalization: Boolean = true
+}
+
+"""
+Completes the checkout. As a result a new order is created and a payment charge is made. This action requires a successful payment before it can be performed. In case additional confirmation step as 3D secure is required confirmationNeeded flag will be set to True and no order created until payment is confirmed with second call of this mutation.
+"""
+type CheckoutComplete {
+  """Placed order."""
+  order: Order
+
+  """
+  Set to true if payment needs to be confirmed before checkout is complete.
+  """
+  confirmationNeeded: Boolean!
+
+  """Confirmation data used to process additional authorization steps."""
+  confirmationData: JSONString
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+}
+
+"""Create a new checkout."""
+type CheckoutCreate {
+  """
+  Whether the checkout was created or the current active one was returned. Refer to checkoutLinesAdd and checkoutLinesUpdate to merge a cart with an active checkout.
+  """
+  created: Boolean @deprecated(reason: "This field will be removed in Saleor 4.0. Always returns `true`.")
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+  checkout: Checkout
+}
+
+input CheckoutCreateInput {
+  """Slug of a channel in which to create a checkout."""
+  channel: String
+
+  """
+  A list of checkout lines, each containing information about an item in the checkout.
+  """
+  lines: [CheckoutLineInput!]!
+
+  """The customer's email address."""
+  email: String
+
+  """
+  The mailing address to where the checkout will be shipped. Note: the address will be ignored if the checkout doesn't contain shippable items.
+  """
+  shippingAddress: AddressInput
+
+  """Billing address of the customer."""
+  billingAddress: AddressInput
+
+  """Checkout language code."""
+  languageCode: LanguageCodeEnum
+
+  """
+  The checkout validation rules that can be changed.
+  
+  Added in Saleor 3.5.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  validationRules: CheckoutValidationRules
+}
+
+input CheckoutLineInput {
+  """The number of items purchased."""
+  quantity: Int!
+
+  """ID of the product variant."""
+  variantId: ID!
+
+  """
+  Custom price of the item. Can be set only by apps with `HANDLE_CHECKOUTS` permission. When the line with the same variant will be provided multiple times, the last price will be used.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  price: PositiveDecimal
+
+  """
+  Flag that allow force splitting the same variant into multiple lines by skipping the matching logic. 
+  
+  Added in Saleor 3.6.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  forceNewLine: Boolean = false
+
+  """
+  Fields required to update the object's metadata.
+  
+  Added in Saleor 3.8.
+  """
+  metadata: [MetadataInput!]
+}
+
+input CheckoutValidationRules {
+  """
+  The validation rules that can be applied to provided shipping address data.
+  """
+  shippingAddress: CheckoutAddressValidationRules
+
+  """
+  The validation rules that can be applied to provided billing address data.
+  """
+  billingAddress: CheckoutAddressValidationRules
+}
+
+"""
+Sets the customer as the owner of the checkout. 
+
+Requires one of the following permissions: AUTHENTICATED_APP, AUTHENTICATED_USER.
+"""
+type CheckoutCustomerAttach {
+  """An updated checkout."""
+  checkout: Checkout
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+}
+
+"""
+Removes the user assigned as the owner of the checkout. 
+
+Requires one of the following permissions: AUTHENTICATED_APP, AUTHENTICATED_USER.
+"""
+type CheckoutCustomerDetach {
+  """An updated checkout."""
+  checkout: Checkout
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+}
+
+"""Updates email address in the existing checkout object."""
+type CheckoutEmailUpdate {
+  """An updated checkout."""
+  checkout: Checkout
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+}
+
+"""Deletes a CheckoutLine."""
+type CheckoutLineDelete {
+  """An updated checkout."""
+  checkout: Checkout
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+}
+
+"""Deletes checkout lines."""
+type CheckoutLinesDelete {
+  """An updated checkout."""
+  checkout: Checkout
+  errors: [CheckoutError!]!
+}
+
+"""
+Adds a checkout line to the existing checkout.If line was already in checkout, its quantity will be increased.
+"""
+type CheckoutLinesAdd {
+  """An updated checkout."""
+  checkout: Checkout
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+}
+
+"""Updates checkout line in the existing checkout."""
+type CheckoutLinesUpdate {
+  """An updated checkout."""
+  checkout: Checkout
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+}
+
+input CheckoutLineUpdateInput {
+  """
+  ID of the product variant. 
+  
+  DEPRECATED: this field will be removed in Saleor 4.0. Use `lineId` instead.
+  """
+  variantId: ID
+
+  """
+  The number of items purchased. Optional for apps, required for any other users.
+  """
+  quantity: Int
+
+  """
+  Custom price of the item. Can be set only by apps with `HANDLE_CHECKOUTS` permission. When the line with the same variant will be provided multiple times, the last price will be used.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  price: PositiveDecimal
+
+  """
+  ID of the line.
+  
+  Added in Saleor 3.6.
+  """
+  lineId: ID
+}
+
+"""Remove a gift card or a voucher from a checkout."""
+type CheckoutRemovePromoCode {
+  """The checkout with the removed gift card or voucher."""
+  checkout: Checkout
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+}
+
+"""Create a new payment for given checkout."""
+type CheckoutPaymentCreate {
+  """Related checkout object."""
+  checkout: Checkout
+
+  """A newly created payment."""
+  payment: Payment
+  paymentErrors: [PaymentError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PaymentError!]!
+}
+
+input PaymentInput {
+  """A gateway to use with that payment."""
+  gateway: String!
+
+  """
+  Client-side generated payment token, representing customer's billing data in a secure manner.
+  """
+  token: String
+
+  """
+  Total amount of the transaction, including all taxes and discounts. If no amount is provided, the checkout total will be used.
+  """
+  amount: PositiveDecimal
+
+  """
+  URL of a storefront view where user should be redirected after requiring additional actions. Payment with additional actions will not be finished if this field is not provided.
+  """
+  returnUrl: String
+
+  """
+  Payment store type.
+  
+  Added in Saleor 3.1.
+  """
+  storePaymentMethod: StorePaymentMethodEnum = NONE
+
+  """
+  User public metadata.
+  
+  Added in Saleor 3.1.
+  """
+  metadata: [MetadataInput!]
+}
+
+"""Enum representing the type of a payment storage in a gateway."""
+enum StorePaymentMethodEnum {
+  """
+  On session storage type. The payment is stored only to be reused when the customer is present in the checkout flow.
+  """
+  ON_SESSION
+
+  """
+  Off session storage type. The payment is stored to be reused even if the customer is absent.
+  """
+  OFF_SESSION
+
+  """Storage is disabled. The payment is not stored."""
+  NONE
+}
+
+"""Update shipping address in the existing checkout."""
+type CheckoutShippingAddressUpdate {
+  """An updated checkout."""
+  checkout: Checkout
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+}
+
+"""Updates the shipping method of the checkout."""
+type CheckoutShippingMethodUpdate {
+  """An updated checkout."""
+  checkout: Checkout
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+}
+
+"""
+Updates the delivery method (shipping method or pick up point) of the checkout.
+
+Added in Saleor 3.1.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CheckoutDeliveryMethodUpdate {
+  """An updated checkout."""
+  checkout: Checkout
+  errors: [CheckoutError!]!
+}
+
+"""Update language code in the existing checkout."""
+type CheckoutLanguageCodeUpdate {
+  """An updated checkout."""
+  checkout: Checkout
+  checkoutErrors: [CheckoutError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [CheckoutError!]!
+}
+
+"""
+Create new order from existing checkout. Requires the following permissions: AUTHENTICATED_APP and HANDLE_CHECKOUTS.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type OrderCreateFromCheckout {
+  """Placed order."""
+  order: Order
+  errors: [OrderCreateFromCheckoutError!]!
+}
+
+type OrderCreateFromCheckoutError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: OrderCreateFromCheckoutErrorCode!
