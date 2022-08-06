@@ -254,4 +254,88 @@ def test_requestor_is_superuser_for_app(app):
             ProductMediaTypes.VIDEO,
         ),
         (
-            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&ab_channel=Testi
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&ab_channel=TestingChannel",
+            ProductMediaTypes.VIDEO,
+        ),
+        (
+            "https://vimeo.com/148751763",
+            ProductMediaTypes.VIDEO,
+        ),
+        (
+            "https://www.flickr.com/photos/megane_wakui/31740618232/",
+            ProductMediaTypes.IMAGE,
+        ),
+    ],
+)
+def test_get_oembed_data(url, expected_media_type):
+    oembed_data, media_type = get_oembed_data(url, "media_url")
+
+    assert oembed_data is not {}
+    assert media_type == expected_media_type
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://www.streamable.com/8vnouo",
+        "https://www.flickr.com/photos/test/test/",
+        "https://www.youtube.com/embed/v=dQw4w9WgXcQ",
+        "https://vimeo.com/test",
+        "http://onet.pl/",
+    ],
+)
+@patch.object(ProviderRegistry, "request")
+def test_get_oembed_data_unsupported_media_provider(mocked_provider, url):
+    mocked_provider.side_effect = ProviderException()
+    with pytest.raises(
+        ValidationError, match="Unsupported media provider or incorrect URL."
+    ):
+        get_oembed_data(url, "media_url")
+
+
+def test_add_hash_to_file_name(image, media_root):
+    previous_file_name = image._name
+
+    add_hash_to_file_name(image)
+
+    assert previous_file_name != image._name
+    file_name, format = os.path.splitext(image._name)
+    assert image._name.startswith(file_name)
+    assert image._name.endswith(format)
+
+
+def test_external_reference_to_global_id(product):
+    # given
+    product.external_reference = "test-ext-id"
+    product.save(update_fields=["external_reference"])
+    model = product.__class__
+    # when
+    global_id = ext_ref_to_global_id_or_error(model, product.external_reference)
+    # then
+    assert global_id == graphene.Node.to_global_id(model.__name__, product.id)
+
+
+def test_external_reference_to_global_id_non_existing(product):
+    # given
+    product.external_reference = None
+    product.save(update_fields=["external_reference"])
+    non_existing_id = "non-existing-ext-ref"
+    model = product.__class__
+    # when
+    with pytest.raises(ValidationError) as e:
+        ext_ref_to_global_id_or_error(model, non_existing_id)
+    # then
+    assert e.value.messages[0] == f"Couldn't resolve to a node: {non_existing_id}"
+
+
+def test_get_instance_by_both_id_and_external_reference():
+    # given
+    data = {"id": "test-id", "external_reference": "test-ext-id"}
+    # when
+    with pytest.raises(ValidationError) as e:
+        ModelWithExtRefMutation.get_object_id(**data)
+    # then
+    assert (
+        e.value.messages[0]
+        == "Argument 'id' cannot be combined with 'external_reference'"
+    )
