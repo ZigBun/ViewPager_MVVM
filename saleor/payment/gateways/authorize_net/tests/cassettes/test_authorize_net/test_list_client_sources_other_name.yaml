@@ -48,4 +48,10 @@ interactions:
       Strict-Transport-Security:
       - max-age=31536000
       X-Cnection:
-     
+      - close
+      X-OPNET-Transaction-Trace:
+      - a2_0ac565cf-65dd-471f-87e8-1ccb37ba4dc7-21900-10720310
+    status:
+      code: 200
+      message: OK
+version: 1
