@@ -22661,3 +22661,4941 @@ type OrderCreateFromCheckoutError {
 
   """The error code."""
   code: OrderCreateFromCheckoutErrorCode!
+
+  """List of variant IDs which causes the error."""
+  variants: [ID!]
+
+  """List of line Ids which cause the error."""
+  lines: [ID!]
+}
+
+"""An enumeration."""
+enum OrderCreateFromCheckoutErrorCode {
+  GRAPHQL_ERROR
+  CHECKOUT_NOT_FOUND
+  CHANNEL_INACTIVE
+  INSUFFICIENT_STOCK
+  VOUCHER_NOT_APPLICABLE
+  GIFT_CARD_NOT_APPLICABLE
+  TAX_ERROR
+  SHIPPING_METHOD_NOT_SET
+  BILLING_ADDRESS_NOT_SET
+  SHIPPING_ADDRESS_NOT_SET
+  INVALID_SHIPPING_METHOD
+  NO_LINES
+  EMAIL_NOT_SET
+  UNAVAILABLE_VARIANT_IN_CHANNEL
+}
+
+"""
+Creates new channel. 
+
+Requires one of the following permissions: MANAGE_CHANNELS.
+"""
+type ChannelCreate {
+  channelErrors: [ChannelError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ChannelError!]!
+  channel: Channel
+}
+
+type ChannelError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: ChannelErrorCode!
+
+  """List of shipping zone IDs which causes the error."""
+  shippingZones: [ID!]
+
+  """List of warehouses IDs which causes the error."""
+  warehouses: [ID!]
+}
+
+"""An enumeration."""
+enum ChannelErrorCode {
+  ALREADY_EXISTS
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+  CHANNELS_CURRENCY_MUST_BE_THE_SAME
+  CHANNEL_WITH_ORDERS
+  DUPLICATED_INPUT_ITEM
+}
+
+input ChannelCreateInput {
+  """isActive flag."""
+  isActive: Boolean
+
+  """
+  The channel stock settings.
+  
+  Added in Saleor 3.7.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  stockSettings: StockSettingsInput
+
+  """List of shipping zones to assign to the channel."""
+  addShippingZones: [ID!]
+
+  """
+  List of warehouses to assign to the channel.
+  
+  Added in Saleor 3.5.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  addWarehouses: [ID!]
+
+  """
+  The channel order settings
+  
+  Added in Saleor 3.12.
+  """
+  orderSettings: OrderSettingsInput
+
+  """Name of the channel."""
+  name: String!
+
+  """Slug of the channel."""
+  slug: String!
+
+  """Currency of the channel."""
+  currencyCode: String!
+
+  """
+  Default country for the channel. Default country can be used in checkout to determine the stock quantities or calculate taxes when the country was not explicitly provided.
+  
+  Added in Saleor 3.1.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  defaultCountry: CountryCode!
+}
+
+input StockSettingsInput {
+  """
+  Allocation strategy options. Strategy defines the preference of warehouses for allocations and reservations.
+  """
+  allocationStrategy: AllocationStrategyEnum!
+}
+
+input OrderSettingsInput {
+  """
+  When disabled, all new orders from checkout will be marked as unconfirmed. When enabled orders from checkout will become unfulfilled immediately. By default set to True
+  """
+  automaticallyConfirmAllNewOrders: Boolean
+
+  """
+  When enabled, all non-shippable gift card orders will be fulfilled automatically. By defualt set to True.
+  """
+  automaticallyFulfillNonShippableGiftCard: Boolean
+}
+
+"""
+Update a channel.
+
+Requires one of the following permissions: MANAGE_CHANNELS.
+Requires one of the following permissions when updating only orderSettings field: MANAGE_CHANNELS, MANAGE_ORDERS.
+"""
+type ChannelUpdate {
+  channelErrors: [ChannelError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ChannelError!]!
+  channel: Channel
+}
+
+input ChannelUpdateInput {
+  """isActive flag."""
+  isActive: Boolean
+
+  """
+  The channel stock settings.
+  
+  Added in Saleor 3.7.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  stockSettings: StockSettingsInput
+
+  """List of shipping zones to assign to the channel."""
+  addShippingZones: [ID!]
+
+  """
+  List of warehouses to assign to the channel.
+  
+  Added in Saleor 3.5.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  addWarehouses: [ID!]
+
+  """
+  The channel order settings
+  
+  Added in Saleor 3.12.
+  """
+  orderSettings: OrderSettingsInput
+
+  """Name of the channel."""
+  name: String
+
+  """Slug of the channel."""
+  slug: String
+
+  """
+  Default country for the channel. Default country can be used in checkout to determine the stock quantities or calculate taxes when the country was not explicitly provided.
+  
+  Added in Saleor 3.1.
+  """
+  defaultCountry: CountryCode
+
+  """List of shipping zones to unassign from the channel."""
+  removeShippingZones: [ID!]
+
+  """
+  List of warehouses to unassign from the channel.
+  
+  Added in Saleor 3.5.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  removeWarehouses: [ID!]
+}
+
+"""
+Delete a channel. Orders associated with the deleted channel will be moved to the target channel. Checkouts, product availability, and pricing will be removed. 
+
+Requires one of the following permissions: MANAGE_CHANNELS.
+"""
+type ChannelDelete {
+  channelErrors: [ChannelError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ChannelError!]!
+  channel: Channel
+}
+
+input ChannelDeleteInput {
+  """ID of channel to migrate orders from origin channel."""
+  channelId: ID!
+}
+
+"""
+Activate a channel. 
+
+Requires one of the following permissions: MANAGE_CHANNELS.
+"""
+type ChannelActivate {
+  """Activated channel."""
+  channel: Channel
+  channelErrors: [ChannelError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ChannelError!]!
+}
+
+"""
+Deactivate a channel. 
+
+Requires one of the following permissions: MANAGE_CHANNELS.
+"""
+type ChannelDeactivate {
+  """Deactivated channel."""
+  channel: Channel
+  channelErrors: [ChannelError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ChannelError!]!
+}
+
+"""
+Reorder the warehouses of a channel.
+
+Added in Saleor 3.7.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point. 
+
+Requires one of the following permissions: MANAGE_CHANNELS.
+"""
+type ChannelReorderWarehouses {
+  """Channel within the warehouses are reordered."""
+  channel: Channel
+  errors: [ChannelError!]!
+}
+
+"""Creates an attribute."""
+type AttributeCreate {
+  attribute: Attribute
+  attributeErrors: [AttributeError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AttributeError!]!
+}
+
+type AttributeError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: AttributeErrorCode!
+}
+
+"""An enumeration."""
+enum AttributeErrorCode {
+  ALREADY_EXISTS
+  GRAPHQL_ERROR
+  INVALID
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+}
+
+input AttributeCreateInput {
+  """The input type to use for entering attribute values in the dashboard."""
+  inputType: AttributeInputTypeEnum
+
+  """The entity type which can be used as a reference."""
+  entityType: AttributeEntityTypeEnum
+
+  """Name of an attribute displayed in the interface."""
+  name: String!
+
+  """Internal representation of an attribute name."""
+  slug: String
+
+  """The attribute type."""
+  type: AttributeTypeEnum!
+
+  """The unit of attribute values."""
+  unit: MeasurementUnitsEnum
+
+  """List of attribute's values."""
+  values: [AttributeValueCreateInput!]
+
+  """Whether the attribute requires values to be passed or not."""
+  valueRequired: Boolean
+
+  """Whether the attribute is for variants only."""
+  isVariantOnly: Boolean
+
+  """Whether the attribute should be visible or not in storefront."""
+  visibleInStorefront: Boolean
+
+  """
+  Whether the attribute can be filtered in storefront.
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.
+  """
+  filterableInStorefront: Boolean
+
+  """Whether the attribute can be filtered in dashboard."""
+  filterableInDashboard: Boolean
+
+  """
+  The position of the attribute in the storefront navigation (0 by default).
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.
+  """
+  storefrontSearchPosition: Int
+
+  """
+  Whether the attribute can be displayed in the admin product list.
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.
+  """
+  availableInGrid: Boolean
+
+  """
+  External ID of this attribute.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+}
+
+input AttributeValueCreateInput {
+  """
+  Represent value of the attribute value (e.g. color values for swatch attributes).
+  """
+  value: String
+
+  """
+  Represents the text of the attribute value, includes formatting.
+  
+  Rich text format. For reference see https://editorjs.io/
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.The rich text attribute hasn't got predefined value, so can be specified only from instance that supports the given attribute.
+  """
+  richText: JSONString
+
+  """
+  Represents the text of the attribute value, plain text without formating.
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.The plain text attribute hasn't got predefined value, so can be specified only from instance that supports the given attribute.
+  """
+  plainText: String
+
+  """URL of the file attribute. Every time, a new value is created."""
+  fileUrl: String
+
+  """File content type."""
+  contentType: String
+
+  """
+  External ID of this attribute value.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+
+  """Name of a value displayed in the interface."""
+  name: String!
+}
+
+"""
+Deletes an attribute. 
+
+Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+"""
+type AttributeDelete {
+  attributeErrors: [AttributeError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AttributeError!]!
+  attribute: Attribute
+}
+
+"""
+Updates attribute. 
+
+Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+"""
+type AttributeUpdate {
+  attribute: Attribute
+  attributeErrors: [AttributeError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AttributeError!]!
+}
+
+input AttributeUpdateInput {
+  """Name of an attribute displayed in the interface."""
+  name: String
+
+  """Internal representation of an attribute name."""
+  slug: String
+
+  """The unit of attribute values."""
+  unit: MeasurementUnitsEnum
+
+  """IDs of values to be removed from this attribute."""
+  removeValues: [ID!]
+
+  """New values to be created for this attribute."""
+  addValues: [AttributeValueUpdateInput!]
+
+  """Whether the attribute requires values to be passed or not."""
+  valueRequired: Boolean
+
+  """Whether the attribute is for variants only."""
+  isVariantOnly: Boolean
+
+  """Whether the attribute should be visible or not in storefront."""
+  visibleInStorefront: Boolean
+
+  """
+  Whether the attribute can be filtered in storefront.
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.
+  """
+  filterableInStorefront: Boolean
+
+  """Whether the attribute can be filtered in dashboard."""
+  filterableInDashboard: Boolean
+
+  """
+  The position of the attribute in the storefront navigation (0 by default).
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.
+  """
+  storefrontSearchPosition: Int
+
+  """
+  Whether the attribute can be displayed in the admin product list.
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.
+  """
+  availableInGrid: Boolean
+
+  """
+  External ID of this product.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+}
+
+input AttributeValueUpdateInput {
+  """
+  Represent value of the attribute value (e.g. color values for swatch attributes).
+  """
+  value: String
+
+  """
+  Represents the text of the attribute value, includes formatting.
+  
+  Rich text format. For reference see https://editorjs.io/
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.The rich text attribute hasn't got predefined value, so can be specified only from instance that supports the given attribute.
+  """
+  richText: JSONString
+
+  """
+  Represents the text of the attribute value, plain text without formating.
+  
+  DEPRECATED: this field will be removed in Saleor 4.0.The plain text attribute hasn't got predefined value, so can be specified only from instance that supports the given attribute.
+  """
+  plainText: String
+
+  """URL of the file attribute. Every time, a new value is created."""
+  fileUrl: String
+
+  """File content type."""
+  contentType: String
+
+  """
+  External ID of this attribute value.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+
+  """Name of a value displayed in the interface."""
+  name: String
+}
+
+"""
+Creates/updates translations for an attribute. 
+
+Requires one of the following permissions: MANAGE_TRANSLATIONS.
+"""
+type AttributeTranslate {
+  translationErrors: [TranslationError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [TranslationError!]!
+  attribute: Attribute
+}
+
+"""
+Deletes attributes. 
+
+Requires one of the following permissions: MANAGE_PAGE_TYPES_AND_ATTRIBUTES.
+"""
+type AttributeBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  attributeErrors: [AttributeError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AttributeError!]!
+}
+
+"""
+Deletes values of attributes. 
+
+Requires one of the following permissions: MANAGE_PAGE_TYPES_AND_ATTRIBUTES.
+"""
+type AttributeValueBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  attributeErrors: [AttributeError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AttributeError!]!
+}
+
+"""
+Creates a value for an attribute. 
+
+Requires one of the following permissions: MANAGE_PRODUCTS.
+"""
+type AttributeValueCreate {
+  """The updated attribute."""
+  attribute: Attribute
+  attributeErrors: [AttributeError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AttributeError!]!
+  attributeValue: AttributeValue
+}
+
+"""
+Deletes a value of an attribute. 
+
+Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+"""
+type AttributeValueDelete {
+  """The updated attribute."""
+  attribute: Attribute
+  attributeErrors: [AttributeError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AttributeError!]!
+  attributeValue: AttributeValue
+}
+
+"""
+Updates value of an attribute. 
+
+Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+"""
+type AttributeValueUpdate {
+  """The updated attribute."""
+  attribute: Attribute
+  attributeErrors: [AttributeError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AttributeError!]!
+  attributeValue: AttributeValue
+}
+
+"""
+Creates/updates translations for an attribute value. 
+
+Requires one of the following permissions: MANAGE_TRANSLATIONS.
+"""
+type AttributeValueTranslate {
+  translationErrors: [TranslationError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [TranslationError!]!
+  attributeValue: AttributeValue
+}
+
+input AttributeValueTranslationInput {
+  name: String
+
+  """
+  Translated text.
+  
+  Rich text format. For reference see https://editorjs.io/
+  """
+  richText: JSONString
+
+  """Translated text."""
+  plainText: String
+}
+
+"""
+Reorder the values of an attribute. 
+
+Requires one of the following permissions: MANAGE_PRODUCT_TYPES_AND_ATTRIBUTES.
+"""
+type AttributeReorderValues {
+  """Attribute from which values are reordered."""
+  attribute: Attribute
+  attributeErrors: [AttributeError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AttributeError!]!
+}
+
+"""
+Creates a new app. Requires the following permissions: AUTHENTICATED_STAFF_USER and MANAGE_APPS.
+"""
+type AppCreate {
+  """The newly created authentication token."""
+  authToken: String
+  appErrors: [AppError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AppError!]!
+  app: App
+}
+
+type AppError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: AppErrorCode!
+
+  """List of permissions which causes the error."""
+  permissions: [PermissionEnum!]
+}
+
+"""An enumeration."""
+enum AppErrorCode {
+  FORBIDDEN
+  GRAPHQL_ERROR
+  INVALID
+  INVALID_STATUS
+  INVALID_PERMISSION
+  INVALID_URL_FORMAT
+  INVALID_MANIFEST_FORMAT
+  INVALID_CUSTOM_HEADERS
+  MANIFEST_URL_CANT_CONNECT
+  NOT_FOUND
+  REQUIRED
+  UNIQUE
+  OUT_OF_SCOPE_APP
+  OUT_OF_SCOPE_PERMISSION
+}
+
+input AppInput {
+  """Name of the app."""
+  name: String
+
+  """List of permission code names to assign to this app."""
+  permissions: [PermissionEnum!]
+}
+
+"""
+Updates an existing app. 
+
+Requires one of the following permissions: MANAGE_APPS.
+"""
+type AppUpdate {
+  appErrors: [AppError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AppError!]!
+  app: App
+}
+
+"""
+Deletes an app. 
+
+Requires one of the following permissions: MANAGE_APPS.
+"""
+type AppDelete {
+  appErrors: [AppError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AppError!]!
+  app: App
+}
+
+"""
+Creates a new token. 
+
+Requires one of the following permissions: MANAGE_APPS.
+"""
+type AppTokenCreate {
+  """The newly created authentication token."""
+  authToken: String
+  appErrors: [AppError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AppError!]!
+  appToken: AppToken
+}
+
+input AppTokenInput {
+  """Name of the token."""
+  name: String
+
+  """ID of app."""
+  app: ID!
+}
+
+"""
+Deletes an authentication token assigned to app. 
+
+Requires one of the following permissions: MANAGE_APPS.
+"""
+type AppTokenDelete {
+  appErrors: [AppError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AppError!]!
+  appToken: AppToken
+}
+
+"""Verify provided app token."""
+type AppTokenVerify {
+  """Determine if token is valid or not."""
+  valid: Boolean!
+  appErrors: [AppError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AppError!]!
+}
+
+"""
+Install new app by using app manifest. Requires the following permissions: AUTHENTICATED_STAFF_USER and MANAGE_APPS.
+"""
+type AppInstall {
+  appErrors: [AppError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AppError!]!
+  appInstallation: AppInstallation
+}
+
+input AppInstallInput {
+  """Name of the app to install."""
+  appName: String
+
+  """Url to app's manifest in JSON format."""
+  manifestUrl: String
+
+  """Determine if app will be set active or not."""
+  activateAfterInstallation: Boolean = true
+
+  """List of permission code names to assign to this app."""
+  permissions: [PermissionEnum!]
+}
+
+"""
+Retry failed installation of new app. 
+
+Requires one of the following permissions: MANAGE_APPS.
+"""
+type AppRetryInstall {
+  appErrors: [AppError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AppError!]!
+  appInstallation: AppInstallation
+}
+
+"""
+Delete failed installation. 
+
+Requires one of the following permissions: MANAGE_APPS.
+"""
+type AppDeleteFailedInstallation {
+  appErrors: [AppError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AppError!]!
+  appInstallation: AppInstallation
+}
+
+"""
+Fetch and validate manifest. 
+
+Requires one of the following permissions: MANAGE_APPS.
+"""
+type AppFetchManifest {
+  manifest: Manifest
+  appErrors: [AppError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AppError!]!
+}
+
+"""The manifest definition."""
+type Manifest {
+  identifier: String!
+  version: String!
+  name: String!
+  about: String
+  permissions: [Permission!]
+  appUrl: String
+
+  """URL to iframe with the configuration for the app."""
+  configurationUrl: String @deprecated(reason: "This field will be removed in Saleor 4.0. Use `appUrl` instead.")
+  tokenTargetUrl: String
+
+  """Description of the data privacy defined for this app."""
+  dataPrivacy: String @deprecated(reason: "This field will be removed in Saleor 4.0. Use `dataPrivacyUrl` instead.")
+  dataPrivacyUrl: String
+  homepageUrl: String
+  supportUrl: String
+  extensions: [AppManifestExtension!]!
+
+  """
+  List of the app's webhooks.
+  
+  Added in Saleor 3.5.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  webhooks: [AppManifestWebhook!]!
+
+  """
+  The audience that will be included in all JWT tokens for the app.
+  
+  Added in Saleor 3.8.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  audience: String
+}
+
+type AppManifestExtension {
+  """List of the app extension's permissions."""
+  permissions: [Permission!]!
+
+  """Label of the extension to show in the dashboard."""
+  label: String!
+
+  """URL of a view where extension's iframe is placed."""
+  url: String!
+
+  """Place where given extension will be mounted."""
+  mount: AppExtensionMountEnum!
+
+  """Type of way how app extension will be opened."""
+  target: AppExtensionTargetEnum!
+}
+
+type AppManifestWebhook {
+  """The name of the webhook."""
+  name: String!
+
+  """The asynchronous events that webhook wants to subscribe."""
+  asyncEvents: [WebhookEventTypeAsyncEnum!]
+
+  """The synchronous events that webhook wants to subscribe."""
+  syncEvents: [WebhookEventTypeSyncEnum!]
+
+  """Subscription query of a webhook"""
+  query: String!
+
+  """The url to receive the payload."""
+  targetUrl: String!
+}
+
+"""
+Activate the app. 
+
+Requires one of the following permissions: MANAGE_APPS.
+"""
+type AppActivate {
+  appErrors: [AppError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AppError!]!
+  app: App
+}
+
+"""
+Deactivate the app. 
+
+Requires one of the following permissions: MANAGE_APPS.
+"""
+type AppDeactivate {
+  appErrors: [AppError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AppError!]!
+  app: App
+}
+
+"""Create JWT token."""
+type CreateToken {
+  """JWT token, required to authenticate."""
+  token: String
+
+  """JWT refresh token, required to re-generate access token."""
+  refreshToken: String
+
+  """CSRF token required to re-generate access token."""
+  csrfToken: String
+
+  """A user instance."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+type AccountError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: AccountErrorCode!
+
+  """A type of address that causes the error."""
+  addressType: AddressTypeEnum
+}
+
+"""An enumeration."""
+enum AccountErrorCode {
+  ACTIVATE_OWN_ACCOUNT
+  ACTIVATE_SUPERUSER_ACCOUNT
+  DUPLICATED_INPUT_ITEM
+  DEACTIVATE_OWN_ACCOUNT
+  DEACTIVATE_SUPERUSER_ACCOUNT
+  DELETE_NON_STAFF_USER
+  DELETE_OWN_ACCOUNT
+  DELETE_STAFF_ACCOUNT
+  DELETE_SUPERUSER_ACCOUNT
+  GRAPHQL_ERROR
+  INACTIVE
+  INVALID
+  INVALID_PASSWORD
+  LEFT_NOT_MANAGEABLE_PERMISSION
+  INVALID_CREDENTIALS
+  NOT_FOUND
+  OUT_OF_SCOPE_USER
+  OUT_OF_SCOPE_GROUP
+  OUT_OF_SCOPE_PERMISSION
+  PASSWORD_ENTIRELY_NUMERIC
+  PASSWORD_TOO_COMMON
+  PASSWORD_TOO_SHORT
+  PASSWORD_TOO_SIMILAR
+  REQUIRED
+  UNIQUE
+  JWT_SIGNATURE_EXPIRED
+  JWT_INVALID_TOKEN
+  JWT_DECODE_ERROR
+  JWT_MISSING_TOKEN
+  JWT_INVALID_CSRF_TOKEN
+  CHANNEL_INACTIVE
+  MISSING_CHANNEL_SLUG
+  ACCOUNT_NOT_CONFIRMED
+}
+
+"""
+Refresh JWT token. Mutation tries to take refreshToken from the input.If it fails it will try to take refreshToken from the http-only cookie -refreshToken. csrfToken is required when refreshToken is provided as a cookie.
+"""
+type RefreshToken {
+  """JWT token, required to authenticate."""
+  token: String
+
+  """A user instance."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""Verify JWT token."""
+type VerifyToken {
+  """User assigned to token."""
+  user: User
+
+  """Determine if token is valid or not."""
+  isValid: Boolean!
+
+  """JWT payload."""
+  payload: GenericScalar
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""
+The `GenericScalar` scalar type represents a generic
+GraphQL scalar value that could be:
+String, Boolean, Int, Float, List or Object.
+"""
+scalar GenericScalar
+
+"""
+Deactivate all JWT tokens of the currently authenticated user. 
+
+Requires one of the following permissions: AUTHENTICATED_USER.
+"""
+type DeactivateAllUserTokens {
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""Prepare external authentication url for user by custom plugin."""
+type ExternalAuthenticationUrl {
+  """The data returned by authentication plugin."""
+  authenticationData: JSONString
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""Obtain external access tokens for user by custom plugin."""
+type ExternalObtainAccessTokens {
+  """The token, required to authenticate."""
+  token: String
+
+  """The refresh token, required to re-generate external access token."""
+  refreshToken: String
+
+  """CSRF token required to re-generate external access token."""
+  csrfToken: String
+
+  """A user instance."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""Refresh user's access by custom plugin."""
+type ExternalRefresh {
+  """The token, required to authenticate."""
+  token: String
+
+  """The refresh token, required to re-generate external access token."""
+  refreshToken: String
+
+  """CSRF token required to re-generate external access token."""
+  csrfToken: String
+
+  """A user instance."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""Logout user by custom plugin."""
+type ExternalLogout {
+  """The data returned by authentication plugin."""
+  logoutData: JSONString
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""Verify external authentication data by plugin."""
+type ExternalVerify {
+  """User assigned to data."""
+  user: User
+
+  """Determine if authentication data is valid or not."""
+  isValid: Boolean!
+
+  """External data."""
+  verifyData: JSONString
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""Sends an email with the account password modification link."""
+type RequestPasswordReset {
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""Confirm user account with token sent by email during registration."""
+type ConfirmAccount {
+  """An activated user account."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""
+Sets the user's password from the token sent by email using the RequestPasswordReset mutation.
+"""
+type SetPassword {
+  """JWT token, required to authenticate."""
+  token: String
+
+  """JWT refresh token, required to re-generate access token."""
+  refreshToken: String
+
+  """CSRF token required to re-generate access token."""
+  csrfToken: String
+
+  """A user instance."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""
+Change the password of the logged in user. 
+
+Requires one of the following permissions: AUTHENTICATED_USER.
+"""
+type PasswordChange {
+  """A user instance with a new password."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""
+Request email change of the logged in user. 
+
+Requires one of the following permissions: AUTHENTICATED_USER.
+"""
+type RequestEmailChange {
+  """A user instance."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""
+Confirm the email change of the logged-in user. 
+
+Requires one of the following permissions: AUTHENTICATED_USER.
+"""
+type ConfirmEmailChange {
+  """A user instance with a new email."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""
+Create a new address for the customer. 
+
+Requires one of the following permissions: AUTHENTICATED_USER.
+"""
+type AccountAddressCreate {
+  """A user instance for which the address was created."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+  address: Address
+}
+
+"""
+Updates an address of the logged-in user. Requires one of the following permissions: MANAGE_USERS, IS_OWNER.
+"""
+type AccountAddressUpdate {
+  """A user object for which the address was edited."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+  address: Address
+}
+
+"""
+Delete an address of the logged-in user. Requires one of the following permissions: MANAGE_USERS, IS_OWNER.
+"""
+type AccountAddressDelete {
+  """A user instance for which the address was deleted."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+  address: Address
+}
+
+"""
+Sets a default address for the authenticated user. 
+
+Requires one of the following permissions: AUTHENTICATED_USER.
+"""
+type AccountSetDefaultAddress {
+  """An updated user instance."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""Register a new user."""
+type AccountRegister {
+  """Informs whether users need to confirm their email address."""
+  requiresConfirmation: Boolean
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+  user: User
+}
+
+input AccountRegisterInput {
+  """Given name."""
+  firstName: String
+
+  """Family name."""
+  lastName: String
+
+  """User language code."""
+  languageCode: LanguageCodeEnum
+
+  """The email address of the user."""
+  email: String!
+
+  """Password."""
+  password: String!
+
+  """Base of frontend URL that will be needed to create confirmation URL."""
+  redirectUrl: String
+
+  """User public metadata."""
+  metadata: [MetadataInput!]
+
+  """
+  Slug of a channel which will be used to notify users. Optional when only one channel exists.
+  """
+  channel: String
+}
+
+"""
+Updates the account of the logged-in user. 
+
+Requires one of the following permissions: AUTHENTICATED_USER.
+"""
+type AccountUpdate {
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+  user: User
+}
+
+input AccountInput {
+  """Given name."""
+  firstName: String
+
+  """Family name."""
+  lastName: String
+
+  """User language code."""
+  languageCode: LanguageCodeEnum
+
+  """Billing address of the customer."""
+  defaultBillingAddress: AddressInput
+
+  """Shipping address of the customer."""
+  defaultShippingAddress: AddressInput
+}
+
+"""
+Sends an email with the account removal link for the logged-in user. 
+
+Requires one of the following permissions: AUTHENTICATED_USER.
+"""
+type AccountRequestDeletion {
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""
+Remove user account. 
+
+Requires one of the following permissions: AUTHENTICATED_USER.
+"""
+type AccountDelete {
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+  user: User
+}
+
+"""
+Creates user address. 
+
+Requires one of the following permissions: MANAGE_USERS.
+"""
+type AddressCreate {
+  """A user instance for which the address was created."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+  address: Address
+}
+
+"""
+Updates an address. 
+
+Requires one of the following permissions: MANAGE_USERS.
+"""
+type AddressUpdate {
+  """A user object for which the address was edited."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+  address: Address
+}
+
+"""
+Deletes an address. 
+
+Requires one of the following permissions: MANAGE_USERS.
+"""
+type AddressDelete {
+  """A user instance for which the address was deleted."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+  address: Address
+}
+
+"""
+Sets a default address for the given user. 
+
+Requires one of the following permissions: MANAGE_USERS.
+"""
+type AddressSetDefault {
+  """An updated user instance."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""
+Creates a new customer. 
+
+Requires one of the following permissions: MANAGE_USERS.
+"""
+type CustomerCreate {
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+  user: User
+}
+
+input UserCreateInput {
+  """Billing address of the customer."""
+  defaultBillingAddress: AddressInput
+
+  """Shipping address of the customer."""
+  defaultShippingAddress: AddressInput
+
+  """Given name."""
+  firstName: String
+
+  """Family name."""
+  lastName: String
+
+  """The unique email address of the user."""
+  email: String
+
+  """User account is active."""
+  isActive: Boolean
+
+  """A note about the user."""
+  note: String
+
+  """User language code."""
+  languageCode: LanguageCodeEnum
+
+  """
+  External ID of the customer.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+
+  """
+  URL of a view where users should be redirected to set the password. URL in RFC 1808 format.
+  """
+  redirectUrl: String
+
+  """
+  Slug of a channel which will be used for notify user. Optional when only one channel exists.
+  """
+  channel: String
+}
+
+"""
+Updates an existing customer. 
+
+Requires one of the following permissions: MANAGE_USERS.
+"""
+type CustomerUpdate {
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+  user: User
+}
+
+input CustomerInput {
+  """Billing address of the customer."""
+  defaultBillingAddress: AddressInput
+
+  """Shipping address of the customer."""
+  defaultShippingAddress: AddressInput
+
+  """Given name."""
+  firstName: String
+
+  """Family name."""
+  lastName: String
+
+  """The unique email address of the user."""
+  email: String
+
+  """User account is active."""
+  isActive: Boolean
+
+  """A note about the user."""
+  note: String
+
+  """User language code."""
+  languageCode: LanguageCodeEnum
+
+  """
+  External ID of the customer.
+  
+  Added in Saleor 3.10.
+  """
+  externalReference: String
+}
+
+"""
+Deletes a customer. 
+
+Requires one of the following permissions: MANAGE_USERS.
+"""
+type CustomerDelete {
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+  user: User
+}
+
+"""
+Deletes customers. 
+
+Requires one of the following permissions: MANAGE_USERS.
+"""
+type CustomerBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""
+Creates a new staff user. Apps are not allowed to perform this mutation. 
+
+Requires one of the following permissions: MANAGE_STAFF.
+"""
+type StaffCreate {
+  staffErrors: [StaffError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [StaffError!]!
+  user: User
+}
+
+type StaffError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: AccountErrorCode!
+
+  """A type of address that causes the error."""
+  addressType: AddressTypeEnum
+
+  """List of permissions which causes the error."""
+  permissions: [PermissionEnum!]
+
+  """List of permission group IDs which cause the error."""
+  groups: [ID!]
+
+  """List of user IDs which causes the error."""
+  users: [ID!]
+}
+
+input StaffCreateInput {
+  """Given name."""
+  firstName: String
+
+  """Family name."""
+  lastName: String
+
+  """The unique email address of the user."""
+  email: String
+
+  """User account is active."""
+  isActive: Boolean
+
+  """A note about the user."""
+  note: String
+
+  """List of permission group IDs to which user should be assigned."""
+  addGroups: [ID!]
+
+  """
+  URL of a view where users should be redirected to set the password. URL in RFC 1808 format.
+  """
+  redirectUrl: String
+}
+
+"""
+Updates an existing staff user. Apps are not allowed to perform this mutation. 
+
+Requires one of the following permissions: MANAGE_STAFF.
+"""
+type StaffUpdate {
+  staffErrors: [StaffError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [StaffError!]!
+  user: User
+}
+
+input StaffUpdateInput {
+  """Given name."""
+  firstName: String
+
+  """Family name."""
+  lastName: String
+
+  """The unique email address of the user."""
+  email: String
+
+  """User account is active."""
+  isActive: Boolean
+
+  """A note about the user."""
+  note: String
+
+  """List of permission group IDs to which user should be assigned."""
+  addGroups: [ID!]
+
+  """List of permission group IDs from which user should be unassigned."""
+  removeGroups: [ID!]
+}
+
+"""
+Deletes a staff user. Apps are not allowed to perform this mutation. 
+
+Requires one of the following permissions: MANAGE_STAFF.
+"""
+type StaffDelete {
+  staffErrors: [StaffError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [StaffError!]!
+  user: User
+}
+
+"""
+Deletes staff users. Apps are not allowed to perform this mutation. 
+
+Requires one of the following permissions: MANAGE_STAFF.
+"""
+type StaffBulkDelete {
+  """Returns how many objects were affected."""
+  count: Int!
+  staffErrors: [StaffError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [StaffError!]!
+}
+
+"""
+Create a user avatar. Only for staff members. This mutation must be sent as a `multipart` request. More detailed specs of the upload format can be found here: https://github.com/jaydenseric/graphql-multipart-request-spec 
+
+Requires one of the following permissions: AUTHENTICATED_STAFF_USER.
+"""
+type UserAvatarUpdate {
+  """An updated user instance."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""
+Deletes a user avatar. Only for staff members. 
+
+Requires one of the following permissions: AUTHENTICATED_STAFF_USER.
+"""
+type UserAvatarDelete {
+  """An updated user instance."""
+  user: User
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""
+Activate or deactivate users. 
+
+Requires one of the following permissions: MANAGE_USERS.
+"""
+type UserBulkSetActive {
+  """Returns how many objects were affected."""
+  count: Int!
+  accountErrors: [AccountError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [AccountError!]!
+}
+
+"""
+Create new permission group. Apps are not allowed to perform this mutation. 
+
+Requires one of the following permissions: MANAGE_STAFF.
+"""
+type PermissionGroupCreate {
+  permissionGroupErrors: [PermissionGroupError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PermissionGroupError!]!
+  group: Group
+}
+
+type PermissionGroupError {
+  """
+  Name of a field that caused the error. A value of `null` indicates that the error isn't associated with a particular field.
+  """
+  field: String
+
+  """The error message."""
+  message: String
+
+  """The error code."""
+  code: PermissionGroupErrorCode!
+
+  """List of permissions which causes the error."""
+  permissions: [PermissionEnum!]
+
+  """List of user IDs which causes the error."""
+  users: [ID!]
+}
+
+"""An enumeration."""
+enum PermissionGroupErrorCode {
+  ASSIGN_NON_STAFF_MEMBER
+  DUPLICATED_INPUT_ITEM
+  CANNOT_REMOVE_FROM_LAST_GROUP
+  LEFT_NOT_MANAGEABLE_PERMISSION
+  OUT_OF_SCOPE_PERMISSION
+  OUT_OF_SCOPE_USER
+  REQUIRED
+  UNIQUE
+}
+
+input PermissionGroupCreateInput {
+  """List of permission code names to assign to this group."""
+  addPermissions: [PermissionEnum!]
+
+  """List of users to assign to this group."""
+  addUsers: [ID!]
+
+  """Group name."""
+  name: String!
+}
+
+"""
+Update permission group. Apps are not allowed to perform this mutation. 
+
+Requires one of the following permissions: MANAGE_STAFF.
+"""
+type PermissionGroupUpdate {
+  permissionGroupErrors: [PermissionGroupError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PermissionGroupError!]!
+  group: Group
+}
+
+input PermissionGroupUpdateInput {
+  """List of permission code names to assign to this group."""
+  addPermissions: [PermissionEnum!]
+
+  """List of users to assign to this group."""
+  addUsers: [ID!]
+
+  """Group name."""
+  name: String
+
+  """List of permission code names to unassign from this group."""
+  removePermissions: [PermissionEnum!]
+
+  """List of users to unassign from this group."""
+  removeUsers: [ID!]
+}
+
+"""
+Delete permission group. Apps are not allowed to perform this mutation. 
+
+Requires one of the following permissions: MANAGE_STAFF.
+"""
+type PermissionGroupDelete {
+  permissionGroupErrors: [PermissionGroupError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [PermissionGroupError!]!
+  group: Group
+}
+
+type Subscription {
+  """
+  Look up subscription event.
+  
+  Added in Saleor 3.2.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  event: Event
+}
+
+interface Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+}
+
+union IssuingPrincipal = App | User
+
+"""An enumeration."""
+enum DistanceUnitsEnum {
+  CM
+  M
+  KM
+  FT
+  YD
+  INCH
+}
+
+"""An enumeration."""
+enum AreaUnitsEnum {
+  SQ_CM
+  SQ_M
+  SQ_KM
+  SQ_FT
+  SQ_YD
+  SQ_INCH
+}
+
+"""An enumeration."""
+enum VolumeUnitsEnum {
+  CUBIC_MILLIMETER
+  CUBIC_CENTIMETER
+  CUBIC_DECIMETER
+  CUBIC_METER
+  LITER
+  CUBIC_FOOT
+  CUBIC_INCH
+  CUBIC_YARD
+  QT
+  PINT
+  FL_OZ
+  ACRE_IN
+  ACRE_FT
+}
+
+"""
+Event sent when new address is created.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type AddressCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The address the event relates to."""
+  address: Address
+}
+
+"""
+Event sent when address is updated.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type AddressUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The address the event relates to."""
+  address: Address
+}
+
+"""
+Event sent when address is deleted.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type AddressDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The address the event relates to."""
+  address: Address
+}
+
+"""
+Event sent when new app is installed.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type AppInstalled implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The application the event relates to."""
+  app: App
+}
+
+"""
+Event sent when app is updated.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type AppUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The application the event relates to."""
+  app: App
+}
+
+"""
+Event sent when app is deleted.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type AppDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The application the event relates to."""
+  app: App
+}
+
+"""
+Event sent when app status has changed.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type AppStatusChanged implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The application the event relates to."""
+  app: App
+}
+
+"""
+Event sent when new attribute is created.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type AttributeCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The attribute the event relates to."""
+  attribute: Attribute
+}
+
+"""
+Event sent when attribute is updated.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type AttributeUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The attribute the event relates to."""
+  attribute: Attribute
+}
+
+"""
+Event sent when attribute is deleted.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type AttributeDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The attribute the event relates to."""
+  attribute: Attribute
+}
+
+"""
+Event sent when new attribute value is created.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type AttributeValueCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The attribute value the event relates to."""
+  attributeValue: AttributeValue
+}
+
+"""
+Event sent when attribute value is updated.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type AttributeValueUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The attribute value the event relates to."""
+  attributeValue: AttributeValue
+}
+
+"""
+Event sent when attribute value is deleted.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type AttributeValueDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The attribute value the event relates to."""
+  attributeValue: AttributeValue
+}
+
+"""
+Event sent when new category is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CategoryCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The category the event relates to."""
+  category: Category
+}
+
+"""
+Event sent when category is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CategoryUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The category the event relates to."""
+  category: Category
+}
+
+"""
+Event sent when category is deleted.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CategoryDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The category the event relates to."""
+  category: Category
+}
+
+"""
+Event sent when new channel is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ChannelCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The channel the event relates to."""
+  channel: Channel
+}
+
+"""
+Event sent when channel is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ChannelUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The channel the event relates to."""
+  channel: Channel
+}
+
+"""
+Event sent when channel is deleted.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ChannelDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The channel the event relates to."""
+  channel: Channel
+}
+
+"""
+Event sent when channel status has changed.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ChannelStatusChanged implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The channel the event relates to."""
+  channel: Channel
+}
+
+"""
+Event sent when new gift card is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type GiftCardCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The gift card the event relates to."""
+  giftCard: GiftCard
+}
+
+"""
+Event sent when gift card is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type GiftCardUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The gift card the event relates to."""
+  giftCard: GiftCard
+}
+
+"""
+Event sent when gift card is deleted.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type GiftCardDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The gift card the event relates to."""
+  giftCard: GiftCard
+}
+
+"""
+Event sent when gift card status has changed.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type GiftCardStatusChanged implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The gift card the event relates to."""
+  giftCard: GiftCard
+}
+
+"""
+Event sent when gift card metadata is updated.
+
+Added in Saleor 3.8.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type GiftCardMetadataUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The gift card the event relates to."""
+  giftCard: GiftCard
+}
+
+"""
+Event sent when new menu is created.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type MenuCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The menu the event relates to."""
+  menu(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Menu
+}
+
+"""
+Event sent when menu is updated.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type MenuUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The menu the event relates to."""
+  menu(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Menu
+}
+
+"""
+Event sent when menu is deleted.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type MenuDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The menu the event relates to."""
+  menu(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Menu
+}
+
+"""
+Event sent when new menu item is created.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type MenuItemCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The menu item the event relates to."""
+  menuItem(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): MenuItem
+}
+
+"""
+Event sent when menu item is updated.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type MenuItemUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The menu item the event relates to."""
+  menuItem(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): MenuItem
+}
+
+"""
+Event sent when menu item is deleted.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type MenuItemDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The menu item the event relates to."""
+  menuItem(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): MenuItem
+}
+
+"""
+Event sent when new order is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type OrderCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The order the event relates to."""
+  order: Order
+}
+
+"""
+Event sent when order is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type OrderUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The order the event relates to."""
+  order: Order
+}
+
+"""
+Event sent when order is confirmed.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type OrderConfirmed implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The order the event relates to."""
+  order: Order
+}
+
+"""
+Event sent when order is fully paid.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type OrderFullyPaid implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The order the event relates to."""
+  order: Order
+}
+
+"""
+Event sent when order is fulfilled.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type OrderFulfilled implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The order the event relates to."""
+  order: Order
+}
+
+"""
+Event sent when order is canceled.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type OrderCancelled implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The order the event relates to."""
+  order: Order
+}
+
+"""
+Event sent when order metadata is updated.
+
+Added in Saleor 3.8.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type OrderMetadataUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The order the event relates to."""
+  order: Order
+}
+
+"""
+Event sent when new draft order is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type DraftOrderCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The order the event relates to."""
+  order: Order
+}
+
+"""
+Event sent when draft order is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type DraftOrderUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The order the event relates to."""
+  order: Order
+}
+
+"""
+Event sent when draft order is deleted.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type DraftOrderDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The order the event relates to."""
+  order: Order
+}
+
+"""
+Event sent when new product is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ProductCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product the event relates to."""
+  product(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Product
+
+  """The category of the product."""
+  category: Category
+}
+
+"""
+Event sent when product is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ProductUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product the event relates to."""
+  product(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Product
+
+  """The category of the product."""
+  category: Category
+}
+
+"""
+Event sent when product is deleted.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ProductDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product the event relates to."""
+  product(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Product
+
+  """The category of the product."""
+  category: Category
+}
+
+"""
+Event sent when product metadata is updated.
+
+Added in Saleor 3.8.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ProductMetadataUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product the event relates to."""
+  product(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Product
+
+  """The category of the product."""
+  category: Category
+}
+
+"""
+Event sent when new product media is created.
+
+Added in Saleor 3.12.
+"""
+type ProductMediaCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product media the event relates to."""
+  productMedia: ProductMedia
+}
+
+"""
+Event sent when product media is updated.
+
+Added in Saleor 3.12.
+"""
+type ProductMediaUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product media the event relates to."""
+  productMedia: ProductMedia
+}
+
+"""
+Event sent when product media is deleted.
+
+Added in Saleor 3.12.
+"""
+type ProductMediaDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product media the event relates to."""
+  productMedia: ProductMedia
+}
+
+"""
+Event sent when new product variant is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ProductVariantCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product variant the event relates to."""
+  productVariant(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ProductVariant
+}
+
+"""
+Event sent when product variant is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ProductVariantUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product variant the event relates to."""
+  productVariant(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ProductVariant
+}
+
+"""
+Event sent when product variant is out of stock.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ProductVariantOutOfStock implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product variant the event relates to."""
+  productVariant(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ProductVariant
+
+  """Look up a warehouse."""
+  warehouse: Warehouse
+}
+
+"""
+Event sent when product variant is back in stock.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ProductVariantBackInStock implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product variant the event relates to."""
+  productVariant(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ProductVariant
+
+  """Look up a warehouse."""
+  warehouse: Warehouse
+}
+
+"""
+Event sent when product variant stock is updated.
+
+Added in Saleor 3.11.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ProductVariantStockUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product variant the event relates to."""
+  productVariant(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ProductVariant
+
+  """Look up a warehouse."""
+  warehouse: Warehouse
+}
+
+"""
+Event sent when product variant is deleted.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ProductVariantDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product variant the event relates to."""
+  productVariant(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ProductVariant
+}
+
+"""
+Event sent when product variant metadata is updated.
+
+Added in Saleor 3.8.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ProductVariantMetadataUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The product variant the event relates to."""
+  productVariant(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ProductVariant
+}
+
+"""
+Event sent when new sale is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type SaleCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The sale the event relates to."""
+  sale(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Sale
+}
+
+"""
+Event sent when sale is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type SaleUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The sale the event relates to."""
+  sale(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Sale
+}
+
+"""
+Event sent when sale is deleted.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type SaleDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The sale the event relates to."""
+  sale(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Sale
+}
+
+"""
+The event informs about the start or end of the sale.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type SaleToggle implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """
+  The sale the event relates to.
+  
+  Added in Saleor 3.5.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  sale(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Sale
+}
+
+"""
+Event sent when invoice is requested.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type InvoiceRequested implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The invoice the event relates to."""
+  invoice: Invoice
+
+  """
+  Order related to the invoice.
+  
+  Added in Saleor 3.10.
+  """
+  order: Order!
+}
+
+"""
+Event sent when invoice is deleted.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type InvoiceDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The invoice the event relates to."""
+  invoice: Invoice
+
+  """
+  Order related to the invoice.
+  
+  Added in Saleor 3.10.
+  """
+  order: Order
+}
+
+"""
+Event sent when invoice is sent.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type InvoiceSent implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The invoice the event relates to."""
+  invoice: Invoice
+
+  """
+  Order related to the invoice.
+  
+  Added in Saleor 3.10.
+  """
+  order: Order
+}
+
+"""
+Event sent when new fulfillment is created.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type FulfillmentCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The fulfillment the event relates to."""
+  fulfillment: Fulfillment
+
+  """The order the fulfillment belongs to."""
+  order: Order
+}
+
+"""
+Event sent when fulfillment is canceled.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type FulfillmentCanceled implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The fulfillment the event relates to."""
+  fulfillment: Fulfillment
+
+  """The order the fulfillment belongs to."""
+  order: Order
+}
+
+"""
+Event sent when fulfillment is approved.
+
+Added in Saleor 3.7.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type FulfillmentApproved implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The fulfillment the event relates to."""
+  fulfillment: Fulfillment
+
+  """The order the fulfillment belongs to."""
+  order: Order
+}
+
+"""
+Event sent when fulfillment metadata is updated.
+
+Added in Saleor 3.8.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type FulfillmentMetadataUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The fulfillment the event relates to."""
+  fulfillment: Fulfillment
+
+  """The order the fulfillment belongs to."""
+  order: Order
+}
+
+"""
+Event sent when new customer user is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CustomerCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The user the event relates to."""
+  user: User
+}
+
+"""
+Event sent when customer user is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CustomerUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The user the event relates to."""
+  user: User
+}
+
+"""
+Event sent when customer user metadata is updated.
+
+Added in Saleor 3.8.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CustomerMetadataUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The user the event relates to."""
+  user: User
+}
+
+"""
+Event sent when new collection is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CollectionCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The collection the event relates to."""
+  collection(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Collection
+}
+
+"""
+Event sent when collection is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CollectionUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The collection the event relates to."""
+  collection(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Collection
+}
+
+"""
+Event sent when collection is deleted.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CollectionDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The collection the event relates to."""
+  collection(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Collection
+}
+
+"""
+Event sent when collection metadata is updated.
+
+Added in Saleor 3.8.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CollectionMetadataUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The collection the event relates to."""
+  collection(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Collection
+}
+
+"""
+Event sent when new checkout is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CheckoutCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The checkout the event relates to."""
+  checkout: Checkout
+}
+
+"""
+Event sent when checkout is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CheckoutUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The checkout the event relates to."""
+  checkout: Checkout
+}
+
+"""
+Event sent when checkout metadata is updated.
+
+Added in Saleor 3.8.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CheckoutMetadataUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The checkout the event relates to."""
+  checkout: Checkout
+}
+
+"""
+Event sent when new page is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PageCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The page the event relates to."""
+  page: Page
+}
+
+"""
+Event sent when page is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PageUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The page the event relates to."""
+  page: Page
+}
+
+"""
+Event sent when page is deleted.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PageDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The page the event relates to."""
+  page: Page
+}
+
+"""
+Event sent when new page type is created.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PageTypeCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The page type the event relates to."""
+  pageType: PageType
+}
+
+"""
+Event sent when page type is updated.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PageTypeUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The page type the event relates to."""
+  pageType: PageType
+}
+
+"""
+Event sent when page type is deleted.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PageTypeDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The page type the event relates to."""
+  pageType: PageType
+}
+
+"""
+Event sent when new permission group is created.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PermissionGroupCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The permission group the event relates to."""
+  permissionGroup: Group
+}
+
+"""
+Event sent when permission group is updated.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PermissionGroupUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The permission group the event relates to."""
+  permissionGroup: Group
+}
+
+"""
+Event sent when permission group is deleted.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PermissionGroupDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The permission group the event relates to."""
+  permissionGroup: Group
+}
+
+"""
+Event sent when new shipping price is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ShippingPriceCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The shipping method the event relates to."""
+  shippingMethod(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ShippingMethodType
+
+  """The shipping zone the shipping method belongs to."""
+  shippingZone(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ShippingZone
+}
+
+"""
+Event sent when shipping price is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ShippingPriceUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The shipping method the event relates to."""
+  shippingMethod(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ShippingMethodType
+
+  """The shipping zone the shipping method belongs to."""
+  shippingZone(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ShippingZone
+}
+
+"""
+Event sent when shipping price is deleted.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ShippingPriceDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The shipping method the event relates to."""
+  shippingMethod(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ShippingMethodType
+
+  """The shipping zone the shipping method belongs to."""
+  shippingZone(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ShippingZone
+}
+
+"""
+Event sent when new shipping zone is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ShippingZoneCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The shipping zone the event relates to."""
+  shippingZone(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ShippingZone
+}
+
+"""
+Event sent when shipping zone is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ShippingZoneUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The shipping zone the event relates to."""
+  shippingZone(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ShippingZone
+}
+
+"""
+Event sent when shipping zone is deleted.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ShippingZoneDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The shipping zone the event relates to."""
+  shippingZone(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ShippingZone
+}
+
+"""
+Event sent when shipping zone metadata is updated.
+
+Added in Saleor 3.8.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ShippingZoneMetadataUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The shipping zone the event relates to."""
+  shippingZone(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): ShippingZone
+}
+
+"""
+Event sent when new staff user is created.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type StaffCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The user the event relates to."""
+  user: User
+}
+
+"""
+Event sent when staff user is updated.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type StaffUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The user the event relates to."""
+  user: User
+}
+
+"""
+Event sent when staff user is deleted.
+
+Added in Saleor 3.5.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type StaffDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The user the event relates to."""
+  user: User
+}
+
+"""
+Event sent when transaction action is requested.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type TransactionActionRequest implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """
+  Look up a transaction.
+  
+  Added in Saleor 3.4.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  transaction: TransactionItem
+
+  """
+  Requested action data.
+  
+  Added in Saleor 3.4.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  action: TransactionAction!
+}
+
+type TransactionAction {
+  """Determines the action type."""
+  actionType: TransactionActionEnum!
+
+  """Transaction request amount. Null when action type is VOID."""
+  amount: PositiveDecimal
+}
+
+"""
+Event sent when transaction item metadata is updated.
+
+Added in Saleor 3.8.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type TransactionItemMetadataUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """
+  Look up a transaction.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  transaction: TransactionItem
+}
+
+"""
+Event sent when new translation is created.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type TranslationCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The translation the event relates to."""
+  translation: TranslationTypes
+}
+
+union TranslationTypes = ProductTranslation | CollectionTranslation | CategoryTranslation | AttributeTranslation | AttributeValueTranslation | ProductVariantTranslation | PageTranslation | ShippingMethodTranslation | SaleTranslation | VoucherTranslation | MenuItemTranslation
+
+"""
+Event sent when translation is updated.
+
+Added in Saleor 3.2.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type TranslationUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The translation the event relates to."""
+  translation: TranslationTypes
+}
+
+"""
+Event sent when new voucher is created.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type VoucherCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The voucher the event relates to."""
+  voucher(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Voucher
+}
+
+"""
+Event sent when voucher is updated.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type VoucherUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The voucher the event relates to."""
+  voucher(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Voucher
+}
+
+"""
+Event sent when voucher is deleted.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type VoucherDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The voucher the event relates to."""
+  voucher(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Voucher
+}
+
+"""
+Event sent when voucher metadata is updated.
+
+Added in Saleor 3.8.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type VoucherMetadataUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The voucher the event relates to."""
+  voucher(
+    """Slug of a channel for which the data should be returned."""
+    channel: String
+  ): Voucher
+}
+
+"""
+Event sent when new warehouse is created.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type WarehouseCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The warehouse the event relates to."""
+  warehouse: Warehouse
+}
+
+"""
+Event sent when warehouse is updated.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type WarehouseUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The warehouse the event relates to."""
+  warehouse: Warehouse
+}
+
+"""
+Event sent when warehouse is deleted.
+
+Added in Saleor 3.4.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type WarehouseDeleted implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The warehouse the event relates to."""
+  warehouse: Warehouse
+}
+
+"""
+Event sent when warehouse metadata is updated.
+
+Added in Saleor 3.8.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type WarehouseMetadataUpdated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The warehouse the event relates to."""
+  warehouse: Warehouse
+}
+
+"""
+Event sent when thumbnail is created.
+
+Added in Saleor 3.12.
+"""
+type ThumbnailCreated implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """
+  Thumbnail id.
+  
+  Added in Saleor 3.12.
+  """
+  id: ID
+
+  """
+  Thumbnail url.
+  
+  Added in Saleor 3.12.
+  """
+  url: String
+
+  """
+  Object the thumbnail refers to.
+  
+  Added in Saleor 3.12.
+  """
+  objectId: ID
+
+  """
+  Original media url.
+  
+  Added in Saleor 3.12.
+  """
+  mediaUrl: String
+}
+
+"""
+Authorize payment.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PaymentAuthorize implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """Look up a payment."""
+  payment: Payment
+}
+
+"""
+Capture payment.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PaymentCaptureEvent implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """Look up a payment."""
+  payment: Payment
+}
+
+"""
+Refund payment.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PaymentRefundEvent implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """Look up a payment."""
+  payment: Payment
+}
+
+"""
+Void payment.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PaymentVoidEvent implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """Look up a payment."""
+  payment: Payment
+}
+
+"""
+Confirm payment.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PaymentConfirmEvent implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """Look up a payment."""
+  payment: Payment
+}
+
+"""
+Process payment.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PaymentProcessEvent implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """Look up a payment."""
+  payment: Payment
+}
+
+"""
+List payment gateways.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type PaymentListGateways implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The checkout the event relates to."""
+  checkout: Checkout
+}
+
+"""
+Filter shipping methods for order.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type OrderFilterShippingMethods implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The order the event relates to."""
+  order: Order
+
+  """
+  Shipping methods that can be used with this checkout.
+  
+  Added in Saleor 3.6.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  shippingMethods: [ShippingMethod!]
+}
+
+"""
+Filter shipping methods for checkout.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CheckoutFilterShippingMethods implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The checkout the event relates to."""
+  checkout: Checkout
+
+  """
+  Shipping methods that can be used with this checkout.
+  
+  Added in Saleor 3.6.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  shippingMethods: [ShippingMethod!]
+}
+
+"""
+List shipping methods for checkout.
+
+Added in Saleor 3.6.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type ShippingListMethodsForCheckout implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+
+  """The checkout the event relates to."""
+  checkout: Checkout
+
+  """
+  Shipping methods that can be used with this checkout.
+  
+  Added in Saleor 3.6.
+  
+  Note: this API is currently in Feature Preview and can be subject to changes at later point.
+  """
+  shippingMethods: [ShippingMethod!]
+}
+
+"""
+Synchronous webhook for calculating checkout/order taxes.
+
+Added in Saleor 3.7.
+
+Note: this API is currently in Feature Preview and can be subject to changes at later point.
+"""
+type CalculateTaxes implements Event {
+  """Time of the event."""
+  issuedAt: DateTime
+
+  """Saleor version that triggered the event."""
+  version: String
+
+  """The user or application that triggered the event."""
+  issuingPrincipal: IssuingPrincipal
+
+  """The application receiving the webhook."""
+  recipient: App
+  taxBase: TaxableObject!
+}
+
+"""Taxable object."""
+type TaxableObject {
+  """The source object related to this tax object."""
+  sourceObject: TaxSourceObject!
+
+  """Determines if prices contain entered tax.."""
+  pricesEnteredWithTax: Boolean!
+
+  """The currency of the object."""
+  currency: String!
+
+  """The price of shipping method."""
+  shippingPrice: Money!
+
+  """The address data."""
+  address: Address
+
+  """List of discounts."""
+  discounts: [TaxableObjectDiscount!]!
+
+  """List of lines assigned to the object."""
+  lines: [TaxableObjectLine!]!
+  channel: Channel!
+}
+
+"""Taxable object discount."""
+type TaxableObjectDiscount {
+  """The name of the discount."""
+  name: String
+
+  """The amount of the discount."""
+  amount: Money!
+}
+
+type TaxableObjectLine {
+  """The source line related to this tax line."""
+  sourceLine: TaxSourceLine!
+
+  """Number of items."""
+  quantity: Int!
+
+  """Determines if taxes are being charged for the product."""
+  chargeTaxes: Boolean!
+
+  """The product name."""
+  productName: String!
+
+  """The variant name."""
+  variantName: String!
+
+  """The product sku."""
+  productSku: String
+
+  """Price of the single item in the order line."""
+  unitPrice: Money!
+
+  """Price of the order line."""
+  totalPrice: Money!
+}
+
+union TaxSourceLine = CheckoutLine | OrderLine
+
+"""_Any value scalar as defined by Federation spec."""
+scalar _Any
+
+"""_Entity union as defined by Federation spec."""
+union _Entity = App | Address | User | Group | ProductVariant | Product | ProductType | ProductMedia | Category | Collection | PageType
+
+"""_Service manifest as defined by Federation spec."""
+type _Service {
+  sdl: String
+}
