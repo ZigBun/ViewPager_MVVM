@@ -624,4 +624,229 @@ def test_create_variant_with_page_reference_attribute(
             "product": product_id,
             "sku": sku,
             "stocks": stocks,
-            "attributes": [{"i
+            "attributes": [{"id": ref_attr_id, "references": [page_ref_1, page_ref_2]}],
+            "trackInventory": True,
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)["data"]["productVariantCreate"]
+    flush_post_commit_hooks()
+
+    assert not content["errors"]
+    data = content["productVariant"]
+    assert data["sku"] == sku
+    variant_id = data["id"]
+    _, variant_pk = graphene.Node.from_global_id(variant_id)
+    assert (
+        data["attributes"][0]["attribute"]["slug"]
+        == product_type_page_reference_attribute.slug
+    )
+    expected_values = [
+        {
+            "slug": f"{variant_pk}_{page_list[0].pk}",
+            "file": None,
+            "richText": None,
+            "plainText": None,
+            "reference": page_ref_1,
+            "name": page_list[0].title,
+            "boolean": None,
+            "date": None,
+            "dateTime": None,
+        },
+        {
+            "slug": f"{variant_pk}_{page_list[1].pk}",
+            "file": None,
+            "richText": None,
+            "plainText": None,
+            "reference": page_ref_2,
+            "name": page_list[1].title,
+            "boolean": None,
+            "date": None,
+            "dateTime": None,
+        },
+    ]
+    for value in expected_values:
+        assert value in data["attributes"][0]["values"]
+    assert len(data["stocks"]) == 1
+    assert data["stocks"][0]["quantity"] == stocks[0]["quantity"]
+    assert data["stocks"][0]["warehouse"]["slug"] == warehouse.slug
+
+    product_type_page_reference_attribute.refresh_from_db()
+    assert product_type_page_reference_attribute.values.count() == values_count + 2
+
+    created_webhook_mock.assert_called_once_with(product.variants.last())
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_updated")
+@patch("saleor.plugins.manager.PluginsManager.product_variant_created")
+def test_create_variant_with_page_reference_attribute_no_references_given(
+    created_webhook_mock,
+    updated_webhook_mock,
+    staff_api_client,
+    product,
+    product_type,
+    product_type_page_reference_attribute,
+    permission_manage_products,
+    warehouse,
+    site_settings,
+):
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    sku = "1"
+
+    product_type_page_reference_attribute.value_required = True
+    product_type_page_reference_attribute.save(update_fields=["value_required"])
+
+    product_type.variant_attributes.clear()
+    product_type.variant_attributes.add(product_type_page_reference_attribute)
+    ref_attr_id = graphene.Node.to_global_id(
+        "Attribute", product_type_page_reference_attribute.id
+    )
+    file_url = f"http://{site_settings.site.domain}{settings.MEDIA_URL}test.jpg"
+
+    values_count = product_type_page_reference_attribute.values.count()
+
+    stocks = [
+        {
+            "warehouse": graphene.Node.to_global_id("Warehouse", warehouse.pk),
+            "quantity": 20,
+        }
+    ]
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "sku": sku,
+            "stocks": stocks,
+            "attributes": [{"id": ref_attr_id, "file": file_url}],
+            "trackInventory": True,
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)["data"]["productVariantCreate"]
+    flush_post_commit_hooks()
+    errors = content["errors"]
+    data = content["productVariant"]
+
+    assert not data
+    assert len(errors) == 1
+    assert errors[0]["code"] == ProductErrorCode.REQUIRED.name
+    assert errors[0]["field"] == "attributes"
+    assert errors[0]["attributes"] == [ref_attr_id]
+
+    product_type_page_reference_attribute.refresh_from_db()
+    assert product_type_page_reference_attribute.values.count() == values_count
+
+    created_webhook_mock.assert_not_called()
+    updated_webhook_mock.assert_not_called()
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_created")
+def test_create_variant_with_product_reference_attribute(
+    created_webhook_mock,
+    staff_api_client,
+    product,
+    product_type,
+    product_type_product_reference_attribute,
+    product_list,
+    permission_manage_products,
+    warehouse,
+):
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    sku = "1"
+
+    product_type_product_reference_attribute.value_required = True
+    product_type_product_reference_attribute.save(update_fields=["value_required"])
+
+    product_type.variant_attributes.clear()
+    product_type.variant_attributes.add(product_type_product_reference_attribute)
+    ref_attr_id = graphene.Node.to_global_id(
+        "Attribute", product_type_product_reference_attribute.id
+    )
+
+    product_ref_1 = graphene.Node.to_global_id("Product", product_list[0].pk)
+    product_ref_2 = graphene.Node.to_global_id("Product", product_list[1].pk)
+
+    values_count = product_type_product_reference_attribute.values.count()
+
+    stocks = [
+        {
+            "warehouse": graphene.Node.to_global_id("Warehouse", warehouse.pk),
+            "quantity": 20,
+        }
+    ]
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "sku": sku,
+            "stocks": stocks,
+            "attributes": [
+                {"id": ref_attr_id, "references": [product_ref_1, product_ref_2]}
+            ],
+            "trackInventory": True,
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)["data"]["productVariantCreate"]
+    flush_post_commit_hooks()
+
+    assert not content["errors"]
+    data = content["productVariant"]
+    assert data["sku"] == sku
+    variant_id = data["id"]
+    _, variant_pk = graphene.Node.from_global_id(variant_id)
+    assert (
+        data["attributes"][0]["attribute"]["slug"]
+        == product_type_product_reference_attribute.slug
+    )
+    expected_values = [
+        {
+            "slug": f"{variant_pk}_{product_list[0].pk}",
+            "file": None,
+            "richText": None,
+            "plainText": None,
+            "reference": product_ref_1,
+            "name": product_list[0].name,
+            "boolean": None,
+            "date": None,
+            "dateTime": None,
+        },
+        {
+            "slug": f"{variant_pk}_{product_list[1].pk}",
+            "file": None,
+            "richText": None,
+            "plainText": None,
+            "reference": product_ref_2,
+            "name": product_list[1].name,
+            "boolean": None,
+            "date": None,
+            "dateTime": None,
+        },
+    ]
+    for value in expected_values:
+        assert value in data["attributes"][0]["values"]
+    assert len(data["stocks"]) == 1
+    assert data["stocks"][0]["quantity"] == stocks[0]["quantity"]
+    assert data["stocks"][0]["warehouse"]["slug"] == warehouse.slug
+
+    product_type_product_reference_attribute.refresh_from_db()
+    assert product_type_product_reference_attribute.values.count() == values_count + 2
+
+    created_webhook_mock.assert_called_once_with(product.variants.last())
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_updated")
+@patch("saleor.plugins.manager.PluginsManager.product_variant_created")
+def test_create_variant_with_product_reference_attribute_no_references_given(
+    created_webhook_mock,
+    updated_webhook_mock,
+    staff_api_client,
+    produc
