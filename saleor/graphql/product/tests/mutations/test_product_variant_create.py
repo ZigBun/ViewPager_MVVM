@@ -380,4 +380,248 @@ def test_create_variant_with_file_attribute(
     assert data["attributes"][0]["values"][0]["name"] == existing_value.name
     assert data["weight"]["unit"] == WeightUnitsEnum.KG.name
     assert data["weight"]["value"] == weight
-    
+    assert len(data["stocks"]) == 1
+    assert data["stocks"][0]["quantity"] == stocks[0]["quantity"]
+    assert data["stocks"][0]["warehouse"]["slug"] == warehouse.slug
+
+    file_attribute.refresh_from_db()
+    assert file_attribute.values.count() == values_count + 1
+
+    created_webhook_mock.assert_called_once_with(product.variants.last())
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_created")
+def test_create_variant_with_boolean_attribute(
+    created_webhook_mock,
+    permission_manage_products,
+    product,
+    product_type,
+    staff_api_client,
+    boolean_attribute,
+    size_attribute,
+    warehouse,
+):
+    product_type.variant_attributes.add(
+        boolean_attribute, through_defaults={"variant_selection": True}
+    )
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    boolean_attr_id = graphene.Node.to_global_id("Attribute", boolean_attribute.id)
+    size_attr_id = graphene.Node.to_global_id("Attribute", size_attribute.pk)
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "sku": "1",
+            "stocks": [
+                {
+                    "warehouse": graphene.Node.to_global_id("Warehouse", warehouse.pk),
+                    "quantity": 20,
+                }
+            ],
+            "weight": 10.22,
+            "attributes": [
+                {"id": boolean_attr_id, "boolean": True},
+                {"id": size_attr_id, "values": ["XXXL"]},
+            ],
+            "trackInventory": True,
+        }
+    }
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)["data"]["productVariantCreate"]
+    flush_post_commit_hooks()
+    data = content["productVariant"]
+
+    assert not content["errors"]
+    assert data["name"] == "Boolean: Yes / XXXL"
+    expected_attribute_data = {
+        "attribute": {"slug": "boolean"},
+        "values": [
+            {
+                "name": "Boolean: Yes",
+                "slug": f"{boolean_attribute.id}_true",
+                "reference": None,
+                "richText": None,
+                "plainText": None,
+                "boolean": True,
+                "file": None,
+                "dateTime": None,
+                "date": None,
+            }
+        ],
+    }
+
+    assert expected_attribute_data in data["attributes"]
+    created_webhook_mock.assert_called_once_with(product.variants.last())
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_created")
+def test_create_variant_with_file_attribute_new_value(
+    created_webhook_mock,
+    staff_api_client,
+    product,
+    product_type,
+    file_attribute,
+    permission_manage_products,
+    warehouse,
+    site_settings,
+):
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    sku = "1"
+    weight = 10.22
+
+    product_type.variant_attributes.clear()
+    product_type.variant_attributes.add(file_attribute)
+    file_attr_id = graphene.Node.to_global_id("Attribute", file_attribute.id)
+    new_value = "new_value.txt"
+    file_url = f"http://{site_settings.site.domain}{settings.MEDIA_URL}{new_value}"
+
+    values_count = file_attribute.values.count()
+
+    stocks = [
+        {
+            "warehouse": graphene.Node.to_global_id("Warehouse", warehouse.pk),
+            "quantity": 20,
+        }
+    ]
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "sku": sku,
+            "stocks": stocks,
+            "weight": weight,
+            "attributes": [{"id": file_attr_id, "file": file_url}],
+            "trackInventory": True,
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)["data"]["productVariantCreate"]
+    flush_post_commit_hooks()
+
+    assert not content["errors"]
+    data = content["productVariant"]
+    assert data["name"] == sku
+    assert data["sku"] == sku
+    assert data["attributes"][0]["attribute"]["slug"] == file_attribute.slug
+    assert data["attributes"][0]["values"][0]["slug"] == slugify(new_value)
+    assert data["weight"]["unit"] == WeightUnitsEnum.KG.name
+    assert data["weight"]["value"] == weight
+    assert len(data["stocks"]) == 1
+    assert data["stocks"][0]["quantity"] == stocks[0]["quantity"]
+    assert data["stocks"][0]["warehouse"]["slug"] == warehouse.slug
+
+    file_attribute.refresh_from_db()
+    assert file_attribute.values.count() == values_count + 1
+
+    created_webhook_mock.assert_called_once_with(product.variants.last())
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_created")
+def test_create_variant_with_file_attribute_no_file_url_given(
+    created_webhook_mock,
+    staff_api_client,
+    product,
+    product_type,
+    file_attribute,
+    permission_manage_products,
+    warehouse,
+):
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    sku = "1"
+    weight = 10.22
+
+    product_type.variant_attributes.clear()
+    product_type.variant_attributes.add(file_attribute)
+    file_attr_id = graphene.Node.to_global_id("Attribute", file_attribute.id)
+
+    values_count = file_attribute.values.count()
+
+    stocks = [
+        {
+            "warehouse": graphene.Node.to_global_id("Warehouse", warehouse.pk),
+            "quantity": 20,
+        }
+    ]
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "sku": sku,
+            "stocks": stocks,
+            "weight": weight,
+            "attributes": [{"id": file_attr_id}],
+            "trackInventory": True,
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)["data"]["productVariantCreate"]
+    flush_post_commit_hooks()
+
+    errors = content["errors"]
+    data = content["productVariant"]
+    assert not errors
+    assert data["name"] == sku
+    assert data["sku"] == sku
+    assert data["attributes"][0]["attribute"]["slug"] == file_attribute.slug
+    assert len(data["attributes"][0]["values"]) == 0
+    assert data["weight"]["unit"] == WeightUnitsEnum.KG.name
+    assert data["weight"]["value"] == weight
+    assert len(data["stocks"]) == 1
+    assert data["stocks"][0]["quantity"] == stocks[0]["quantity"]
+    assert data["stocks"][0]["warehouse"]["slug"] == warehouse.slug
+
+    file_attribute.refresh_from_db()
+    assert file_attribute.values.count() == values_count
+
+    created_webhook_mock.assert_called_once_with(product.variants.last())
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_created")
+def test_create_variant_with_page_reference_attribute(
+    created_webhook_mock,
+    staff_api_client,
+    product,
+    product_type,
+    product_type_page_reference_attribute,
+    page_list,
+    permission_manage_products,
+    warehouse,
+):
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    sku = "1"
+
+    product_type.variant_attributes.clear()
+    product_type.variant_attributes.add(product_type_page_reference_attribute)
+    ref_attr_id = graphene.Node.to_global_id(
+        "Attribute", product_type_page_reference_attribute.id
+    )
+
+    page_ref_1 = graphene.Node.to_global_id("Page", page_list[0].pk)
+    page_ref_2 = graphene.Node.to_global_id("Page", page_list[1].pk)
+
+    values_count = product_type_page_reference_attribute.values.count()
+
+    stocks = [
+        {
+            "warehouse": graphene.Node.to_global_id("Warehouse", warehouse.pk),
+            "quantity": 20,
+        }
+    ]
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "sku": sku,
+            "stocks": stocks,
+            "attributes": [{"i
