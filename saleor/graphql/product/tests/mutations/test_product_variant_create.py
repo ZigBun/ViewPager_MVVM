@@ -1558,4 +1558,238 @@ def test_create_variant_with_date_attribute(
     }
 
     response = staff_api_client.post_graphql(
-        query, variables, p
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)["data"]["productVariantCreate"]
+    flush_post_commit_hooks()
+    data = content["productVariant"]
+    variant = product.variants.last()
+    expected_attributes_data = {
+        "attribute": {"slug": "release-date"},
+        "values": [
+            {
+                "boolean": None,
+                "file": None,
+                "reference": None,
+                "richText": None,
+                "plainText": None,
+                "dateTime": None,
+                "date": str(date_value),
+                "name": str(date_value),
+                "slug": f"{variant.id}_{date_attribute.id}",
+            }
+        ],
+    }
+
+    assert not content["errors"]
+    assert data["sku"] == sku
+    assert expected_attributes_data in data["attributes"]
+
+    created_webhook_mock.assert_called_once_with(variant)
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_created")
+@freeze_time(datetime(2020, 5, 5, 5, 5, 5, tzinfo=pytz.utc))
+def test_create_variant_with_date_time_attribute(
+    created_webhook_mock,
+    permission_manage_products,
+    product,
+    product_type,
+    staff_api_client,
+    date_time_attribute,
+    warehouse,
+):
+    product_type.variant_attributes.add(date_time_attribute)
+
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    sku = "1"
+    weight = 10.22
+    date_time_attribute_id = graphene.Node.to_global_id(
+        "Attribute", date_time_attribute.id
+    )
+    date_time_value = datetime.now(tz=pytz.utc)
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "sku": sku,
+            "weight": weight,
+            "attributes": [
+                {"id": date_time_attribute_id, "dateTime": date_time_value},
+            ],
+        }
+    }
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)["data"]["productVariantCreate"]
+    flush_post_commit_hooks()
+    data = content["productVariant"]
+    variant = product.variants.last()
+    expected_attributes_data = {
+        "attribute": {"slug": "release-date-time"},
+        "values": [
+            {
+                "boolean": None,
+                "file": None,
+                "reference": None,
+                "richText": None,
+                "plainText": None,
+                "dateTime": date_time_value.isoformat(),
+                "date": None,
+                "name": str(date_time_value),
+                "slug": f"{variant.id}_{date_time_attribute.id}",
+            }
+        ],
+    }
+
+    assert not content["errors"]
+    assert data["sku"] == sku
+    assert expected_attributes_data in data["attributes"]
+
+    created_webhook_mock.assert_called_once_with(variant)
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_created")
+@patch("saleor.plugins.manager.PluginsManager.product_variant_updated")
+def test_create_variant_with_empty_string_for_sku(
+    updated_webhook_mock,
+    created_webhook_mock,
+    staff_api_client,
+    product,
+    product_type,
+    permission_manage_products,
+    warehouse,
+):
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    sku = ""
+    weight = 10.22
+    variant_slug = product_type.variant_attributes.first().slug
+    attribute_id = graphene.Node.to_global_id(
+        "Attribute", product_type.variant_attributes.first().pk
+    )
+    variant_value = "test-value"
+    stocks = [
+        {
+            "warehouse": graphene.Node.to_global_id("Warehouse", warehouse.pk),
+            "quantity": 20,
+        }
+    ]
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "sku": sku,
+            "stocks": stocks,
+            "weight": weight,
+            "attributes": [{"id": attribute_id, "values": [variant_value]}],
+            "trackInventory": True,
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)["data"]["productVariantCreate"]
+    flush_post_commit_hooks()
+
+    assert not content["errors"]
+    data = content["productVariant"]
+    assert data["name"] == variant_value
+    assert data["sku"] is None
+    assert data["attributes"][0]["attribute"]["slug"] == variant_slug
+    assert data["attributes"][0]["values"][0]["slug"] == variant_value
+    assert data["weight"]["unit"] == WeightUnitsEnum.KG.name
+    assert data["weight"]["value"] == weight
+    assert len(data["stocks"]) == 1
+    assert data["stocks"][0]["quantity"] == stocks[0]["quantity"]
+    assert data["stocks"][0]["warehouse"]["slug"] == warehouse.slug
+    created_webhook_mock.assert_called_once_with(product.variants.last())
+    updated_webhook_mock.assert_not_called()
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_created")
+@patch("saleor.plugins.manager.PluginsManager.product_variant_updated")
+def test_create_variant_without_sku(
+    updated_webhook_mock,
+    created_webhook_mock,
+    staff_api_client,
+    product,
+    product_type,
+    permission_manage_products,
+    warehouse,
+):
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    weight = 10.22
+    variant_slug = product_type.variant_attributes.first().slug
+    attribute_id = graphene.Node.to_global_id(
+        "Attribute", product_type.variant_attributes.first().pk
+    )
+    variant_value = "test-value"
+    stocks = [
+        {
+            "warehouse": graphene.Node.to_global_id("Warehouse", warehouse.pk),
+            "quantity": 20,
+        }
+    ]
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "stocks": stocks,
+            "weight": weight,
+            "attributes": [{"id": attribute_id, "values": [variant_value]}],
+            "trackInventory": True,
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)["data"]["productVariantCreate"]
+    flush_post_commit_hooks()
+
+    assert not content["errors"]
+    data = content["productVariant"]
+    assert data["name"] == variant_value
+    assert data["sku"] is None
+    assert data["attributes"][0]["attribute"]["slug"] == variant_slug
+    assert data["attributes"][0]["values"][0]["slug"] == variant_value
+    assert data["weight"]["unit"] == WeightUnitsEnum.KG.name
+    assert data["weight"]["value"] == weight
+    assert len(data["stocks"]) == 1
+    assert data["stocks"][0]["quantity"] == stocks[0]["quantity"]
+    assert data["stocks"][0]["warehouse"]["slug"] == warehouse.slug
+    created_webhook_mock.assert_called_once_with(product.variants.last())
+    updated_webhook_mock.assert_not_called()
+
+
+VARIANT_CREATE_MUTATION = """
+    mutation variantCreate($input: ProductVariantCreateInput!) {
+        productVariantCreate (input: $input)
+        {
+            productVariant {
+                id
+            }
+            errors {
+                field,
+                message,
+                code,
+                attributes
+            }
+        }
+    }
+"""
+
+
+def test_variant_create_product_without_variant_attributes(
+    product_with_product_attributes, staff_api_client, permission_manage_products
+):
+    product = product_with_product_attributes
+
+    prod_id = graphene.Node.to_global_id("Product", product.pk)
+    attr_id = graphene.Node.to_global_id(
+        "Attribute", product.product_type.product_attributes.first().pk
+    )
