@@ -1079,4 +1079,237 @@ def test_create_variant_with_variant_reference_attribute_no_references_given(
     assert errors[0]["attributes"] == [ref_attr_id]
 
     product_type_variant_reference_attribute.refresh_from_db()
-    assert product_type_variant_reference_attribute.
+    assert product_type_variant_reference_attribute.values.count() == values_count
+
+    created_webhook_mock.assert_not_called()
+    updated_webhook_mock.assert_not_called()
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_created")
+def test_create_variant_with_numeric_attribute(
+    created_webhook_mock,
+    staff_api_client,
+    product,
+    product_type,
+    permission_manage_products,
+    warehouse,
+    numeric_attribute,
+):
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    sku = "1"
+    weight = 10.22
+    product_type.variant_attributes.set([numeric_attribute])
+    variant_slug = numeric_attribute.slug
+    attribute_id = graphene.Node.to_global_id("Attribute", numeric_attribute.pk)
+    variant_value = "22.31"
+    stocks = [
+        {
+            "warehouse": graphene.Node.to_global_id("Warehouse", warehouse.pk),
+            "quantity": 20,
+        }
+    ]
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "sku": sku,
+            "stocks": stocks,
+            "weight": weight,
+            "attributes": [{"id": attribute_id, "values": [variant_value]}],
+            "trackInventory": True,
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)["data"]["productVariantCreate"]
+    assert not content["errors"]
+    data = content["productVariant"]
+    variant_pk = graphene.Node.from_global_id(data["id"])[1]
+    assert data["name"] == sku
+    assert data["sku"] == sku
+    assert data["attributes"][0]["attribute"]["slug"] == variant_slug
+    assert (
+        data["attributes"][0]["values"][0]["slug"]
+        == f"{variant_pk}_{numeric_attribute.pk}"
+    )
+    assert data["weight"]["unit"] == WeightUnitsEnum.KG.name
+    assert data["weight"]["value"] == weight
+    assert len(data["stocks"]) == 1
+    assert data["stocks"][0]["quantity"] == stocks[0]["quantity"]
+    assert data["stocks"][0]["warehouse"]["slug"] == warehouse.slug
+    created_webhook_mock.assert_called_once_with(product.variants.last())
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_updated")
+def test_create_variant_with_numeric_attribute_not_numeric_value_given(
+    updated_webhook_mock,
+    staff_api_client,
+    product,
+    product_type,
+    permission_manage_products,
+    warehouse,
+    numeric_attribute,
+):
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    sku = "1"
+    weight = 10.22
+    product_type.variant_attributes.set([numeric_attribute])
+    attribute_id = graphene.Node.to_global_id("Attribute", numeric_attribute.pk)
+    variant_value = "abd"
+    stocks = [
+        {
+            "warehouse": graphene.Node.to_global_id("Warehouse", warehouse.pk),
+            "quantity": 20,
+        }
+    ]
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "sku": sku,
+            "stocks": stocks,
+            "weight": weight,
+            "attributes": [{"id": attribute_id, "values": [variant_value]}],
+            "trackInventory": True,
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["productVariantCreate"]
+    error = data["errors"][0]
+    assert not data["productVariant"]
+    assert error["field"] == "attributes"
+    assert error["code"] == ProductErrorCode.INVALID.name
+
+    updated_webhook_mock.assert_not_called()
+
+
+def test_create_product_variant_with_negative_weight(
+    staff_api_client, product, product_type, permission_manage_products
+):
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+
+    attribute_id = graphene.Node.to_global_id(
+        "Attribute", product_type.variant_attributes.first().pk
+    )
+    variant_value = "test-value"
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "weight": -1,
+            "attributes": [{"id": attribute_id, "values": [variant_value]}],
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["productVariantCreate"]
+    error = data["errors"][0]
+    assert error["field"] == "weight"
+    assert error["code"] == ProductErrorCode.INVALID.name
+
+
+def test_create_product_variant_required_without_attributes(
+    staff_api_client, product, permission_manage_products
+):
+    # given
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+
+    attribute = product.product_type.variant_attributes.first()
+    attribute.value_required = True
+    attribute.save(update_fields=["value_required"])
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "sku": "test-sku",
+            "attributes": [],
+        }
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["productVariantCreate"]
+    error = data["errors"][0]
+
+    assert error["field"] == "attributes"
+    assert error["code"] == ProductErrorCode.REQUIRED.name
+
+
+def test_create_product_variant_missing_required_attributes(
+    staff_api_client, product, product_type, color_attribute, permission_manage_products
+):
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    sku = "1"
+    attribute_id = graphene.Node.to_global_id(
+        "Attribute", product_type.variant_attributes.first().pk
+    )
+    variant_value = "test-value"
+
+    color_attribute.value_required = True
+    color_attribute.save(update_fields=["value_required"])
+
+    product_type.variant_attributes.add(
+        color_attribute, through_defaults={"variant_selection": True}
+    )
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "sku": sku,
+            "attributes": [{"id": attribute_id, "values": [variant_value]}],
+        }
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    assert content["data"]["productVariantCreate"]["errors"]
+    assert content["data"]["productVariantCreate"]["errors"][0] == {
+        "field": "attributes",
+        "code": ProductErrorCode.REQUIRED.name,
+        "message": ANY,
+        "attributes": [graphene.Node.to_global_id("Attribute", color_attribute.pk)],
+    }
+    assert not product.variants.filter(sku=sku).exists()
+
+
+def test_create_product_variant_duplicated_attributes(
+    staff_api_client,
+    product_with_variant_with_two_attributes,
+    color_attribute,
+    size_attribute,
+    permission_manage_products,
+):
+    query = CREATE_VARIANT_MUTATION
+    product = product_with_variant_with_two_attributes
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    color_attribute_id = graphene.Node.to_global_id("Attribute", color_attribute.id)
+    size_attribute_id = graphene.Node.to_global_id("Attribute", size_attribute.id)
+    sku = str(uuid4())[:12]
+    variables = {
+        "input": {
+            "product": product_id,
+            "sku": sku,
+            "attributes": [
+                {"id": color_attribute_id, "values": ["red"]},
+                {"id": size_attribute_id, "values": ["small"]},
+            ],
+        }
+    }
+    response = staff_api_client.po
