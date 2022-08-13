@@ -1793,3 +1793,94 @@ def test_variant_create_product_without_variant_attributes(
     attr_id = graphene.Node.to_global_id(
         "Attribute", product.product_type.product_attributes.first().pk
     )
+    input = {
+        "sku": "my-sku",
+        "product": prod_id,
+        "attributes": [{"id": attr_id, "values": ["1"]}],
+    }
+    response = staff_api_client.post_graphql(
+        VARIANT_CREATE_MUTATION,
+        variables={"input": input},
+        permissions=[permission_manage_products],
+    )
+    content = get_graphql_content(response)
+
+    errors = content["data"]["productVariantCreate"]["errors"]
+    assert errors
+    assert errors[0]["code"] == ProductErrorCode.ATTRIBUTE_CANNOT_BE_ASSIGNED.name
+    assert len(errors[0]["attributes"]) == 1
+    assert errors[0]["attributes"][0] == attr_id
+
+
+def test_variant_create_product_with_variant_attributes_variant_flag_false(
+    product_with_variant_attributes, staff_api_client, permission_manage_products
+):
+    product = product_with_variant_attributes
+
+    product_type = product.product_type
+    product_type.has_variants = False
+    product_type.save()
+
+    prod_id = graphene.Node.to_global_id("Product", product.pk)
+    attr_id = graphene.Node.to_global_id(
+        "Attribute", product.product_type.variant_attributes.first().pk
+    )
+
+    input = {
+        "sku": "my-sku",
+        "product": prod_id,
+        "attributes": [{"id": attr_id, "values": ["1"]}],
+    }
+    response = staff_api_client.post_graphql(
+        VARIANT_CREATE_MUTATION,
+        variables={"input": input},
+        permissions=[permission_manage_products],
+    )
+    content = get_graphql_content(response)
+
+    errors = content["data"]["productVariantCreate"]["errors"]
+    assert errors
+    assert errors[0]["code"] == ProductErrorCode.INVALID.name
+
+
+def test_create_product_variant_with_non_unique_external_reference(
+    staff_api_client,
+    category,
+    product,
+    product_type,
+    permission_manage_products,
+):
+    # given
+    query = CREATE_VARIANT_MUTATION
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+    variant = product.variants.first()
+    attribute_id = graphene.Node.to_global_id(
+        "Attribute", product_type.variant_attributes.first().pk
+    )
+
+    ext_ref = "test-ext-ref"
+    variant.external_reference = ext_ref
+    variant.save(update_fields=["external_reference"])
+
+    variables = {
+        "input": {
+            "product": product_id,
+            "attributes": [{"id": attribute_id, "values": ["test-value"]}],
+            "externalReference": ext_ref,
+        }
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+
+    # then
+    error = content["data"]["productVariantCreate"]["errors"][0]
+    assert error["field"] == "externalReference"
+    assert error["code"] == ProductErrorCode.UNIQUE.name
+    assert (
+        error["message"]
+        == "Product variant with this External reference already exists."
+    )
