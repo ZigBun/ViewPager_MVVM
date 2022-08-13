@@ -376,4 +376,39 @@ def fetch_discounts(date: datetime.date) -> List[DiscountInfo]:
             product_ids=products[sale.pk],
             variants_ids=variants[sale.pk],
         )
-        for sale in sal
+        for sale in sales
+    ]
+
+
+def fetch_active_discounts() -> List[DiscountInfo]:
+    return fetch_discounts(timezone.now())
+
+
+def fetch_catalogue_info(instance: Sale) -> CatalogueInfo:
+    catalogue_info: CatalogueInfo = defaultdict(set)
+    for sale_data in Sale.objects.filter(id=instance.id).values(*CATALOGUE_FIELDS):
+        for field in CATALOGUE_FIELDS:
+            if id := sale_data.get(field):
+                catalogue_info[field].add(id)
+
+    return catalogue_info
+
+
+def apply_discount_to_value(
+    value: Decimal,
+    value_type: str,
+    currency: str,
+    price_to_discount: Union[Money, TaxedMoney],
+):
+    """Calculate the price based on the provided values."""
+    if value_type == DiscountValueType.FIXED:
+        discount_method = fixed_discount
+        discount_kwargs = {"discount": Money(value, currency)}
+    else:
+        discount_method = percentage_discount
+        discount_kwargs = {"percentage": value, "rounding": ROUND_HALF_UP}
+    discount = partial(
+        discount_method,
+        **discount_kwargs,
+    )
+    return discount(price_to_discount)
