@@ -206,4 +206,117 @@ class ProductOrderField(graphene.Enum):
         )
 
     @staticmethod
-    def qs_with_published(queryset: QuerySet, channel_slug: str) -> QuerySe
+    def qs_with_published(queryset: QuerySet, channel_slug: str) -> QuerySet:
+        subquery = Subquery(
+            ProductChannelListing.objects.filter(
+                product_id=OuterRef("pk"), channel__slug=str(channel_slug)
+            ).values_list("is_published")[:1]
+        )
+        return queryset.annotate(
+            is_published=ExpressionWrapper(subquery, output_field=BooleanField())
+        )
+
+    @staticmethod
+    def qs_with_publication_date(queryset: QuerySet, channel_slug: str) -> QuerySet:
+        return ProductOrderField.qs_with_published_at(queryset, channel_slug)
+
+    @staticmethod
+    def qs_with_published_at(queryset: QuerySet, channel_slug: str) -> QuerySet:
+        subquery = Subquery(
+            ProductChannelListing.objects.filter(
+                product_id=OuterRef("pk"), channel__slug=str(channel_slug)
+            ).values_list("published_at")[:1]
+        )
+        return queryset.annotate(
+            published_at=ExpressionWrapper(subquery, output_field=DateTimeField())
+        )
+
+    @staticmethod
+    def qs_with_collection(queryset: QuerySet, **_kwargs) -> QuerySet:
+        return queryset.annotate(
+            sort_order=Window(
+                expression=DenseRank(),
+                order_by=(
+                    F("collectionproduct__sort_order").asc(nulls_last=True),
+                    F("collectionproduct__id"),
+                ),
+            )
+        )
+
+
+class ProductOrder(ChannelSortInputObjectType):
+    attribute_id = graphene.Argument(
+        graphene.ID,
+        description=(
+            "Sort product by the selected attribute's values.\n"
+            "Note: this doesn't take translations into account yet."
+        ),
+    )
+    field = graphene.Argument(
+        ProductOrderField, description="Sort products by the selected field."
+    )
+
+    class Meta:
+        sort_enum = ProductOrderField
+
+
+class ProductVariantSortField(graphene.Enum):
+    LAST_MODIFIED_AT = ["updated_at", "name", "pk"]
+
+    @property
+    def description(self):
+        # pylint: disable=no-member
+        if self.name in ProductVariantSortField.__enum__._member_names_:
+            sort_name = self.name.lower().replace("_", " ")
+            return f"Sort products variants by {sort_name}."
+
+        raise ValueError(f"Unsupported enum value: {self.value}")
+
+
+class ProductVariantSortingInput(SortInputObjectType):
+    class Meta:
+        sort_enum = ProductVariantSortField
+        type_name = "productVariants"
+
+
+class ProductTypeSortField(graphene.Enum):
+    NAME = ["name", "slug"]
+    DIGITAL = ["is_digital", "name", "slug"]
+    SHIPPING_REQUIRED = ["is_shipping_required", "name", "slug"]
+
+    @property
+    def description(self):
+        # pylint: disable=no-member
+        descriptions = {
+            ProductTypeSortField.NAME.name: "name",  # type: ignore[attr-defined] # graphene.Enum is not typed # noqa: E501
+            ProductTypeSortField.DIGITAL.name: "type",  # type: ignore[attr-defined] # graphene.Enum is not typed # noqa: E501
+            ProductTypeSortField.SHIPPING_REQUIRED.name: "shipping",  # type: ignore[attr-defined] # graphene.Enum is not typed # noqa: E501
+        }
+        if self.name in descriptions:
+            return f"Sort products by {descriptions[self.name]}."
+        raise ValueError(f"Unsupported enum value: {self.value}")
+
+
+class ProductTypeSortingInput(SortInputObjectType):
+    class Meta:
+        sort_enum = ProductTypeSortField
+        type_name = "product types"
+
+
+class MediaChoicesSortField(graphene.Enum):
+    ID = ["id"]
+
+    @property
+    def description(self):
+        descriptions = {
+            MediaChoicesSortField.ID.name: "Sort media by ID.",  # type: ignore[attr-defined] # graphene.Enum is not typed # noqa: E501
+        }
+        if self.name in descriptions:
+            return descriptions[self.name]
+        raise ValueError(f"Unsupported enum value: {self.value}")
+
+
+class MediaSortingInput(SortInputObjectType):
+    class Meta:
+        sort_enum = MediaChoicesSortField
+        type_name = "media"
