@@ -24,4 +24,9 @@ class ShippingZoneFilter(django_filters.FilterSet):
 
     class Meta:
         model = ShippingZone
-        
+        fields = ["search"]
+
+
+class ShippingZoneFilterInput(FilterInputObjectType):
+    class Meta:
+        filterset_class = ShippingZoneFilter
