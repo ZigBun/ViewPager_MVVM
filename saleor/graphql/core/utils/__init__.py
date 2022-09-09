@@ -106,4 +106,29 @@ def to_global_id_or_none(instance):
 
 
 def add_hash_to_file_name(file):
-    """Add unique text fragment to the fi
+    """Add unique text fragment to the file name to prevent file overriding."""
+    file_name, format = os.path.splitext(file._name)
+    hash = secrets.token_hex(nbytes=4)
+    new_name = f"{file_name}_{hash}{format}"
+    file._name = new_name
+
+
+def raise_validation_error(field=None, message=None, code=None):
+    raise ValidationError({field: ValidationError(message, code=code)})
+
+
+def ext_ref_to_global_id_or_error(model, external_reference):
+    """Convert external reference to graphen global id."""
+    internal_id = (
+        model.objects.filter(external_reference=external_reference)
+        .values_list("id", flat=True)
+        .first()
+    )
+    if internal_id:
+        return graphene.Node.to_global_id(model.__name__, internal_id)
+    else:
+        raise_validation_error(
+            field="externalReference",
+            message=f"Couldn't resolve to a node: {external_reference}",
+            code="not_found",
+        )
