@@ -116,4 +116,108 @@ class ProcessedImage:
     def retrieve_image(self):
         """Return a PIL Image instance stored at `image_path`."""
         image = self.storage.open(self.image_path, "rb")
-        image_format = 
+        image_format = self.get_image_metadata_from_file(image)
+        return (Image.open(image), image_format)
+
+    def get_image_metadata_from_file(self, file_like):
+        """Return a image format and InMemoryUploadedFile-friendly save format.
+
+        Receive a valid image file and returns a 2-tuple of two strings:
+            [0]: Image format (i.e. 'jpg', 'gif' or 'png')
+            [1]: InMemoryUploadedFile-friendly save format (i.e. 'image/jpeg')
+        image_format, in_memory_file_type
+        """
+        mime_type = magic.from_buffer(file_like.read(1024), mime=True)
+        file_like.seek(0)
+        image_format = MIME_TYPE_TO_PIL_IDENTIFIER[mime_type]
+        return image_format
+
+    def preprocess(self, image, image_format):
+        """Preprocess an image.
+
+        An API hook for image pre-processing. Calls any image format specific
+        pre-processors (if defined). I.E. If `image_format` is 'JPEG', this
+        method will look for a method named `preprocess_JPEG`, if found
+        `image` will be passed to it.
+
+        Arguments:
+            image: a PIL Image instance
+            image_format: str, a valid PIL format (i.e. 'JPEG' or 'WEBP')
+
+        Subclasses should return a 2-tuple:
+            * [0]: A PIL Image instance.
+            * [1]: A dictionary of additional keyword arguments to be used
+                    when the instance is saved. If no additional keyword
+                    arguments, return an empty dict ({}).
+
+        """
+        format = self.format or image_format
+        save_kwargs = {"format": format}
+
+        # Ensuring image is properly rotated
+        if hasattr(image, "_getexif"):
+            exif_datadict = image._getexif()  # returns None if no EXIF data
+            if exif_datadict is not None:
+                exif = dict(exif_datadict.items())
+                orientation = exif.get(self.EXIF_ORIENTATION_KEY, None)
+                if orientation == 3:
+                    image = image.transpose(Image.ROTATE_180)
+                elif orientation == 6:
+                    image = image.transpose(Image.ROTATE_270)
+                elif orientation == 8:
+                    image = image.transpose(Image.ROTATE_90)
+
+        # Ensure any embedded ICC profile is preserved
+        save_kwargs["icc_profile"] = image.info.get("icc_profile")
+
+        if hasattr(self, f"preprocess_{format}"):
+            image, addl_save_kwargs = getattr(self, f"preprocess_{format}")(image=image)
+            save_kwargs.update(addl_save_kwargs)
+
+        return image, save_kwargs
+
+    def preprocess_AVIF(self, image):
+        """Receive a PIL Image instance of an AVIF and return 2-tuple."""
+        save_kwargs = {
+            "quality": self.AVIF_QUAL,
+            "icc_profile": image.info.get("icc_profile", ""),
+        }
+
+        return (image, save_kwargs)
+
+    def preprocess_GIF(self, image):
+        """Receive a PIL Image instance of a GIF and return 2-tuple."""
+        if "transparency" in image.info:
+            save_kwargs = {"transparency": image.info["transparency"]}
+        else:
+            save_kwargs = {}
+        return (image, save_kwargs)
+
+    def preprocess_JPEG(self, image):
+        """Receive a PIL Image instance of a JPEG and returns 2-tuple."""
+        save_kwargs = {"progressive": self.PROGRESSIVE_JPEG, "quality": self.JPEG_QUAL}
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+        return (image, save_kwargs)
+
+    def preprocess_WEBP(self, image):
+        """Receive a PIL Image instance of a WEBP and return 2-tuple."""
+        save_kwargs = {
+            "quality": self.WEBP_QUAL,
+            "lossless": self.LOSSLESS_WEBP,
+            "icc_profile": image.info.get("icc_profile", ""),
+        }
+
+        return (image, save_kwargs)
+
+    def process_image(self, image, save_kwargs):
+        """Return a BytesIO instance of `image` that fits in a bounding box.
+
+        Bounding box dimensions are `width`x`height`.
+        """
+        image_file = BytesIO()
+        image.thumbnail(
+            (self.size, self.size),
+        )
+        image.save(image_file, **save_kwargs)
+        return image_file
