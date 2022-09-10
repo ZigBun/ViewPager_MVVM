@@ -344,4 +344,230 @@ def test_send_email_order_confirmation(mocked_notify, order, site_settings):
     notifications.send_order_confirmation(order_info, redirect_url, manager)
 
     expected_payload = {
-        "
+        "order": get_default_order_payload(order, redirect_url),
+        "recipient_email": order.get_customer_email(),
+        **get_site_context_payload(site_settings.site),
+    }
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ORDER_CONFIRMATION,
+        expected_payload,
+        channel_slug=order.channel.slug,
+    )
+
+
+@mock.patch("saleor.plugins.manager.PluginsManager.notify")
+def test_send_email_order_confirmation_for_cc(
+    mocked_notify, order_with_lines_for_cc, site_settings, warehouse_for_cc
+):
+    manager = get_plugins_manager()
+    redirect_url = "https://www.example.com"
+    order_info = fetch_order_info(order_with_lines_for_cc)
+
+    notifications.send_order_confirmation(order_info, redirect_url, manager)
+
+    expected_payload = {
+        "order": get_default_order_payload(order_with_lines_for_cc, redirect_url),
+        "recipient_email": order_with_lines_for_cc.get_customer_email(),
+        **get_site_context_payload(site_settings.site),
+    }
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ORDER_CONFIRMATION,
+        expected_payload,
+        channel_slug=order_with_lines_for_cc.channel.slug,
+    )
+    assert expected_payload["order"]["collection_point_name"] == warehouse_for_cc.name
+
+
+@mock.patch("saleor.plugins.manager.PluginsManager.notify")
+def test_send_confirmation_emails_without_addresses_for_payment(
+    mocked_notify,
+    site_settings,
+    anonymous_plugins,
+    digital_content,
+    payment_dummy,
+):
+    order = payment_dummy.order
+    line_data = OrderLineData(
+        variant_id=str(digital_content.product_variant.id),
+        variant=digital_content.product_variant,
+        quantity=1,
+    )
+
+    line = add_variant_to_order(
+        order=order,
+        line_data=line_data,
+        user=None,
+        app=None,
+        manager=anonymous_plugins,
+    )
+    DigitalContentUrl.objects.create(content=digital_content, line=line)
+
+    order.shipping_address = None
+    order.shipping_method = None
+    order.billing_address = None
+    order.save(update_fields=["shipping_address", "shipping_method", "billing_address"])
+    order_info = fetch_order_info(order)
+
+    notifications.send_payment_confirmation(order_info, anonymous_plugins)
+
+    expected_payload = {
+        "order": get_default_order_payload(order),
+        "recipient_email": order.get_customer_email(),
+        "payment": {
+            "created": payment_dummy.created_at,
+            "modified": payment_dummy.modified_at,
+            "charge_status": payment_dummy.charge_status,
+            "total": payment_dummy.total,
+            "captured_amount": payment_dummy.captured_amount,
+            "currency": payment_dummy.currency,
+        },
+        **get_site_context_payload(site_settings.site),
+    }
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ORDER_PAYMENT_CONFIRMATION,
+        expected_payload,
+        channel_slug=order.channel.slug,
+    )
+
+
+@mock.patch("saleor.plugins.manager.PluginsManager.notify")
+def test_send_confirmation_emails_without_addresses_for_order(
+    mocked_notify,
+    order,
+    site_settings,
+    digital_content,
+    anonymous_plugins,
+):
+    assert not order.lines.count()
+    line_data = OrderLineData(
+        variant_id=str(digital_content.product_variant.id),
+        variant=digital_content.product_variant,
+        quantity=1,
+    )
+
+    line = add_variant_to_order(
+        order=order,
+        line_data=line_data,
+        user=None,
+        app=None,
+        manager=anonymous_plugins,
+    )
+    DigitalContentUrl.objects.create(content=digital_content, line=line)
+
+    order.shipping_address = None
+    order.shipping_method = None
+    order.billing_address = None
+    order.save(update_fields=["shipping_address", "shipping_method", "billing_address"])
+    order_info = fetch_order_info(order)
+
+    redirect_url = "https://www.example.com"
+
+    notifications.send_order_confirmation(order_info, redirect_url, anonymous_plugins)
+
+    expected_payload = {
+        "order": get_default_order_payload(order, redirect_url),
+        "recipient_email": order.get_customer_email(),
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ORDER_CONFIRMATION,
+        expected_payload,
+        channel_slug=order.channel.slug,
+    )
+
+
+@mock.patch("saleor.plugins.manager.PluginsManager.notify")
+def test_send_fulfillment_confirmation_by_user(
+    mocked_notify, fulfilled_order, site_settings, staff_user
+):
+    fulfillment = fulfilled_order.fulfillments.first()
+    fulfillment.tracking_number = "https://www.example.com"
+    fulfillment.save()
+    manager = get_plugins_manager()
+
+    notifications.send_fulfillment_confirmation_to_customer(
+        order=fulfilled_order,
+        fulfillment=fulfillment,
+        user=staff_user,
+        app=None,
+        manager=manager,
+    )
+
+    expected_payload = get_default_fulfillment_payload(fulfilled_order, fulfillment)
+    expected_payload["requester_user_id"] = to_global_id_or_none(staff_user)
+    expected_payload["requester_app_id"] = None
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ORDER_FULFILLMENT_CONFIRMATION,
+        payload=expected_payload,
+        channel_slug=fulfilled_order.channel.slug,
+    )
+
+
+@mock.patch("saleor.plugins.manager.PluginsManager.notify")
+def test_send_fulfillment_confirmation_by_app(
+    mocked_notify, fulfilled_order, site_settings, app
+):
+    fulfillment = fulfilled_order.fulfillments.first()
+    fulfillment.tracking_number = "https://www.example.com"
+    fulfillment.save()
+    manager = get_plugins_manager()
+
+    notifications.send_fulfillment_confirmation_to_customer(
+        order=fulfilled_order,
+        fulfillment=fulfillment,
+        user=None,
+        app=app,
+        manager=manager,
+    )
+
+    expected_payload = get_default_fulfillment_payload(fulfilled_order, fulfillment)
+    expected_payload["requester_user_id"] = None
+    expected_payload["requester_app_id"] = to_global_id_or_none(app)
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ORDER_FULFILLMENT_CONFIRMATION,
+        payload=expected_payload,
+        channel_slug=fulfilled_order.channel.slug,
+    )
+
+
+@mock.patch("saleor.plugins.manager.PluginsManager.notify")
+def test_send_fulfillment_update(mocked_notify, fulfilled_order, site_settings):
+    fulfillment = fulfilled_order.fulfillments.first()
+    fulfillment.tracking_number = "https://www.example.com"
+    fulfillment.save()
+    manager = get_plugins_manager()
+
+    notifications.send_fulfillment_update(
+        order=fulfilled_order, fulfillment=fulfillment, manager=manager
+    )
+
+    expected_payload = get_default_fulfillment_payload(fulfilled_order, fulfillment)
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ORDER_FULFILLMENT_UPDATE,
+        expected_payload,
+        channel_slug=fulfilled_order.channel.slug,
+    )
+
+
+@mock.patch("saleor.plugins.manager.PluginsManager.notify")
+def test_send_email_order_canceled_by_user(
+    mocked_notify, order, site_settings, staff_user
+):
+    # given
+    manager = get_plugins_manager()
+
+    # when
+    notifications.send_order_canceled_confirmation(order, staff_user, None, manager)
+
+    # then
+    expected_payload = {
+        "order": get_default_order_payload(order),
+        "recipient_email": order.get_customer_email(),
+        "requester_user_id": to_global_id_or_none(staff_user),
+        "requester_app_id": None,
+        **get_site_context_payload(site_settings.site),
+    }
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ORDER_CANCELED
