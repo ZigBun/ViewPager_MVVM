@@ -154,4 +154,194 @@ def test_get_order_line_payload(order_line):
         "id": to_global_id_or_none(order_line),
         "product_name": order_line.product_name,
         "variant_name": order_line.variant_name,
-     
+        "product_sku": order_line.product_sku,
+        "product_variant_id": to_global_id_or_none(order_line.variant),
+        "is_shipping_required": order_line.is_shipping_required,
+        "quantity": order_line.quantity,
+        "quantity_fulfilled": order_line.quantity_fulfilled,
+        "currency": order_line.currency,
+        "unit_price_net_amount": quantize_price(
+            order_line.unit_price_net_amount, currency
+        ),
+        "unit_price_gross_amount": quantize_price(
+            order_line.unit_price_gross_amount, currency
+        ),
+        "unit_tax_amount": quantize_price(unit_tax_amount, currency),
+        "total_gross_amount": quantize_price(total_gross.amount, currency),
+        "total_net_amount": quantize_price(total_net.amount, currency),
+        "total_tax_amount": quantize_price(total_tax.amount, currency),
+        "tax_rate": order_line.tax_rate,
+        "is_digital": order_line.is_digital,
+        "digital_url": None,
+        "unit_discount_amount": order_line.unit_discount_amount,
+        "unit_discount_reason": order_line.unit_discount_reason,
+        "unit_discount_type": order_line.unit_discount_type,
+        "unit_discount_value": order_line.unit_discount_value,
+        "metadata": order_line.metadata,
+    }
+
+
+def test_get_order_line_payload_deleted_variant(order_line):
+    order_line.variant = None
+    payload = get_order_line_payload(order_line)
+
+    assert payload["variant"] is None
+    assert payload["product"] is None
+
+
+def test_get_address_payload(address):
+    payload = get_address_payload(address)
+    assert payload == {
+        "first_name": address.first_name,
+        "last_name": address.last_name,
+        "company_name": address.company_name,
+        "street_address_1": address.street_address_1,
+        "street_address_2": address.street_address_2,
+        "city": address.city,
+        "city_area": address.city_area,
+        "postal_code": address.postal_code,
+        "country": str(address.country),
+        "country_area": address.country_area,
+        "phone": str(address.phone),
+    }
+
+
+def test_get_default_order_payload(order_line):
+    order_line.refresh_from_db()
+    order = order_line.order
+    order_line_payload = get_order_line_payload(order_line)
+    redirect_url = "http://redirect.com/path"
+    subtotal = order.get_subtotal()
+    order.total = subtotal + order.shipping_price
+    tax = order.total_gross_amount - order.total_net_amount
+
+    value = Decimal("20")
+    discount = partial(fixed_discount, discount=Money(value, order.currency))
+    order.undiscounted_total = order.total
+    order.total = discount(order.total)
+    order.discounts.create(
+        value_type=DiscountValueType.FIXED,
+        value=value,
+        reason="Discount reason",
+        amount=(order.undiscounted_total - order.total).gross,
+    )
+    order.save()
+
+    payload = get_default_order_payload(order, redirect_url)
+
+    assert payload == {
+        "discounts": [
+            {
+                "amount_value": Decimal("20.000"),
+                "name": None,
+                "reason": "Discount reason",
+                "translated_name": None,
+                "type": "manual",
+                "value": Decimal("20.000"),
+                "value_type": "fixed",
+            }
+        ],
+        "channel_slug": order.channel.slug,
+        "id": to_global_id_or_none(order),
+        "number": order.number,
+        "token": order.id,
+        "created": str(order.created_at),
+        "display_gross_prices": order.display_gross_prices,
+        "currency": order.currency,
+        "total_gross_amount": order.total_gross_amount,
+        "total_net_amount": order.total_net_amount,
+        "shipping_method_name": order.shipping_method_name,
+        "collection_point_name": order.collection_point_name,
+        "status": order.status,
+        "metadata": order.metadata,
+        "private_metadata": {},
+        "shipping_price_net_amount": order.shipping_price_net_amount,
+        "shipping_price_gross_amount": order.shipping_price_gross_amount,
+        "order_details_url": f"{redirect_url}?token={order.id}",
+        "email": order.get_customer_email(),
+        "subtotal_gross_amount": subtotal.gross.amount,
+        "subtotal_net_amount": subtotal.net.amount,
+        "tax_amount": tax,
+        "lines": [order_line_payload],
+        "billing_address": get_address_payload(order.billing_address),
+        "shipping_address": get_address_payload(order.shipping_address),
+        "language_code": order.language_code,
+        "discount_amount": Decimal("20.000"),
+        "undiscounted_total_gross_amount": order.undiscounted_total.gross.amount,
+        "undiscounted_total_net_amount": order.undiscounted_total.net.amount,
+        "voucher_discount": None,
+    }
+
+
+def test_get_default_fulfillment_payload(fulfillment, digital_content, site_settings):
+    order = fulfillment.order
+    fulfillment.tracking_number = "http://tracking.url.com/123"
+    fulfillment.save(update_fields=["tracking_number"])
+    line = order.lines.first()
+    line.variant = digital_content.product_variant
+    line.save(update_fields=["variant"])
+    DigitalContentUrl.objects.create(content=digital_content, line=line)
+
+    order_payload = get_default_order_payload(order)
+    payload = get_default_fulfillment_payload(order, fulfillment)
+
+    # make sure that test will not fail because of the list order
+    payload["order"]["lines"] = sorted(
+        payload["order"]["lines"], key=lambda line: line["id"]
+    )
+    payload["physical_lines"] = sorted(
+        payload["physical_lines"], key=lambda line: line["id"]
+    )
+    order_payload["lines"] = sorted(order_payload["lines"], key=lambda line: line["id"])
+
+    digital_line = fulfillment.lines.get(order_line=line.id)
+    physical_line = fulfillment.lines.exclude(id=digital_line.id).first()
+    assert payload == {
+        "order": order_payload,
+        "fulfillment": {
+            "tracking_number": fulfillment.tracking_number,
+            "is_tracking_number_url": fulfillment.is_tracking_number_url,
+        },
+        "physical_lines": [get_default_fulfillment_line_payload(physical_line)],
+        "digital_lines": [get_default_fulfillment_line_payload(digital_line)],
+        "recipient_email": order.get_customer_email(),
+        **get_site_context_payload(site_settings.site),
+    }
+
+
+@mock.patch("saleor.plugins.manager.PluginsManager.notify")
+def test_send_email_payment_confirmation(mocked_notify, site_settings, payment_dummy):
+    manager = get_plugins_manager()
+    order = payment_dummy.order
+    order_info = fetch_order_info(order)
+    expected_payload = {
+        "order": get_default_order_payload(order),
+        "recipient_email": order.get_customer_email(),
+        "payment": {
+            "created": payment_dummy.created_at,
+            "modified": payment_dummy.modified_at,
+            "charge_status": payment_dummy.charge_status,
+            "total": payment_dummy.total,
+            "captured_amount": payment_dummy.captured_amount,
+            "currency": payment_dummy.currency,
+        },
+        **get_site_context_payload(site_settings.site),
+    }
+    notifications.send_payment_confirmation(order_info, manager)
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ORDER_PAYMENT_CONFIRMATION,
+        expected_payload,
+        channel_slug=order.channel.slug,
+    )
+
+
+@mock.patch("saleor.plugins.manager.PluginsManager.notify")
+def test_send_email_order_confirmation(mocked_notify, order, site_settings):
+    manager = get_plugins_manager()
+    redirect_url = "https://www.example.com"
+    order_info = fetch_order_info(order)
+
+    notifications.send_order_confirmation(order_info, redirect_url, manager)
+
+    expected_payload = {
+        "
