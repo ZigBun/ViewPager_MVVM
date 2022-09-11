@@ -570,4 +570,114 @@ def test_send_email_order_canceled_by_user(
         **get_site_context_payload(site_settings.site),
     }
     mocked_notify.assert_called_once_with(
-        NotifyEventType.ORDER_CANCELED
+        NotifyEventType.ORDER_CANCELED,
+        expected_payload,
+        channel_slug=order.channel.slug,
+    )
+
+
+@mock.patch("saleor.plugins.manager.PluginsManager.notify")
+def test_send_email_order_canceled_by_app(mocked_notify, order, site_settings, app):
+    # given
+    manager = get_plugins_manager()
+
+    # when
+    notifications.send_order_canceled_confirmation(order, None, app, manager)
+
+    # then
+    expected_payload = {
+        "order": get_default_order_payload(order),
+        "recipient_email": order.get_customer_email(),
+        "requester_user_id": None,
+        "requester_app_id": to_global_id_or_none(app),
+        **get_site_context_payload(site_settings.site),
+    }
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ORDER_CANCELED,
+        expected_payload,
+        channel_slug=order.channel.slug,
+    )
+
+
+@mock.patch("saleor.plugins.manager.PluginsManager.notify")
+def test_send_email_order_refunded_by_user(
+    mocked_notify, order, site_settings, staff_user
+):
+    # given
+    manager = get_plugins_manager()
+    amount = order.total.gross.amount
+
+    # when
+    notifications.send_order_refunded_confirmation(
+        order, staff_user, None, amount, order.currency, manager
+    )
+
+    # then
+    expected_payload = {
+        "requester_user_id": to_global_id_or_none(staff_user),
+        "requester_app_id": None,
+        "order": get_default_order_payload(order),
+        "amount": amount,
+        "currency": order.currency,
+        "recipient_email": order.get_customer_email(),
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ORDER_REFUND_CONFIRMATION,
+        expected_payload,
+        channel_slug=order.channel.slug,
+    )
+
+
+@mock.patch("saleor.plugins.manager.PluginsManager.notify")
+def test_send_email_order_refunded_by_app(mocked_notify, order, site_settings, app):
+    # given
+    manager = get_plugins_manager()
+    amount = order.total.gross.amount
+
+    # when
+    notifications.send_order_refunded_confirmation(
+        order, None, app, amount, order.currency, manager
+    )
+
+    # then
+    expected_payload = {
+        "requester_user_id": None,
+        "requester_app_id": to_global_id_or_none(app),
+        "order": get_default_order_payload(order),
+        "amount": amount,
+        "currency": order.currency,
+        "recipient_email": order.get_customer_email(),
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ORDER_REFUND_CONFIRMATION,
+        expected_payload,
+        channel_slug=order.channel.slug,
+    )
+
+
+def test_get_default_images_payload(product_with_image):
+    # given
+    size = 128
+
+    thumbnail_mock = mock.MagicMock(spec=File)
+    thumbnail_mock.name = "thumbnail_image.jpg"
+
+    media = product_with_image.media.first()
+    Thumbnail.objects.create(product_media=media, image=thumbnail_mock, size=size)
+
+    media_id = graphene.Node.to_global_id("ProductMedia", media.id)
+
+    # when
+    payload = get_default_images_payload([media])
+
+    # then
+    images_payload = payload["first_image"]["original"]
+    for th_size in THUMBNAIL_SIZES:
+        assert (
+            images_payload[str(th_size)]
+            == f"http://mirumee.com/thumbnail/{media_id}/{th_size}/"
+        )
