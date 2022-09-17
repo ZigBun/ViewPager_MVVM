@@ -1,0 +1,12 @@
+name: TEST-ENV-DEPLOYMENT
+# Build and deploy test instance for every pull request
+
+on:
+  pull_request:
+    types: [reopened, synchronize, labeled]
+    branches: ["**"]
+
+jobs:
+  deploy:
+    name: Deploy test environment for labeled pull requests
+    if: ${{ ((github.event.action == 'labeled') && (gith
