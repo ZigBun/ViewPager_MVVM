@@ -24,4 +24,20 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="invoice",
             name="private_metadata",
-            fi
+            field=models.JSONField(
+                blank=True,
+                default=dict,
+                encoder=saleor.core.utils.json_serializer.CustomJsonEncoder,
+                null=True,
+            ),
+        ),
+        migrations.AlterField(
+            model_name="invoiceevent",
+            name="parameters",
+            field=models.JSONField(
+                blank=True,
+                default=dict,
+                encoder=saleor.core.utils.json_serializer.CustomJsonEncoder,
+            ),
+        ),
+    ]
