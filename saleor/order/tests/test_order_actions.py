@@ -194,4 +194,226 @@ def test_handle_fully_paid_order_gift_cards_created(
 
     flush_post_commit_hooks()
     gift_card = GiftCard.objects.get()
-    assert gift_card.ini
+    assert gift_card.initial_balance == non_shippable_gift_card_line.unit_price_gross
+    assert GiftCardEvent.objects.filter(gift_card=gift_card, type=GiftCardEvents.BOUGHT)
+
+    send_notification_mock.assert_called_once_with(
+        None,
+        None,
+        order.user,
+        order.user_email,
+        gift_card,
+        manager,
+        order.channel.slug,
+        resending=False,
+    )
+
+
+@patch("saleor.giftcard.utils.send_gift_card_notification")
+@patch("saleor.order.actions.send_payment_confirmation")
+def test_handle_fully_paid_order_gift_cards_not_created(
+    mock_send_payment_confirmation,
+    send_notification_mock,
+    site_settings,
+    order_with_lines,
+    non_shippable_gift_card_product,
+    shippable_gift_card_product,
+):
+    """Ensure the non shippable gift card are not fulfilled when the flag for
+    automatic fulfillment non shippable gift card is not set."""
+    # given
+    channel = order_with_lines.channel
+    channel.automatically_fulfill_non_shippable_gift_card = False
+    channel.save()
+
+    order = order_with_lines
+
+    non_shippable_gift_card_line = order_with_lines.lines.first()
+    non_shippable_variant = non_shippable_gift_card_product.variants.get()
+    non_shippable_gift_card_line.variant = non_shippable_variant
+    non_shippable_gift_card_line.is_gift_card = True
+    non_shippable_gift_card_line.is_shipping_required = False
+    non_shippable_gift_card_line.quantity = 1
+    allocation = non_shippable_gift_card_line.allocations.first()
+    allocation.quantity_allocated = 1
+    allocation.save(update_fields=["quantity_allocated"])
+
+    shippable_gift_card_line = order_with_lines.lines.last()
+    shippable_variant = shippable_gift_card_product.variants.get()
+    shippable_gift_card_line.variant = shippable_variant
+    shippable_gift_card_line.is_gift_card = True
+    shippable_gift_card_line.is_shipping_required = True
+    shippable_gift_card_line.quantity = 1
+
+    OrderLine.objects.bulk_update(
+        [non_shippable_gift_card_line, shippable_gift_card_line],
+        ["variant", "is_gift_card", "is_shipping_required", "quantity"],
+    )
+
+    manager = get_plugins_manager()
+
+    order.payments.add(Payment.objects.create())
+    order_info = fetch_order_info(order)
+
+    # when
+    handle_fully_paid_order(manager, order_info)
+
+    # then
+    flush_post_commit_hooks()
+    assert order.events.filter(type=OrderEvents.ORDER_FULLY_PAID)
+
+    mock_send_payment_confirmation.assert_called_once_with(order_info, manager)
+
+    flush_post_commit_hooks()
+    assert not GiftCard.objects.exists()
+    send_notification_mock.assert_not_called
+
+
+def test_mark_as_paid(admin_user, draft_order):
+    manager = get_plugins_manager()
+    mark_order_as_paid(draft_order, admin_user, None, manager)
+    payment = draft_order.payments.last()
+    assert payment.charge_status == ChargeStatus.FULLY_CHARGED
+    assert payment.captured_amount == draft_order.total.gross.amount
+    assert draft_order.events.last().type == (OrderEvents.ORDER_MARKED_AS_PAID)
+    transactions = payment.transactions.all()
+    assert transactions.count() == 1
+    assert transactions[0].kind == TransactionKind.EXTERNAL
+
+
+def test_mark_as_paid_with_external_reference(admin_user, draft_order):
+    external_reference = "transaction_id"
+    manager = get_plugins_manager()
+    mark_order_as_paid(
+        draft_order, admin_user, None, manager, external_reference=external_reference
+    )
+    payment = draft_order.payments.last()
+    assert payment.charge_status == ChargeStatus.FULLY_CHARGED
+    assert payment.captured_amount == draft_order.total.gross.amount
+    assert payment.psp_reference == external_reference
+    assert draft_order.events.last().type == (OrderEvents.ORDER_MARKED_AS_PAID)
+    transactions = payment.transactions.all()
+    assert transactions.count() == 1
+    assert transactions[0].kind == TransactionKind.EXTERNAL
+    assert transactions[0].token == external_reference
+
+
+def test_mark_as_paid_no_billing_address(admin_user, draft_order):
+    draft_order.billing_address = None
+    draft_order.save()
+
+    manager = get_plugins_manager()
+    with pytest.raises(Exception):
+        mark_order_as_paid(draft_order, admin_user, None, manager)
+
+
+def test_clean_mark_order_as_paid(payment_txn_preauth):
+    order = payment_txn_preauth.order
+    with pytest.raises(PaymentError):
+        clean_mark_order_as_paid(order)
+
+
+def test_cancel_fulfillment(fulfilled_order, warehouse):
+    fulfillment = fulfilled_order.fulfillments.first()
+    line_1, line_2 = fulfillment.lines.all()
+
+    cancel_fulfillment(fulfillment, None, None, warehouse, get_plugins_manager())
+
+    fulfillment.refresh_from_db()
+    fulfilled_order.refresh_from_db()
+    assert fulfillment.status == FulfillmentStatus.CANCELED
+    assert fulfilled_order.status == OrderStatus.UNFULFILLED
+    assert line_1.order_line.quantity_fulfilled == 0
+    assert line_2.order_line.quantity_fulfilled == 0
+
+
+def test_cancel_fulfillment_variant_witout_inventory_tracking(
+    fulfilled_order_without_inventory_tracking, warehouse
+):
+    fulfillment = fulfilled_order_without_inventory_tracking.fulfillments.first()
+    line = fulfillment.lines.first()
+    stock = line.order_line.variant.stocks.get()
+    stock_quantity_before = stock.quantity
+
+    cancel_fulfillment(fulfillment, None, None, warehouse, get_plugins_manager())
+
+    fulfillment.refresh_from_db()
+    line.refresh_from_db()
+    fulfilled_order_without_inventory_tracking.refresh_from_db()
+    assert fulfillment.status == FulfillmentStatus.CANCELED
+    assert line.order_line.quantity_fulfilled == 0
+    assert fulfilled_order_without_inventory_tracking.status == OrderStatus.UNFULFILLED
+    assert stock_quantity_before == line.order_line.variant.stocks.get().quantity
+
+
+@patch("saleor.order.actions.send_order_canceled_confirmation")
+def test_cancel_order(
+    send_order_canceled_confirmation_mock,
+    fulfilled_order_with_all_cancelled_fulfillments,
+):
+    # given
+    order = fulfilled_order_with_all_cancelled_fulfillments
+    manager = get_plugins_manager()
+
+    assert Allocation.objects.filter(
+        order_line__order=order, quantity_allocated__gt=0
+    ).exists()
+
+    # when
+    cancel_order(order, None, None, manager)
+
+    # then
+    order_event = order.events.last()
+    assert order_event.type == OrderEvents.CANCELED
+
+    assert order.status == OrderStatus.CANCELED
+    assert not Allocation.objects.filter(
+        order_line__order=order, quantity_allocated__gt=0
+    ).exists()
+
+    flush_post_commit_hooks()
+    send_order_canceled_confirmation_mock.assert_called_once_with(
+        order, None, None, manager
+    )
+
+
+@patch("saleor.order.actions.send_order_refunded_confirmation")
+def test_order_refunded_by_user(
+    send_order_refunded_confirmation_mock,
+    order,
+    checkout_with_item,
+):
+    # given
+    payment = Payment.objects.create(
+        gateway="mirumee.payments.dummy", is_active=True, checkout=checkout_with_item
+    )
+    amount = order.total.gross.amount
+    app = None
+
+    # when
+    manager = get_plugins_manager()
+    order_refunded(order, order.user, app, amount, payment, manager)
+
+    # then
+    order_event = order.events.last()
+    assert order_event.type == OrderEvents.PAYMENT_REFUNDED
+
+    send_order_refunded_confirmation_mock.assert_called_once_with(
+        order, order.user, None, amount, payment.currency, manager
+    )
+
+
+@patch("saleor.order.actions.send_order_refunded_confirmation")
+def test_order_refunded_by_app(
+    send_order_refunded_confirmation_mock,
+    order,
+    checkout_with_item,
+    app,
+):
+    # given
+    payment = Payment.objects.create(
+        gateway="mirumee.payments.dummy", is_active=True, checkout=checkout_with_item
+    )
+    amount = order.total.gross.amount
+
+ 
