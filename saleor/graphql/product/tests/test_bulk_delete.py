@@ -395,3 +395,1260 @@ def test_delete_collections_trigger_product_updated_webhook(
     response = staff_api_client.post_graphql(
         MUTATION_COLLECTION_BULK_DELETE,
         variables,
+        permissions=[permission_manage_products],
+    )
+    content = get_graphql_content(response)
+
+    assert content["data"]["collectionBulkDelete"]["count"] == 3
+    assert not Collection.objects.filter(
+        id__in=[collection.id for collection in collection_list]
+    ).exists()
+    assert len(product_list) == product_updated_mock.call_count
+
+
+DELETE_PRODUCTS_MUTATION = """
+mutation productBulkDelete($ids: [ID!]!) {
+    productBulkDelete(ids: $ids) {
+        count
+        errors {
+            code
+            field
+        }
+    }
+}
+"""
+
+
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_products(
+    mocked_recalculate_orders_task,
+    staff_api_client,
+    product_list,
+    permission_manage_products,
+    order_list,
+    channel_USD,
+):
+    # given
+    query = DELETE_PRODUCTS_MUTATION
+
+    not_draft_order = order_list[0]
+    draft_order = order_list[1]
+    draft_order.status = OrderStatus.DRAFT
+    draft_order.save(update_fields=["status"])
+
+    draft_order_lines_pks = []
+    not_draft_order_lines_pks = []
+    for variant in [product_list[0].variants.first(), product_list[1].variants.first()]:
+        product = variant.product
+        variant_channel_listing = variant.channel_listings.get(channel=channel_USD)
+        net = variant.get_price(product, [], channel_USD, variant_channel_listing, None)
+        gross = Money(amount=net.amount, currency=net.currency)
+        quantity = 3
+        total_price = TaxedMoney(net=net * quantity, gross=gross * quantity)
+        order_line = OrderLine.objects.create(
+            variant=variant,
+            order=draft_order,
+            product_name=str(product),
+            variant_name=str(variant),
+            product_sku=variant.sku,
+            product_variant_id=variant.get_global_id(),
+            is_shipping_required=variant.is_shipping_required(),
+            is_gift_card=variant.is_gift_card(),
+            unit_price=TaxedMoney(net=net, gross=gross),
+            total_price=total_price,
+            quantity=3,
+        )
+        draft_order_lines_pks.append(order_line.pk)
+
+        order_line_not_draft = OrderLine.objects.create(
+            variant=variant,
+            order=not_draft_order,
+            product_name=str(product),
+            variant_name=str(variant),
+            product_sku=variant.sku,
+            product_variant_id=variant.get_global_id(),
+            is_shipping_required=variant.is_shipping_required(),
+            is_gift_card=variant.is_gift_card(),
+            unit_price=TaxedMoney(net=net, gross=gross),
+            total_price=total_price,
+            quantity=3,
+        )
+        not_draft_order_lines_pks.append(order_line_not_draft.pk)
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("Product", product.id)
+            for product in product_list
+        ]
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+
+    # then
+    content = get_graphql_content(response)
+
+    assert content["data"]["productBulkDelete"]["count"] == 3
+    assert not Product.objects.filter(
+        id__in=[product.id for product in product_list]
+    ).exists()
+
+    assert not OrderLine.objects.filter(pk__in=draft_order_lines_pks).exists()
+
+    assert OrderLine.objects.filter(pk__in=not_draft_order_lines_pks).exists()
+    mocked_recalculate_orders_task.assert_called_once_with([draft_order.id])
+
+
+def test_delete_products_invalid_object_typed_of_given_ids(
+    staff_api_client, product_list, permission_manage_products, staff_user
+):
+    query = DELETE_PRODUCTS_MUTATION
+    staff_user.user_permissions.add(permission_manage_products)
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("PageType", type.id) for type in product_list
+        ]
+    }
+    response = staff_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["productBulkDelete"]
+    errors = data["errors"]
+    assert len(errors) == 1
+    assert errors[0]["code"] == ProductErrorCode.GRAPHQL_ERROR.name
+    assert errors[0]["field"] == "ids"
+    assert data["count"] == 0
+
+
+@patch("saleor.product.signals.delete_from_storage_task.delay")
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_products_with_images(
+    mocked_recalculate_orders_task,
+    delete_from_storage_task_mock,
+    staff_api_client,
+    product_list,
+    image_list,
+    permission_manage_products,
+    channel_USD,
+    media_root,
+):
+    # given
+    media1 = ProductMedia.objects.create(product=product_list[0], image=image_list[0])
+    media2 = ProductMedia.objects.create(product=product_list[1], image=image_list[1])
+
+    query = DELETE_PRODUCTS_MUTATION
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("Product", product.id)
+            for product in product_list
+        ]
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+
+    assert content["data"]["productBulkDelete"]["count"] == 3
+    assert delete_from_storage_task_mock.call_count == 2
+    assert {
+        call_args.args[0] for call_args in delete_from_storage_task_mock.call_args_list
+    } == {media1.image.name, media2.image.name}
+    mocked_recalculate_orders_task.assert_not_called()
+
+
+@patch("saleor.plugins.webhook.plugin.get_webhooks_for_event")
+@patch("saleor.plugins.webhook.plugin.trigger_webhooks_async")
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_products_trigger_webhook(
+    mocked_recalculate_orders_task,
+    mocked_webhook_trigger,
+    mocked_get_webhooks_for_event,
+    any_webhook,
+    staff_api_client,
+    product_list,
+    permission_manage_products,
+    channel_USD,
+    settings,
+):
+    # given
+    mocked_get_webhooks_for_event.return_value = [any_webhook]
+    settings.PLUGINS = ["saleor.plugins.webhook.plugin.WebhookPlugin"]
+
+    query = DELETE_PRODUCTS_MUTATION
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("Product", product.id)
+            for product in product_list
+        ]
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+
+    assert content["data"]["productBulkDelete"]["count"] == 3
+    assert mocked_webhook_trigger.called
+    mocked_recalculate_orders_task.assert_not_called()
+
+
+@patch("saleor.plugins.webhook.plugin.get_webhooks_for_event")
+@patch("saleor.plugins.webhook.plugin.trigger_webhooks_async")
+def test_delete_products_without_variants(
+    mocked_webhook_trigger,
+    mocked_get_webhooks_for_event,
+    any_webhook,
+    staff_api_client,
+    product_list,
+    permission_manage_products,
+    channel_USD,
+    settings,
+):
+    # given
+    mocked_get_webhooks_for_event.return_value = [any_webhook]
+    settings.PLUGINS = ["saleor.plugins.webhook.plugin.WebhookPlugin"]
+
+    for product in product_list:
+        product.variants.all().delete()
+
+    query = DELETE_PRODUCTS_MUTATION
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("Product", product.id)
+            for product in product_list
+        ]
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+
+    assert content["data"]["productBulkDelete"]["count"] == 3
+    assert mocked_webhook_trigger.called
+
+
+def test_delete_products_removes_checkout_lines(
+    staff_api_client,
+    product_list,
+    checkout_with_items,
+    permission_manage_products,
+    channel_USD,
+    settings,
+):
+    # given
+    checkout = checkout_with_items
+    lines_count = checkout.lines.count()
+    lines, _ = fetch_checkout_lines(checkout)
+    old_quantity = calculate_checkout_quantity(lines)
+
+    query = DELETE_PRODUCTS_MUTATION
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("Product", product.id)
+            for product in product_list
+        ]
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+
+    assert content["data"]["productBulkDelete"]["count"] == 3
+
+    checkout.refresh_from_db()
+    lines, _ = fetch_checkout_lines(checkout)
+    assert checkout.lines.count() == lines_count - 3
+    assert old_quantity == calculate_checkout_quantity(lines) + 3
+
+
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_products_with_file_attributes(
+    mocked_recalculate_orders_task,
+    staff_api_client,
+    product_list,
+    file_attribute,
+    permission_manage_products,
+    channel_USD,
+    settings,
+):
+    # given
+    query = DELETE_PRODUCTS_MUTATION
+
+    values = [value for value in file_attribute.values.all()]
+    for i, product in enumerate(product_list[: len(values)]):
+        product_type = product.product_type
+        product_type.product_attributes.add(file_attribute)
+        existing_value = values[i]
+        associate_attribute_values_to_instance(product, file_attribute, existing_value)
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("Product", product.id)
+            for product in product_list
+        ]
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+
+    assert content["data"]["productBulkDelete"]["count"] == 3
+    mocked_recalculate_orders_task.assert_not_called()
+    for value in values:
+        with pytest.raises(value._meta.model.DoesNotExist):
+            value.refresh_from_db()
+
+
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_products_variants_in_draft_order(
+    mocked_recalculate_orders_task,
+    draft_order,
+    staff_api_client,
+    product_list,
+    permission_manage_products,
+):
+    query = DELETE_PRODUCTS_MUTATION
+    products_id = draft_order.lines.all().values_list("variant__product_id", flat=True)
+    assert ProductChannelListing.objects.filter(product_id__in=products_id).exists()
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("Product", product_id)
+            for product_id in products_id
+        ]
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+
+    assert content["data"]["productBulkDelete"]["count"] == 2
+    assert not Product.objects.filter(id__in=products_id).exists()
+    assert not ProductChannelListing.objects.filter(product_id__in=products_id).exists()
+    mocked_recalculate_orders_task.assert_called_once_with([draft_order.id])
+
+    event = OrderEvent.objects.filter(
+        type=OrderEvents.ORDER_LINE_PRODUCT_DELETED
+    ).last()
+    assert event
+    assert event.order == draft_order
+    assert event.user == staff_api_client.user
+    expected_params = [
+        {
+            "item": str(line),
+            "line_pk": line.pk,
+            "quantity": line.quantity,
+        }
+        for line in draft_order.lines.all()
+    ]
+    for param in expected_params:
+        assert param in event.parameters
+
+
+def test_delete_product_media(
+    staff_api_client, product_with_images, permission_manage_products
+):
+    media = product_with_images.media.all()
+
+    query = """
+    mutation productMediaBulkDelete($ids: [ID!]!) {
+        productMediaBulkDelete(ids: $ids) {
+            count
+        }
+    }
+    """
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("ProductMedia", media_obj.id)
+            for media_obj in media
+        ]
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+
+    assert content["data"]["productMediaBulkDelete"]["count"] == 2
+    assert not ProductMedia.objects.filter(
+        id__in=[media_obj.id for media_obj in media]
+    ).exists()
+
+
+PRODUCT_TYPE_BULK_DELETE_MUTATION = """
+    mutation productTypeBulkDelete($ids: [ID!]!) {
+        productTypeBulkDelete(ids: $ids) {
+            count
+            errors {
+                field
+                code
+            }
+        }
+    }
+"""
+
+
+def test_delete_product_types(
+    staff_api_client, product_type_list, permission_manage_product_types_and_attributes
+):
+    query = PRODUCT_TYPE_BULK_DELETE_MUTATION
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("ProductType", type.id)
+            for type in product_type_list
+        ]
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_product_types_and_attributes]
+    )
+    content = get_graphql_content(response)
+
+    assert content["data"]["productTypeBulkDelete"]["count"] == 3
+    assert not ProductType.objects.filter(
+        id__in=[type.id for type in product_type_list]
+    ).exists()
+
+
+def test_delete_product_types_invalid_object_typed_of_given_ids(
+    staff_api_client,
+    product_type_list,
+    permission_manage_product_types_and_attributes,
+    staff_user,
+):
+    query = PRODUCT_TYPE_BULK_DELETE_MUTATION
+    staff_user.user_permissions.add(permission_manage_product_types_and_attributes)
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("PageType", type.id)
+            for type in product_type_list
+        ]
+    }
+    response = staff_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["productTypeBulkDelete"]
+    errors = data["errors"]
+    assert len(errors) == 1
+    assert errors[0]["code"] == ProductErrorCode.GRAPHQL_ERROR.name
+    assert errors[0]["field"] == "ids"
+    assert data["count"] == 0
+
+
+def test_delete_product_types_with_file_attributes(
+    staff_api_client,
+    product_type_list,
+    product_list,
+    file_attribute,
+    permission_manage_product_types_and_attributes,
+):
+    query = PRODUCT_TYPE_BULK_DELETE_MUTATION
+
+    values = [value for value in file_attribute.values.all()]
+    for i, product_type in enumerate(product_type_list[: len(values)]):
+        product_type.product_attributes.add(file_attribute)
+        product = product_list[i]
+        product.product_type = product_type
+        product.save()
+        existing_value = values[i]
+        associate_attribute_values_to_instance(product, file_attribute, existing_value)
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("ProductType", type.id)
+            for type in product_type_list
+        ]
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_product_types_and_attributes]
+    )
+    content = get_graphql_content(response)
+
+    assert content["data"]["productTypeBulkDelete"]["count"] == 3
+    assert not ProductType.objects.filter(
+        id__in=[type.id for type in product_type_list]
+    ).exists()
+    for value in values:
+        with pytest.raises(value._meta.model.DoesNotExist):
+            value.refresh_from_db()
+
+
+PRODUCT_VARIANT_BULK_DELETE_BY_SKU_MUTATION = """
+mutation productVariantBulkDelete($skus: [String!]!) {
+    productVariantBulkDelete(skus: $skus) {
+        count
+        errors {
+            code
+            field
+        }
+    }
+}
+"""
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_deleted")
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_product_variants_by_sku(
+    mocked_recalculate_orders_task,
+    product_variant_deleted_webhook_mock,
+    staff_api_client,
+    product_variant_list,
+    permission_manage_products,
+):
+    # given
+    product = product_variant_list[0].product
+
+    variant = product.variants.get(sku="123")
+    variant.sku = "abcd"
+    variant.save(update_fields=["sku"])
+
+    assert ProductVariantChannelListing.objects.filter(
+        variant_id__in=[variant.id for variant in product_variant_list]
+    ).exists()
+
+    variables = {"skus": [variant.sku for variant in product_variant_list]}
+
+    # when
+    response = staff_api_client.post_graphql(
+        PRODUCT_VARIANT_BULK_DELETE_BY_SKU_MUTATION,
+        variables,
+        permissions=[permission_manage_products],
+    )
+    content = get_graphql_content(response)
+    flush_post_commit_hooks()
+
+    # then
+    assert content["data"]["productVariantBulkDelete"]["count"] == 4
+    assert not ProductVariant.objects.filter(
+        id__in=[variant.id for variant in product_variant_list]
+    ).exists()
+    assert (
+        product_variant_deleted_webhook_mock.call_count
+        == content["data"]["productVariantBulkDelete"]["count"]
+    )
+    mocked_recalculate_orders_task.assert_not_called()
+
+
+PRODUCT_VARIANT_BULK_DELETE_MUTATION = """
+mutation productVariantBulkDelete($ids: [ID!]!) {
+    productVariantBulkDelete(ids: $ids) {
+        count
+        errors {
+            code
+            field
+        }
+    }
+}
+"""
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_deleted")
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_product_variants(
+    mocked_recalculate_orders_task,
+    product_variant_deleted_webhook_mock,
+    staff_api_client,
+    product_variant_list,
+    permission_manage_products,
+):
+    query = PRODUCT_VARIANT_BULK_DELETE_MUTATION
+
+    product = product_variant_list[0].product
+
+    variant = product.variants.get(sku="123")
+    variant.sku = "abcd"
+    variant.save(update_fields=["sku"])
+
+    assert ProductVariantChannelListing.objects.filter(
+        variant_id__in=[variant.id for variant in product_variant_list]
+    ).exists()
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("ProductVariant", variant.id)
+            for variant in product_variant_list
+        ]
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    flush_post_commit_hooks()
+
+    assert content["data"]["productVariantBulkDelete"]["count"] == 4
+    assert not ProductVariant.objects.filter(
+        id__in=[variant.id for variant in product_variant_list]
+    ).exists()
+    assert (
+        product_variant_deleted_webhook_mock.call_count
+        == content["data"]["productVariantBulkDelete"]["count"]
+    )
+    mocked_recalculate_orders_task.assert_not_called()
+
+
+def test_delete_product_variants_invalid_object_typed_of_given_ids(
+    staff_api_client, product_variant_list, permission_manage_products, staff_user
+):
+    query = PRODUCT_VARIANT_BULK_DELETE_MUTATION
+    staff_user.user_permissions.add(permission_manage_products)
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("PageType", type.id)
+            for type in product_variant_list
+        ]
+    }
+    response = staff_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["productVariantBulkDelete"]
+    errors = data["errors"]
+    assert len(errors) == 1
+    assert errors[0]["code"] == ProductErrorCode.GRAPHQL_ERROR.name
+    assert errors[0]["field"] == "ids"
+    assert data["count"] == 0
+
+
+def test_delete_product_variants_removes_checkout_lines(
+    staff_api_client,
+    checkout,
+    product_list,
+    permission_manage_products,
+):
+    query = PRODUCT_VARIANT_BULK_DELETE_MUTATION
+
+    checkout_info = fetch_checkout_info(checkout, [], [], get_plugins_manager())
+    variant_list = [product.variants.first() for product in product_list][:2]
+    for variant in variant_list:
+        add_variant_to_checkout(checkout_info, variant, 1)
+
+    lines_count = checkout.lines.count()
+    lines, _ = fetch_checkout_lines(checkout)
+    old_quantity = calculate_checkout_quantity(lines)
+
+    assert ProductVariantChannelListing.objects.filter(
+        variant_id__in=[variant.id for variant in variant_list]
+    ).exists()
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("ProductVariant", variant.id)
+            for variant in variant_list
+        ]
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    flush_post_commit_hooks()
+
+    assert content["data"]["productVariantBulkDelete"]["count"] == 2
+    assert not ProductVariant.objects.filter(
+        id__in=[variant.id for variant in variant_list]
+    ).exists()
+    checkout.refresh_from_db()
+    lines, _ = fetch_checkout_lines(checkout)
+
+    assert checkout.lines.count() == lines_count - 2
+    assert old_quantity == calculate_checkout_quantity(lines) + 2
+
+
+@patch("saleor.product.signals.delete_from_storage_task")
+@patch("saleor.plugins.manager.PluginsManager.product_variant_deleted")
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_product_variants_with_images(
+    mocked_recalculate_orders_task,
+    product_variant_deleted_webhook_mock,
+    delete_from_storage_task_mock,
+    staff_api_client,
+    product_variant_list,
+    image_list,
+    permission_manage_products,
+    media_root,
+):
+    query = PRODUCT_VARIANT_BULK_DELETE_MUTATION
+
+    assert ProductVariantChannelListing.objects.filter(
+        variant_id__in=[variant.id for variant in product_variant_list]
+    ).exists()
+
+    media1 = ProductMedia.objects.create(
+        product=product_variant_list[0].product, image=image_list[0]
+    )
+    media2 = ProductMedia.objects.create(
+        product=product_variant_list[1].product, image=image_list[1]
+    )
+
+    VariantMedia.objects.create(variant=product_variant_list[0], media=media1)
+    VariantMedia.objects.create(variant=product_variant_list[1], media=media2)
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("ProductVariant", variant.id)
+            for variant in product_variant_list
+        ]
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    flush_post_commit_hooks()
+
+    assert content["data"]["productVariantBulkDelete"]["count"] == 4
+    assert not ProductVariant.objects.filter(
+        id__in=[variant.id for variant in product_variant_list]
+    ).exists()
+    assert (
+        product_variant_deleted_webhook_mock.call_count
+        == content["data"]["productVariantBulkDelete"]["count"]
+    )
+    mocked_recalculate_orders_task.assert_not_called()
+    delete_from_storage_task_mock.assert_not_called()
+
+
+def test_product_delete_removes_reference_to_product(
+    staff_api_client,
+    product_type_product_reference_attribute,
+    product_list,
+    product_type,
+    permission_manage_products,
+):
+    # given
+    query = DELETE_PRODUCTS_MUTATION
+
+    product = product_list[0]
+    product_ref = product_list[1]
+
+    product_type.product_attributes.add(product_type_product_reference_attribute)
+    attr_value = AttributeValue.objects.create(
+        attribute=product_type_product_reference_attribute,
+        name=product_ref.name,
+        slug=f"{product.pk}_{product_ref.pk}",
+        reference_product=product_ref,
+    )
+    associate_attribute_values_to_instance(
+        product, product_type_product_reference_attribute, attr_value
+    )
+
+    reference_id = graphene.Node.to_global_id("Product", product_ref.pk)
+
+    variables = {"ids": [reference_id]}
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["productBulkDelete"]
+
+    with pytest.raises(attr_value._meta.model.DoesNotExist):
+        attr_value.refresh_from_db()
+    with pytest.raises(product_ref._meta.model.DoesNotExist):
+        product_ref.refresh_from_db()
+
+    assert not data["errors"]
+
+
+def test_product_delete_removes_variant_reference_to_product(
+    staff_api_client,
+    variant,
+    product_type_product_reference_attribute,
+    permission_manage_products,
+    product_list,
+):
+    query = DELETE_PRODUCTS_MUTATION
+    product_type = variant.product.product_type
+    product_type.variant_attributes.set([product_type_product_reference_attribute])
+
+    attr_value = AttributeValue.objects.create(
+        attribute=product_type_product_reference_attribute,
+        name=product_list[0].name,
+        slug=f"{variant.pk}_{product_list[0].pk}",
+        reference_product=product_list[0],
+    )
+
+    associate_attribute_values_to_instance(
+        variant,
+        product_type_product_reference_attribute,
+        attr_value,
+    )
+    reference_id = graphene.Node.to_global_id("Product", product_list[0].pk)
+
+    variables = {"ids": [reference_id]}
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["productBulkDelete"]
+
+    with pytest.raises(attr_value._meta.model.DoesNotExist):
+        attr_value.refresh_from_db()
+    with pytest.raises(product_list[0]._meta.model.DoesNotExist):
+        product_list[0].refresh_from_db()
+
+    assert not data["errors"]
+
+
+def test_product_delete_removes_reference_to_variant(
+    staff_api_client,
+    product_type_variant_reference_attribute,
+    product_list,
+    product_type,
+    permission_manage_products,
+):
+    # given
+    query = DELETE_PRODUCTS_MUTATION
+
+    product = product_list[0]
+    variant_ref = product_list[1].variants.first()
+
+    product_type.product_attributes.add(product_type_variant_reference_attribute)
+    attr_value = AttributeValue.objects.create(
+        attribute=product_type_variant_reference_attribute,
+        name=variant_ref.name,
+        slug=f"{product.pk}_{variant_ref.pk}",
+        reference_variant=variant_ref,
+    )
+    associate_attribute_values_to_instance(
+        product, product_type_variant_reference_attribute, attr_value
+    )
+
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+
+    variables = {"ids": [product_id]}
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["productBulkDelete"]
+
+    with pytest.raises(attr_value._meta.model.DoesNotExist):
+        attr_value.refresh_from_db()
+    with pytest.raises(product._meta.model.DoesNotExist):
+        product.refresh_from_db()
+
+    assert not data["errors"]
+
+
+def test_product_delete_removes_reference_to_page(
+    staff_api_client,
+    permission_manage_products,
+    page,
+    page_type_product_reference_attribute,
+    product,
+):
+    query = DELETE_PRODUCTS_MUTATION
+
+    page_type = page.page_type
+    page_type.page_attributes.add(page_type_product_reference_attribute)
+
+    attr_value = AttributeValue.objects.create(
+        attribute=page_type_product_reference_attribute,
+        name=page.title,
+        slug=f"{page.pk}_{product.pk}",
+        reference_product=product,
+    )
+    associate_attribute_values_to_instance(
+        page, page_type_product_reference_attribute, attr_value
+    )
+
+    reference_id = graphene.Node.to_global_id("Product", product.pk)
+
+    variables = {"ids": [reference_id]}
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["productBulkDelete"]
+
+    with pytest.raises(attr_value._meta.model.DoesNotExist):
+        attr_value.refresh_from_db()
+    with pytest.raises(product._meta.model.DoesNotExist):
+        product.refresh_from_db()
+
+    assert not data["errors"]
+
+
+@patch("saleor.plugins.manager.PluginsManager.product_variant_deleted")
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_product_variants_with_file_attribute(
+    mocked_recalculate_orders_task,
+    product_variant_deleted_webhook_mock,
+    staff_api_client,
+    product_variant_list,
+    permission_manage_products,
+    file_attribute,
+):
+    query = PRODUCT_VARIANT_BULK_DELETE_MUTATION
+
+    assert ProductVariantChannelListing.objects.filter(
+        variant_id__in=[variant.id for variant in product_variant_list]
+    ).exists()
+
+    values = [value for value in file_attribute.values.all()]
+    for i, variant in enumerate(product_variant_list[: len(values)]):
+        product_type = variant.product.product_type
+        product_type.variant_attributes.add(file_attribute)
+        existing_value = values[i]
+        associate_attribute_values_to_instance(variant, file_attribute, existing_value)
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("ProductVariant", variant.id)
+            for variant in product_variant_list
+        ]
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+    content = get_graphql_content(response)
+    flush_post_commit_hooks()
+
+    assert content["data"]["productVariantBulkDelete"]["count"] == 4
+    assert not ProductVariant.objects.filter(
+        id__in=[variant.id for variant in product_variant_list]
+    ).exists()
+    assert (
+        product_variant_deleted_webhook_mock.call_count
+        == content["data"]["productVariantBulkDelete"]["count"]
+    )
+    mocked_recalculate_orders_task.assert_not_called()
+    for value in values:
+        with pytest.raises(value._meta.model.DoesNotExist):
+            value.refresh_from_db()
+
+
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_product_variants_in_draft_orders(
+    mocked_recalculate_orders_task,
+    staff_api_client,
+    product_variant_list,
+    permission_manage_products,
+    order_line,
+    order_list,
+    channel_USD,
+):
+    # given
+    query = PRODUCT_VARIANT_BULK_DELETE_MUTATION
+    variants = product_variant_list
+
+    draft_order = order_line.order
+    draft_order.status = OrderStatus.DRAFT
+    draft_order.save(update_fields=["status"])
+
+    second_variant_in_draft = variants[1]
+    second_product = second_variant_in_draft.product
+    second_variant_channel_listing = second_variant_in_draft.channel_listings.get(
+        channel=channel_USD
+    )
+    net = second_variant_in_draft.get_price(
+        second_product, [], channel_USD, second_variant_channel_listing, None
+    )
+    gross = Money(amount=net.amount, currency=net.currency)
+    unit_price = TaxedMoney(net=net, gross=gross)
+    quantity = 3
+    total_price = unit_price * quantity
+    second_draft_order = OrderLine.objects.create(
+        variant=second_variant_in_draft,
+        order=draft_order,
+        product_name=str(second_product),
+        variant_name=str(second_variant_in_draft),
+        product_sku=second_variant_in_draft.sku,
+        product_variant_id=second_variant_in_draft.get_global_id(),
+        is_shipping_required=second_variant_in_draft.is_shipping_required(),
+        is_gift_card=second_variant_in_draft.is_gift_card(),
+        unit_price=TaxedMoney(net=net, gross=gross),
+        total_price=total_price,
+        quantity=quantity,
+    )
+
+    variant = variants[0]
+    product = variant.product
+    variant_channel_listing = variant.channel_listings.get(channel=channel_USD)
+    net = variant.get_price(product, [], channel_USD, variant_channel_listing, None)
+    gross = Money(amount=net.amount, currency=net.currency)
+    unit_price = TaxedMoney(net=net, gross=gross)
+    quantity = 3
+    total_price = unit_price * quantity
+    order_not_draft = order_list[-1]
+    order_line_not_in_draft = OrderLine.objects.create(
+        variant=variant,
+        order=order_not_draft,
+        product_name=str(product),
+        variant_name=str(variant),
+        product_sku=variant.sku,
+        product_variant_id=variant.get_global_id(),
+        is_shipping_required=variant.is_shipping_required(),
+        is_gift_card=variant.is_gift_card(),
+        unit_price=TaxedMoney(net=net, gross=gross),
+        total_price=total_price,
+        quantity=quantity,
+    )
+    order_line_not_in_draft_pk = order_line_not_in_draft.pk
+
+    variant_count = ProductVariant.objects.count()
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("ProductVariant", variant.id)
+            for variant in ProductVariant.objects.all()
+        ]
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+
+    # then
+    content = get_graphql_content(response)
+
+    assert content["data"]["productVariantBulkDelete"]["count"] == variant_count
+    assert not ProductVariant.objects.filter(
+        id__in=[variant.id for variant in product_variant_list]
+    ).exists()
+
+    with pytest.raises(order_line._meta.model.DoesNotExist):
+        order_line.refresh_from_db()
+
+    with pytest.raises(second_draft_order._meta.model.DoesNotExist):
+        second_draft_order.refresh_from_db()
+
+    assert OrderLine.objects.filter(pk=order_line_not_in_draft_pk).exists()
+    mocked_recalculate_orders_task.assert_called_once_with([draft_order.id])
+
+    event = OrderEvent.objects.filter(
+        type=OrderEvents.ORDER_LINE_VARIANT_DELETED
+    ).last()
+    assert event
+    assert event.order == draft_order
+    assert event.user == staff_api_client.user
+    expected_params = [
+        {
+            "item": str(line),
+            "line_pk": line.pk,
+            "quantity": line.quantity,
+        }
+        for line in draft_order.lines.all()
+    ]
+    for param in expected_params:
+        assert param in event.parameters
+
+
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_product_variants_delete_default_variant(
+    mocked_recalculate_orders_task,
+    staff_api_client,
+    product,
+    permission_manage_products,
+):
+    # given
+    query = PRODUCT_VARIANT_BULK_DELETE_MUTATION
+
+    new_default_variant = product.variants.first()
+
+    variants = ProductVariant.objects.bulk_create(
+        [
+            ProductVariant(product=product, sku="1"),
+            ProductVariant(product=product, sku="2"),
+            ProductVariant(product=product, sku="3"),
+        ]
+    )
+
+    default_variant = variants[0]
+
+    product = default_variant.product
+    product.default_variant = default_variant
+    product.save(update_fields=["default_variant"])
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("ProductVariant", variant.id)
+            for variant in variants
+        ]
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+
+    # then
+    content = get_graphql_content(response)
+
+    assert content["data"]["productVariantBulkDelete"]["count"] == 3
+    assert not ProductVariant.objects.filter(
+        id__in=[variant.id for variant in variants]
+    ).exists()
+
+    product.refresh_from_db()
+    assert product.default_variant.pk == new_default_variant.pk
+    mocked_recalculate_orders_task.assert_not_called()
+
+
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_product_variants_delete_all_product_variants(
+    mocked_recalculate_orders_task,
+    staff_api_client,
+    product,
+    permission_manage_products,
+):
+    # given
+    query = PRODUCT_VARIANT_BULK_DELETE_MUTATION
+
+    new_default_variant = product.variants.first()
+
+    variants = ProductVariant.objects.bulk_create(
+        [
+            ProductVariant(product=product, sku="1"),
+            ProductVariant(product=product, sku="2"),
+        ]
+    )
+
+    default_variant = variants[0]
+
+    product = default_variant.product
+    product.default_variant = default_variant
+    product.save(update_fields=["default_variant"])
+
+    ids = [
+        graphene.Node.to_global_id("ProductVariant", variant.id) for variant in variants
+    ]
+    ids.append(graphene.Node.to_global_id("ProductVariant", new_default_variant.id))
+
+    variables = {"ids": ids}
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+
+    # then
+    content = get_graphql_content(response)
+
+    assert content["data"]["productVariantBulkDelete"]["count"] == 3
+    assert not ProductVariant.objects.filter(
+        id__in=[variant.id for variant in variants]
+    ).exists()
+
+    product.refresh_from_db()
+    assert product.default_variant is None
+    mocked_recalculate_orders_task.assert_not_called()
+
+
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_product_variants_from_different_products(
+    mocked_recalculate_orders_task,
+    staff_api_client,
+    product,
+    product_with_two_variants,
+    permission_manage_products,
+):
+    # given
+    query = PRODUCT_VARIANT_BULK_DELETE_MUTATION
+
+    product_1 = product
+    product_2 = product_with_two_variants
+
+    product_1_default_variant = product_1.variants.first()
+    product_2_default_variant = product_2.variants.first()
+
+    product_1.default_variant = product_1_default_variant
+    product_2.default_variant = product_2_default_variant
+
+    Product.objects.bulk_update([product_1, product_2], ["default_variant"])
+
+    product_2_second_variant = product_2.variants.last()
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("ProductVariant", product_1_default_variant.id),
+            graphene.Node.to_global_id("ProductVariant", product_2_default_variant.id),
+        ]
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+
+    # then
+    content = get_graphql_content(response)
+
+    assert content["data"]["productVariantBulkDelete"]["count"] == 2
+    assert not ProductVariant.objects.filter(
+        id__in=[product_1_default_variant.id, product_2_default_variant.id]
+    ).exists()
+
+    product_1.refresh_from_db()
+    product_2.refresh_from_db()
+
+    assert product_1.default_variant is None
+    assert product_2.default_variant.pk == product_2_second_variant.pk
+    mocked_recalculate_orders_task.assert_not_called()
+
+
+@patch("saleor.order.tasks.recalculate_orders_task.delay")
+def test_delete_variants_delete_product_channel_listing_without_available_channel(
+    mocked_recalculate_orders_task,
+    staff_api_client,
+    product,
+    product_with_two_variants,
+    permission_manage_products,
+):
+    """Ensure that when the last available variant for channel is removed,
+    the corresponging product channel listings will be removed too, and when
+    any available variant for channel exist the product channel listing will
+    be not removed."""
+    # given
+    query = PRODUCT_VARIANT_BULK_DELETE_MUTATION
+
+    product_1 = product
+    product_2 = product_with_two_variants
+
+    product_1_default_variant = product_1.variants.first()
+    product_2_default_variant = product_2.variants.first()
+
+    product_1.default_variant = product_1_default_variant
+    product_2.default_variant = product_2_default_variant
+
+    Product.objects.bulk_update([product_1, product_2], ["default_variant"])
+
+    product_2_second_variant = product_2.variants.last()
+
+    assert product_1.channel_listings.count() > 0
+    product_2_channel_listings_count = product_2.channel_listings.count()
+
+    variables = {
+        "ids": [
+            graphene.Node.to_global_id("ProductVariant", product_1_default_variant.id),
+            graphene.Node.to_global_id("ProductVariant", product_2_default_variant.id),
+        ]
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_products]
+    )
+
+    # then
+    content = get_graphql_content(response)
+
+    assert content["data"]["productVariantBulkDelete"]["count"] == 2
+    assert not ProductVariant.objects.filter(
+        id__in=[product_1_default_variant.id, product_2_default_variant.id]
+    ).exists()
+
+    product_1.refresh_from_db()
+    product_2.refresh_from_db()
+
+    assert product_1.default_variant is None
+    assert product_2.default_variant.pk == product_2_second_variant.pk
+    assert product_1.channel_listings.count() == 0
+    assert product_2.channel_listings.count() == product_2_channel_listings_count
+    mocked_recalculate_orders_task.assert_not_called()
