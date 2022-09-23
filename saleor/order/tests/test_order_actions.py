@@ -416,4 +416,211 @@ def test_order_refunded_by_app(
     )
     amount = order.total.gross.amount
 
- 
+    # when
+    manager = get_plugins_manager()
+    order_refunded(order, None, app, amount, payment, manager)
+
+    # then
+    order_event = order.events.last()
+    assert order_event.type == OrderEvents.PAYMENT_REFUNDED
+
+    send_order_refunded_confirmation_mock.assert_called_once_with(
+        order, None, app, amount, payment.currency, manager
+    )
+
+
+def test_fulfill_order_lines(order_with_lines):
+    order = order_with_lines
+    line = order.lines.first()
+    quantity_fulfilled_before = line.quantity_fulfilled
+    variant = line.variant
+    stock = Stock.objects.get(product_variant=variant)
+    stock_quantity_after = stock.quantity - line.quantity
+
+    fulfill_order_lines(
+        [
+            OrderLineInfo(
+                line=line,
+                quantity=line.quantity,
+                variant=variant,
+                warehouse_pk=stock.warehouse.pk,
+            )
+        ],
+        get_plugins_manager(),
+    )
+
+    stock.refresh_from_db()
+    assert stock.quantity == stock_quantity_after
+    assert line.quantity_fulfilled == quantity_fulfilled_before + line.quantity
+
+
+def test_fulfill_order_lines_multiple_lines(order_with_lines):
+    order = order_with_lines
+    lines = order.lines.all()
+
+    assert lines.count() > 1
+
+    quantity_fulfilled_before_1 = lines[0].quantity_fulfilled
+    variant_1 = lines[0].variant
+    stock_1 = Stock.objects.get(product_variant=variant_1)
+    stock_quantity_after_1 = stock_1.quantity - lines[0].quantity
+
+    quantity_fulfilled_before_2 = lines[1].quantity_fulfilled
+    variant_2 = lines[1].variant
+    stock_2 = Stock.objects.get(product_variant=variant_2)
+    stock_quantity_after_2 = stock_2.quantity - lines[1].quantity
+
+    fulfill_order_lines(
+        [
+            OrderLineInfo(
+                line=lines[0],
+                quantity=lines[0].quantity,
+                variant=variant_1,
+                warehouse_pk=stock_1.warehouse.pk,
+            ),
+            OrderLineInfo(
+                line=lines[1],
+                quantity=lines[1].quantity,
+                variant=variant_2,
+                warehouse_pk=stock_2.warehouse.pk,
+            ),
+        ],
+        get_plugins_manager(),
+    )
+
+    stock_1.refresh_from_db()
+    assert stock_1.quantity == stock_quantity_after_1
+    assert (
+        lines[0].quantity_fulfilled == quantity_fulfilled_before_1 + lines[0].quantity
+    )
+
+    stock_2.refresh_from_db()
+    assert stock_2.quantity == stock_quantity_after_2
+    assert (
+        lines[1].quantity_fulfilled == quantity_fulfilled_before_2 + lines[1].quantity
+    )
+
+
+def test_fulfill_order_lines_with_variant_deleted(order_with_lines):
+    line = order_with_lines.lines.first()
+    line.variant.delete()
+
+    line.refresh_from_db()
+
+    fulfill_order_lines(
+        [OrderLineInfo(line=line, quantity=line.quantity)], get_plugins_manager()
+    )
+
+
+def test_fulfill_order_lines_without_inventory_tracking(order_with_lines):
+    order = order_with_lines
+    line = order.lines.first()
+    quantity_fulfilled_before = line.quantity_fulfilled
+    variant = line.variant
+    variant.track_inventory = False
+    variant.save()
+    stock = Stock.objects.get(product_variant=variant)
+
+    # stock should not change
+    stock_quantity_after = stock.quantity
+
+    fulfill_order_lines(
+        [
+            OrderLineInfo(
+                line=line,
+                quantity=line.quantity,
+                variant=variant,
+                warehouse_pk=stock.warehouse.pk,
+            )
+        ],
+        get_plugins_manager(),
+    )
+
+    stock.refresh_from_db()
+    assert stock.quantity == stock_quantity_after
+    assert line.quantity_fulfilled == quantity_fulfilled_before + line.quantity
+
+
+@patch("saleor.order.actions.send_fulfillment_confirmation_to_customer")
+@patch("saleor.order.utils.get_default_digital_content_settings")
+def test_fulfill_digital_lines(
+    mock_digital_settings, mock_email_fulfillment, order_with_lines, media_root
+):
+    mock_digital_settings.return_value = {"automatic_fulfillment": True}
+    line = order_with_lines.lines.all()[0]
+
+    image_file, image_name = create_image()
+    variant = line.variant
+
+    product_type = variant.product.product_type
+    product_type.is_digital = True
+    product_type.is_shipping_required = False
+    product_type.save(update_fields=["is_digital", "is_shipping_required"])
+
+    digital_content = DigitalContent.objects.create(
+        content_file=image_file, product_variant=variant, use_default_settings=True
+    )
+
+    line.variant.digital_content = digital_content
+    line.is_shipping_required = False
+    line.save()
+
+    order_with_lines.refresh_from_db()
+    order_info = fetch_order_info(order_with_lines)
+    manager = get_plugins_manager()
+
+    automatically_fulfill_digital_lines(order_info, manager)
+
+    line.refresh_from_db()
+    fulfillment = Fulfillment.objects.get(order=order_with_lines)
+    fulfillment_lines = fulfillment.lines.all()
+
+    assert fulfillment_lines.count() == 1
+    assert line.digital_content_url
+    assert mock_email_fulfillment.called
+
+
+@patch("saleor.order.actions.send_fulfillment_confirmation_to_customer")
+@patch("saleor.order.utils.get_default_digital_content_settings")
+def test_fulfill_digital_lines_no_allocation(
+    mock_digital_settings, mock_email_fulfillment, order_with_lines, media_root
+):
+    # given
+    mock_digital_settings.return_value = {"automatic_fulfillment": True}
+    line = order_with_lines.lines.all()[0]
+
+    image_file, image_name = create_image()
+    variant = line.variant
+
+    product_type = variant.product.product_type
+    product_type.is_digital = True
+    product_type.is_shipping_required = False
+    product_type.save(update_fields=["is_digital", "is_shipping_required"])
+
+    digital_content = DigitalContent.objects.create(
+        content_file=image_file, product_variant=variant, use_default_settings=True
+    )
+
+    variant.digital_content = digital_content
+    variant.track_inventory = False
+    variant.save()
+
+    line.is_shipping_required = False
+    line.allocations.all().delete()
+    line.save()
+
+    order_with_lines.refresh_from_db()
+    order_info = fetch_order_info(order_with_lines)
+    manager = get_plugins_manager()
+
+    # when
+    automatically_fulfill_digital_lines(order_info, manager)
+
+    # then
+    line.refresh_from_db()
+    fulfillment = Fulfillment.objects.get(order=order_with_lines)
+    fulfillment_lines = fulfillment.lines.all()
+
+    assert fulfillment_lines.count() == 1
+    assert line.digital_content_url
+    assert mock_email_fulfillment.called
