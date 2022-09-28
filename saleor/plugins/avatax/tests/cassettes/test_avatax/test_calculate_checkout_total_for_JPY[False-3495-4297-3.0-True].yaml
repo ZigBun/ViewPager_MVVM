@@ -1,0 +1,7 @@
+interactions:
+- request:
+    body: '{"createTransactionModel": {"companyCode": "DEFAULT", "type": "SalesOrder",
+      "lines": [{"quantity": 3, "amount": "3600", "taxCode": "PS081282", "taxIncluded":
+      true, "itemCode": "123", "discounted": true, "description": "Test product",
+      "ref1": "123"}, {"quantity": 1, "amount": "700.000", "taxCode": "FR000000",
+      "taxIncluded": true, "item
