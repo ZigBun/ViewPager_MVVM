@@ -47,4 +47,30 @@ class OrderAddNote(BaseMutation):
             cleaned_input = validate_required_string_field(data, "message")
         except ValidationError:
             raise ValidationError(
- 
+                {
+                    "message": ValidationError(
+                        "Message can't be empty.",
+                        code=OrderErrorCode.REQUIRED.value,
+                    )
+                }
+            )
+        return cleaned_input
+
+    @classmethod
+    def perform_mutation(  # type: ignore[override]
+        cls, _root, info: ResolveInfo, /, *, id: str, input
+    ):
+        order = cls.get_node_or_error(info, id, only_type=Order)
+        cleaned_input = cls.clean_input(info, order, input)
+        app = get_app_promise(info.context).get()
+        manager = get_plugin_manager_promise(info.context).get()
+        with traced_atomic_transaction():
+            event = events.order_note_added_event(
+                order=order,
+                user=info.context.user,
+                app=app,
+                message=cleaned_input["message"],
+            )
+            func = get_webhook_handler_by_order_status(order.status, manager)
+            cls.call_event(func, order)
+        return OrderAddNote(order=order, event=event)
