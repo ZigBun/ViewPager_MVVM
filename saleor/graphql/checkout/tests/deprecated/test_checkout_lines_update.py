@@ -145,4 +145,18 @@ def test_checkout_lines_update_both_token_and_id_given(
     line = checkout.lines.first()
     variant = line.variant
 
-    variant_id = g
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    checkout_id = graphene.Node.to_global_id("Checkout", checkout.pk)
+
+    variables = {
+        "checkoutId": checkout_id,
+        "token": checkout.token,
+        "lines": [{"variantId": variant_id, "quantity": 1}],
+    }
+    response = user_api_client.post_graphql(MUTATION_CHECKOUT_LINES_UPDATE, variables)
+    content = get_graphql_content(response)
+
+    data = content["data"]["checkoutLinesUpdate"]
+    assert len(data["errors"]) == 1
+    assert not data["checkout"]
+    assert data["errors"][0]["code"] == CheckoutErrorCode.GRAPHQL_ERROR.name
