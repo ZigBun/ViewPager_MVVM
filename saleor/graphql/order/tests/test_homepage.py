@@ -243,4 +243,136 @@ def test_orders_total_count_channel_USD(
             "gte": str(date.today() - timedelta(days=3)),
             "lte": str(date.today()),
         },
-        "channel":
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_ORDER_TODAY_COUNT, variables, permissions=[permission_manage_orders]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    assert content["data"]["orders"]["totalCount"] == 1
+
+
+def test_orders_total_count_channel_PLN(
+    staff_api_client,
+    permission_manage_orders,
+    order_with_lines,
+    order_with_lines_channel_PLN,
+    channel_PLN,
+):
+    # given
+    variables = {
+        "created": {
+            "gte": str(date.today() - timedelta(days=3)),
+            "lte": str(date.today()),
+        },
+        "channel": channel_PLN.slug,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_ORDER_TODAY_COUNT, variables, permissions=[permission_manage_orders]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    assert content["data"]["orders"]["totalCount"] == 1
+
+
+def test_orders_total_count_as_staff(
+    staff_api_client,
+    permission_manage_orders,
+    order_with_lines,
+    order_with_lines_channel_PLN,
+    channel_USD,
+):
+    # given
+    variables = {
+        "created": {
+            "gte": str(date.today() - timedelta(days=3)),
+            "lte": str(date.today()),
+        },
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_ORDER_TODAY_COUNT, variables, permissions=[permission_manage_orders]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    assert content["data"]["orders"]["totalCount"] == 1
+
+
+def test_orders_total_count_as_app(
+    app_api_client,
+    permission_manage_orders,
+    order_with_lines,
+    order_with_lines_channel_PLN,
+    channel_USD,
+):
+    # given
+    variables = {
+        "created": {
+            "gte": str(date.today() - timedelta(days=3)),
+            "lte": str(date.today()),
+        },
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = app_api_client.post_graphql(
+        QUERY_ORDER_TODAY_COUNT, variables, permissions=[permission_manage_orders]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    assert content["data"]["orders"]["totalCount"] == 1
+
+
+def test_orders_total_count_as_customer(
+    user_api_client,
+    order_with_lines,
+    order_with_lines_channel_PLN,
+    channel_USD,
+):
+    # given
+    variables = {
+        "created": {
+            "gte": str(date.today() - timedelta(days=3)),
+            "lte": str(date.today()),
+        },
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = user_api_client.post_graphql(QUERY_ORDER_TODAY_COUNT, variables)
+
+    # then
+    assert_no_permission(response)
+
+
+def test_orders_total_count_as_anonymous(
+    api_client,
+    order_with_lines,
+    order_with_lines_channel_PLN,
+    channel_USD,
+):
+    # given
+    variables = {
+        "created": {
+            "gte": str(date.today() - timedelta(days=3)),
+            "lte": str(date.today()),
+        },
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = api_client.post_graphql(QUERY_ORDER_TODAY_COUNT, variables)
+
+    # then
+    assert_no_permission(response)
