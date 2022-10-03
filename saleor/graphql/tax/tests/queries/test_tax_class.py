@@ -79,4 +79,49 @@ TAX_CLASS_PRIVATE_METADATA_QUERY = """
                 value
             }
         }
- 
+    }
+"""
+
+
+def test_tax_class_private_metadata_requires_manage_taxes_app(
+    app_api_client, default_tax_class, permission_manage_taxes
+):
+    # given
+    tax_class = default_tax_class
+    id = graphene.Node.to_global_id("TaxClass", tax_class.pk)
+    variables = {"id": id}
+
+    # when
+    response = app_api_client.post_graphql(
+        TAX_CLASS_PRIVATE_METADATA_QUERY,
+        variables,
+        permissions=[permission_manage_taxes],
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["taxClass"]
+    assert data["id"] == graphene.Node.to_global_id("TaxClass", tax_class.pk)
+    assert data["privateMetadata"]
+
+
+def test_tax_class_private_metadata_requires_manage_taxes_staff_user(
+    staff_api_client, default_tax_class, permission_manage_taxes
+):
+    # given
+    tax_class = default_tax_class
+    id = graphene.Node.to_global_id("TaxClass", tax_class.pk)
+    variables = {"id": id}
+
+    # when
+    response = staff_api_client.post_graphql(
+        TAX_CLASS_PRIVATE_METADATA_QUERY,
+        variables,
+        permissions=[permission_manage_taxes],
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["taxClass"]
+    assert data["id"] == graphene.Node.to_global_id("TaxClass", tax_class.pk)
+    assert data["privateMetadata"]
