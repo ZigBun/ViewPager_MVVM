@@ -30,4 +30,19 @@ class Migration(migrations.Migration):
                     ("domestic services", "domestic services"),
                     ("e-books", "e-books"),
                     ("foodstuffs", "foodstuffs"),
-                    ("h
+                    ("hotels", "hotels"),
+                    ("medical", "medical"),
+                    ("newspapers", "newspapers"),
+                    ("passenger transport", "passenger transport"),
+                    ("pharmaceuticals", "pharmaceuticals"),
+                    ("property renovations", "property renovations"),
+                    ("restaurants", "restaurants"),
+                    ("social housing", "social housing"),
+                    ("standard", "standard"),
+                    ("water", "water"),
+                ],
+                default="standard",
+                max_length=128,
+            ),
+        )
+    ]
