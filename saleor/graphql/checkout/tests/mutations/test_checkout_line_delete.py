@@ -111,4 +111,30 @@ def test_checkout_lines_delete_with_not_applicable_voucher(
     data = content["data"]["checkoutLineDelete"]
     assert not data["errors"]
     checkout_with_item.refresh_from_db()
-    assert checkout_with_item.li
+    assert checkout_with_item.lines.count() == 0
+    assert checkout_with_item.voucher_code is None
+
+
+def test_checkout_line_delete_remove_shipping_if_removed_product_with_shipping(
+    user_api_client, checkout_with_item, digital_content, address, shipping_method
+):
+    checkout = checkout_with_item
+    digital_variant = digital_content.product_variant
+    checkout.shipping_address = address
+    checkout.shipping_method = shipping_method
+    checkout.save()
+    checkout_info = fetch_checkout_info(checkout, [], [], get_plugins_manager())
+    add_variant_to_checkout(checkout_info, digital_variant, 1)
+    line = checkout.lines.first()
+
+    line_id = graphene.Node.to_global_id("CheckoutLine", line.pk)
+
+    variables = {"id": to_global_id_or_none(checkout), "lineId": line_id}
+    response = user_api_client.post_graphql(MUTATION_CHECKOUT_LINE_DELETE, variables)
+    content = get_graphql_content(response)
+
+    data = content["data"]["checkoutLineDelete"]
+    assert not data["errors"]
+    checkout.refresh_from_db()
+    assert checkout.lines.count() == 1
+    assert not checkout.shipping_method
