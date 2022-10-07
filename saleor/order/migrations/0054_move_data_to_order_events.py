@@ -45,4 +45,6 @@ class Migration(migrations.Migration):
     dependencies = [("order", "0053_orderevent")]
 
     operations = [
-        migrations.RunPyt
+        migrations.RunPython(move_order_note_to_events),
+        migrations.RunPython(move_order_history_entry_to_events),
+    ]
