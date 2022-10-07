@@ -117,4 +117,161 @@ class Warehouse(ModelObjectType[models.Warehouse]):
         edges_with_context = []
         for edge in slice.edges:
             node = edge.node
-            edge.node = ChannelContext(node=node, channel_
+            edge.node = ChannelContext(node=node, channel_slug=None)
+            edges_with_context.append(edge)
+        slice.edges = edges_with_context
+
+        return slice
+
+    @staticmethod
+    def resolve_address(root, info: ResolveInfo):
+        if hasattr(root, "is_object_deleted") and root.is_object_deleted:
+            return root.address
+
+        return AddressByIdLoader(info.context).load(root.address_id)
+
+    @staticmethod
+    def resolve_company_name(root, info: ResolveInfo):
+        def _resolve_company_name(address):
+            return address.company_name
+
+        return (
+            AddressByIdLoader(info.context)
+            .load(root.address_id)
+            .then(_resolve_company_name)
+        )
+
+
+class WarehouseCountableConnection(CountableConnection):
+    class Meta:
+        node = Warehouse
+
+
+class Stock(ModelObjectType[models.Stock]):
+    id = graphene.GlobalID(required=True)
+    warehouse = graphene.Field(Warehouse, required=True)
+    product_variant = graphene.Field(
+        "saleor.graphql.product.types.ProductVariant", required=True
+    )
+    quantity = PermissionsField(
+        graphene.Int,
+        required=True,
+        description=(
+            "Quantity of a product in the warehouse's possession, including the "
+            "allocated stock that is waiting for shipment."
+        ),
+        permissions=[
+            ProductPermissions.MANAGE_PRODUCTS,
+            OrderPermissions.MANAGE_ORDERS,
+        ],
+    )
+    quantity_allocated = PermissionsField(
+        graphene.Int,
+        required=True,
+        description="Quantity allocated for orders.",
+        permissions=[
+            ProductPermissions.MANAGE_PRODUCTS,
+            OrderPermissions.MANAGE_ORDERS,
+        ],
+    )
+    quantity_reserved = PermissionsField(
+        graphene.Int,
+        required=True,
+        description="Quantity reserved for checkouts.",
+        permissions=[
+            ProductPermissions.MANAGE_PRODUCTS,
+            OrderPermissions.MANAGE_ORDERS,
+        ],
+    )
+
+    class Meta:
+        description = "Represents stock."
+        model = models.Stock
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def resolve_quantity(root, _info: ResolveInfo):
+        return root.quantity
+
+    @staticmethod
+    def resolve_quantity_allocated(root, _info: ResolveInfo):
+        return root.allocations.aggregate(
+            quantity_allocated=Coalesce(Sum("quantity_allocated"), 0)
+        )["quantity_allocated"]
+
+    @staticmethod
+    @load_site_callback
+    def resolve_quantity_reserved(root, _info: ResolveInfo, site):
+        if not is_reservation_enabled(site.settings):
+            return 0
+
+        return root.reservations.aggregate(
+            quantity_reserved=Coalesce(
+                Sum(
+                    "quantity_reserved",
+                    filter=Q(reserved_until__gt=timezone.now()),
+                ),
+                0,
+            )
+        )["quantity_reserved"]
+
+    @staticmethod
+    def resolve_warehouse(root, info: ResolveInfo):
+        if root.warehouse_id:
+            return WarehouseByIdLoader(info.context).load(root.warehouse_id)
+        return None
+
+    @staticmethod
+    def resolve_product_variant(root, info: ResolveInfo):
+        return (
+            ProductVariantByIdLoader(info.context)
+            .load(root.product_variant_id)
+            .then(lambda variant: ChannelContext(node=variant, channel_slug=None))
+        )
+
+
+class StockCountableConnection(CountableConnection):
+    class Meta:
+        node = Stock
+
+
+class Allocation(graphene.ObjectType):
+    id = graphene.GlobalID(required=True)
+    quantity = PermissionsField(
+        graphene.Int,
+        required=True,
+        description="Quantity allocated for orders.",
+        permissions=[
+            ProductPermissions.MANAGE_PRODUCTS,
+            OrderPermissions.MANAGE_ORDERS,
+        ],
+    )
+    warehouse = PermissionsField(
+        Warehouse,
+        required=True,
+        description="The warehouse were items were allocated.",
+        permissions=[
+            ProductPermissions.MANAGE_PRODUCTS,
+            OrderPermissions.MANAGE_ORDERS,
+        ],
+    )
+
+    class Meta:
+        description = "Represents allocation."
+        model = models.Allocation
+        interfaces = [graphene.relay.Node]
+
+    @staticmethod
+    def get_node(_info, id):
+        try:
+            return models.Allocation.objects.get(pk=id)
+        except models.Allocation.DoesNotExist:
+            return None
+
+    @staticmethod
+    def resolve_warehouse(root, _info: ResolveInfo):
+        return root.stock.warehouse
+
+    @staticmethod
+    def resolve_quantity(root, _info: ResolveInfo):
+        return root.quantity_allocated
