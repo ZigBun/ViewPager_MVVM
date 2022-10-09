@@ -233,4 +233,58 @@ def test_product_pricing_use_tax_class_from_product_type(
     assert price_range_undiscounted_PL["start"]["net"]["amount"] == net
     assert price_range_undiscounted_PL["start"]["gross"]["amount"] == gross
     assert price_range_undiscounted_PL["stop"]["net"]["amount"] == net
-    assert price_ra
+    assert price_range_undiscounted_PL["stop"]["gross"]["amount"] == gross
+
+
+def test_product_pricing_no_flat_rates_in_one_country(
+    product_available_in_many_channels,
+    channel_PLN,
+    user_api_client,
+):
+    # given
+    product = product_available_in_many_channels
+    _enable_flat_rates(channel_PLN, True)
+    _configure_tax_rates(product)
+    TaxConfigurationPerCountry.objects.filter(country="PL").update(
+        tax_calculation_strategy="TAX_APP"
+    )
+
+    # when
+    variables = {
+        "id": graphene.Node.to_global_id("Product", product.id),
+        "channel": channel_PLN.slug,
+    }
+    response = user_api_client.post_graphql(QUERY_PRODUCT_PRICING, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["product"]
+
+    # then
+    variant = product.variants.first()
+    channel_listing = variant.channel_listings.filter(channel_id=channel_PLN.id).first()
+    price_pl = float(channel_listing.price_amount.quantize(Decimal(".01")))
+    gross_de = channel_listing.price_amount.quantize(Decimal(".01"))
+    net_de = (gross_de / Decimal(1 + TAX_RATE_DE / 100)).quantize(Decimal(".01"))
+    gross_de = float(gross_de)
+    net_de = float(net_de)
+
+    price_range_PL = data["pricingPL"]["priceRange"]
+    price_range_undiscounted_PL = data["pricingPL"]["priceRangeUndiscounted"]
+    assert price_range_PL["start"]["net"]["amount"] == price_pl
+    assert price_range_PL["start"]["gross"]["amount"] == price_pl
+    assert price_range_PL["stop"]["net"]["amount"] == price_pl
+    assert price_range_PL["stop"]["gross"]["amount"] == price_pl
+    assert price_range_undiscounted_PL["start"]["net"]["amount"] == price_pl
+    assert price_range_undiscounted_PL["start"]["gross"]["amount"] == price_pl
+    assert price_range_undiscounted_PL["stop"]["net"]["amount"] == price_pl
+    assert price_range_undiscounted_PL["stop"]["gross"]["amount"] == price_pl
+
+    price_range_DE = data["pricingDE"]["priceRange"]
+    price_range_undiscounted_DE = data["pricingDE"]["priceRangeUndiscounted"]
+    assert price_range_DE["start"]["net"]["amount"] == net_de
+    assert price_range_DE["start"]["gross"]["amount"] == gross_de
+    assert price_range_DE["stop"]["net"]["amount"] == net_de
+    assert price_range_DE["stop"]["gross"]["amount"] == gross_de
+    assert price_range_undiscounted_DE["start"]["net"]["amount"] == net_de
+    assert price_range_undiscounted_DE["start"]["gross"]["amount"] == gross_de
+    assert price_range_undiscounted_DE["stop"]["net"]["amount"] == net_de
+    assert price_range_undiscounted_DE["stop"]["gross"]["amount"] == gross_de
