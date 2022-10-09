@@ -101,3 +101,19 @@ class VoucherFilter(MetadataFilterBase):
     class Meta:
         model = Voucher
         fields = ["status", "times_used", "discount_type", "started", "search"]
+
+
+class SaleFilter(MetadataFilterBase):
+    status = ListObjectTypeFilter(input_class=DiscountStatusEnum, method=filter_status)
+    sale_type = ObjectTypeFilter(
+        input_class=DiscountValueTypeEnum, method=filter_sale_type
+    )
+    started = ObjectTypeFilter(input_class=DateTimeRangeInput, method=filter_started)
+    updated_at = ObjectTypeFilter(
+        input_class=DateTimeRangeInput, method=filter_updated_at_range
+    )
+    search = django_filters.CharFilter(method=filter_sale_search)
+
+    class Meta:
+        model = Sale
+        fields = ["status", "sale_type", "started", "search"]
