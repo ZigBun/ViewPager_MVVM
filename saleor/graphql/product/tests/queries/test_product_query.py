@@ -858,4 +858,242 @@ def test_product_query_by_slug(user_api_client, product, channel_USD):
     response = user_api_client.post_graphql(QUERY_PRODUCT, variables=variables)
     content = get_graphql_content(response)
     product_data = content["data"]["product"]
-   
+    assert product_data is None
+
+
+def test_product_query_by_id_not_existing_in_channel_as_customer(
+    user_api_client, product, channel_USD
+):
+    variables = {
+        "id": graphene.Node.to_global_id("Product", product.pk),
+        "channel": channel_USD.slug,
+    }
+    ProductChannelListing.objects.filter(product=product, channel=channel_USD).delete()
+
+    response = user_api_client.post_graphql(QUERY_PRODUCT, variables=variables)
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is None
+
+
+def test_product_query_by_slug_available_as_staff_user(
+    staff_api_client, permission_manage_products, product, channel_USD
+):
+    variables = {
+        "slug": product.slug,
+        "channel": channel_USD.slug,
+    }
+
+    response = staff_api_client.post_graphql(
+        QUERY_PRODUCT,
+        variables=variables,
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is not None
+    assert product_data["name"] == product.name
+
+
+def test_product_query_by_slug_not_available_as_staff_user(
+    staff_api_client, permission_manage_products, product, channel_USD
+):
+    variables = {
+        "slug": product.slug,
+        "channel": channel_USD.slug,
+    }
+    ProductChannelListing.objects.filter(product=product, channel=channel_USD).update(
+        is_published=False
+    )
+
+    response = staff_api_client.post_graphql(
+        QUERY_PRODUCT,
+        variables=variables,
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is not None
+    assert product_data["name"] == product.name
+
+
+def test_product_query_by_slug_not_existing_in_channel_as_staff_user(
+    staff_api_client, permission_manage_products, product, channel_USD
+):
+    variables = {
+        "slug": product.slug,
+        "channel": channel_USD.slug,
+    }
+    ProductChannelListing.objects.filter(product=product, channel=channel_USD).delete()
+
+    response = staff_api_client.post_graphql(
+        QUERY_PRODUCT,
+        variables=variables,
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is None
+
+
+def test_product_query_by_slug_as_staff_user_without_channel(
+    staff_api_client, permission_manage_products, product, channel_USD
+):
+    variables = {
+        "slug": product.slug,
+    }
+    ProductChannelListing.objects.filter(product=product, channel=channel_USD).delete()
+
+    response = staff_api_client.post_graphql(
+        QUERY_PRODUCT,
+        variables=variables,
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is not None
+    assert product_data["name"] == product.name
+
+
+def test_product_query_by_slug_available_as_app(
+    app_api_client, permission_manage_products, product, channel_USD
+):
+    variables = {
+        "slug": product.slug,
+        "channel": channel_USD.slug,
+    }
+
+    response = app_api_client.post_graphql(
+        QUERY_PRODUCT,
+        variables=variables,
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is not None
+    assert product_data["name"] == product.name
+
+
+def test_product_query_by_slug_not_available_as_app(
+    app_api_client, permission_manage_products, product, channel_USD
+):
+    variables = {
+        "slug": product.slug,
+        "channel": channel_USD.slug,
+    }
+    ProductChannelListing.objects.filter(product=product, channel=channel_USD).update(
+        is_published=False
+    )
+
+    response = app_api_client.post_graphql(
+        QUERY_PRODUCT,
+        variables=variables,
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is not None
+    assert product_data["name"] == product.name
+
+
+def test_product_query_by_slug_not_existing_in_channel_as_app(
+    app_api_client, permission_manage_products, product, channel_USD
+):
+    variables = {
+        "slug": product.slug,
+        "channel": channel_USD.slug,
+    }
+    ProductChannelListing.objects.filter(product=product, channel=channel_USD).delete()
+
+    response = app_api_client.post_graphql(
+        QUERY_PRODUCT,
+        variables=variables,
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is None
+
+
+def test_product_query_by_slug_as_app_without_channel(
+    app_api_client, permission_manage_products, product, channel_USD
+):
+    variables = {
+        "slug": product.slug,
+    }
+    ProductChannelListing.objects.filter(product=product, channel=channel_USD).delete()
+
+    response = app_api_client.post_graphql(
+        QUERY_PRODUCT,
+        variables=variables,
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is not None
+    assert product_data["name"] == product.name
+
+
+def test_product_query_by_slug_available_as_customer(
+    user_api_client, product, channel_USD
+):
+    variables = {
+        "slug": product.slug,
+        "channel": channel_USD.slug,
+    }
+
+    response = user_api_client.post_graphql(QUERY_PRODUCT, variables=variables)
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is not None
+    assert product_data["name"] == product.name
+
+
+def test_product_query_by_slug_not_available_as_customer(
+    user_api_client, product, channel_USD
+):
+    variables = {
+        "slug": product.slug,
+        "channel": channel_USD.slug,
+    }
+    ProductChannelListing.objects.filter(product=product, channel=channel_USD).update(
+        is_published=False
+    )
+
+    response = user_api_client.post_graphql(QUERY_PRODUCT, variables=variables)
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is None
+
+
+def test_product_query_is_available_for_purchase_true(
+    user_api_client, product, channel_USD
+):
+    # given
+    available_for_purchase = timezone.now() - timedelta(days=1)
+    product.channel_listings.update(available_for_purchase_at=available_for_purchase)
+
+    variables = {
+        "id": graphene.Node.to_global_id("Product", product.pk),
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = user_api_client.post_graphql(QUERY_PRODUCT, variables=variables)
+
+    # then
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+
+    assert product_data["availableForPurchase"] == available_for_purchase.strftime(
+        "%Y-%m-%d"
+    )
+    assert product_data["availableForPurchaseAt"] == a
