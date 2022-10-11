@@ -329,4 +329,267 @@ def test_product_query_by_id_not_available_as_app(
         is_published=False
     )
 
-    response = app_api_client.
+    response = app_api_client.post_graphql(
+        QUERY_PRODUCT,
+        variables=variables,
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is not None
+    assert product_data["name"] == product.name
+
+
+def test_product_query_by_id_not_existing_in_channel_as_app(
+    app_api_client, permission_manage_products, product, channel_USD
+):
+    variables = {
+        "id": graphene.Node.to_global_id("Product", product.pk),
+        "channel": channel_USD.slug,
+    }
+    ProductChannelListing.objects.filter(product=product, channel=channel_USD).delete()
+
+    response = app_api_client.post_graphql(
+        QUERY_PRODUCT,
+        variables=variables,
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is None
+
+
+def test_product_query_by_id_as_app_without_channel_slug(
+    app_api_client, permission_manage_products, product, channel_USD
+):
+    variables = {
+        "id": graphene.Node.to_global_id("Product", product.pk),
+    }
+    ProductChannelListing.objects.filter(product=product, channel=channel_USD).delete()
+
+    response = app_api_client.post_graphql(
+        QUERY_PRODUCT,
+        variables=variables,
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+    assert product_data is not None
+    assert product_data["name"] == product.name
+
+
+def test_product_variants_without_sku_query_by_staff(
+    staff_api_client, product, channel_USD
+):
+    product.variants.update(sku=None)
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+
+    variables = {
+        "id": product_id,
+        "channel": channel_USD.slug,
+    }
+
+    response = staff_api_client.post_graphql(
+        QUERY_PRODUCT_BY_ID,
+        variables=variables,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+
+    assert product_data is not None
+    assert product_data["id"] == product_id
+
+    variant = product.variants.first()
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    assert product_data["variants"] == [{"id": variant_id}]
+
+
+def test_product_only_with_variants_without_sku_query_by_customer(
+    user_api_client, product, channel_USD
+):
+    product.variants.update(sku=None)
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+
+    variables = {
+        "id": product_id,
+        "channel": channel_USD.slug,
+    }
+
+    response = user_api_client.post_graphql(
+        QUERY_PRODUCT_BY_ID,
+        variables=variables,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+
+    assert product_data is not None
+    assert product_data["id"] == product_id
+
+    variant = product.variants.first()
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    assert product_data["variants"] == [{"id": variant_id}]
+
+
+def test_product_only_with_variants_without_sku_query_by_anonymous(
+    api_client, product, channel_USD
+):
+    product.variants.update(sku=None)
+    product_id = graphene.Node.to_global_id("Product", product.pk)
+
+    variables = {
+        "id": product_id,
+        "channel": channel_USD.slug,
+    }
+
+    response = api_client.post_graphql(
+        QUERY_PRODUCT_BY_ID,
+        variables=variables,
+    )
+    content = get_graphql_content(response)
+    product_data = content["data"]["product"]
+
+    assert product_data is not None
+    assert product_data["id"] == product_id
+
+    variant = product.variants.first()
+    variant_id = graphene.Node.to_global_id("ProductVariant", variant.pk)
+    assert product_data["variants"] == [{"id": variant_id}]
+
+
+QUERY_PRODUCT_BY_ID_WITH_MEDIA = """
+    query ($id: ID, $channel: String, $size: Int, $format: ThumbnailFormatEnum){
+        product(id: $id, channel: $channel) {
+            media {
+                id
+            }
+            thumbnail(size: $size, format: $format) {
+                url
+                alt
+            }
+            variants {
+                id
+                name
+                media {
+                    id
+                }
+            }
+        }
+    }
+"""
+
+
+def test_query_product_thumbnail_with_size_and_format_proxy_url_returned(
+    staff_api_client, product_with_image, channel_USD, site_settings
+):
+    # given
+    format = ThumbnailFormatEnum.WEBP.name
+
+    id = graphene.Node.to_global_id("Product", product_with_image.pk)
+    variables = {
+        "id": id,
+        "size": 120,
+        "format": format,
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(QUERY_PRODUCT_BY_ID_WITH_MEDIA, variables)
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["product"]
+    product_media_id = graphene.Node.to_global_id(
+        "ProductMedia", product_with_image.media.first().pk
+    )
+    expected_url = (
+        f"http://{site_settings.site.domain}"
+        f"/thumbnail/{product_media_id}/128/{format.lower()}/"
+    )
+    assert data["thumbnail"]["url"] == expected_url
+
+
+def test_query_product_thumbnail_with_size_and_proxy_url_returned(
+    staff_api_client, product_with_image, channel_USD, site_settings
+):
+    # given
+    id = graphene.Node.to_global_id("Product", product_with_image.pk)
+    variables = {
+        "id": id,
+        "size": 120,
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(QUERY_PRODUCT_BY_ID_WITH_MEDIA, variables)
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["product"]
+    product_media_id = graphene.Node.to_global_id(
+        "ProductMedia", product_with_image.media.first().pk
+    )
+    assert (
+        data["thumbnail"]["url"]
+        == f"http://{site_settings.site.domain}/thumbnail/{product_media_id}/128/"
+    )
+
+
+def test_query_product_thumbnail_with_size_and_thumbnail_url_returned(
+    staff_api_client, product_with_image, channel_USD, site_settings
+):
+    # given
+    product_media = product_with_image.media.first()
+
+    thumbnail_mock = MagicMock(spec=File)
+    thumbnail_mock.name = "thumbnail_image.jpg"
+    Thumbnail.objects.create(
+        product_media=product_media, size=128, image=thumbnail_mock
+    )
+
+    id = graphene.Node.to_global_id("Product", product_with_image.pk)
+    variables = {
+        "id": id,
+        "size": 120,
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(QUERY_PRODUCT_BY_ID_WITH_MEDIA, variables)
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["product"]
+    assert (
+        data["thumbnail"]["url"]
+        == f"http://{site_settings.site.domain}/media/thumbnails/{thumbnail_mock.name}"
+    )
+
+
+def test_query_product_thumbnail_only_format_provided_default_size_is_used(
+    staff_api_client, product_with_image, channel_USD, site_settings
+):
+    # given
+    format = ThumbnailFormatEnum.WEBP.name
+
+    id = graphene.Node.to_global_id("Product", product_with_image.pk)
+    variables = {
+        "id": id,
+        "format": format,
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(QUERY_PRODUCT_BY_ID_WITH_MEDIA, variables)
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["product"]
+    product_media_id = graphene.Node.to_global_id(
+        "ProductMedia", product_with_image.media.first().pk
+    )
+    expected_url = (
+        f"http://{site_settings.site.domain}"
+        f"/thumbnail/{product_media_id}/256/{forma
