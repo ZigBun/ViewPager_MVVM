@@ -1591,4 +1591,238 @@ QUERY_PRODUCT_IMAGE_BY_ID = """
             imageById(id: $imageId) {
                 id
                 url
-       
+            }
+        }
+    }
+"""
+
+
+def test_query_product_image_by_id(user_api_client, product_with_image, channel_USD):
+    query = QUERY_PRODUCT_IMAGE_BY_ID
+    media = product_with_image.media.first()
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "imageId": graphene.Node.to_global_id("ProductImage", media.pk),
+        "channel": channel_USD.slug,
+    }
+
+    response = user_api_client.post_graphql(query, variables)
+
+    content = get_graphql_content(response)
+    assert content["data"]["product"]["imageById"]["id"]
+    assert content["data"]["product"]["imageById"]["url"]
+
+
+def test_query_product_image_by_id_missing_id(
+    user_api_client, product_with_image, channel_USD
+):
+    query = QUERY_PRODUCT_IMAGE_BY_ID
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "imageId": graphene.Node.to_global_id("ProductMedia", -1),
+        "channel": channel_USD.slug,
+    }
+
+    response = user_api_client.post_graphql(query, variables)
+
+    content = get_graphql_content(response)
+    assert content["data"]["product"]["imageById"] is None
+
+
+def test_query_product_image_by_id_not_media_id(
+    user_api_client, product_with_image, channel_USD
+):
+    query = QUERY_PRODUCT_IMAGE_BY_ID
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "imageId": graphene.Node.to_global_id("Product", -1),
+        "channel": channel_USD.slug,
+    }
+
+    response = user_api_client.post_graphql(query, variables)
+
+    content = get_graphql_content(response)
+    assert content["data"]["product"]["imageById"] is None
+
+
+def test_query_product_image_by_invalid_id(
+    user_api_client, product_with_image, channel_USD
+):
+    query = QUERY_PRODUCT_IMAGE_BY_ID
+    id = "mnb"
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "imageId": id,
+        "channel": channel_USD.slug,
+    }
+
+    response = user_api_client.post_graphql(query, variables)
+
+    content = get_graphql_content_from_response(response)
+    assert len(content["errors"]) == 1
+    assert content["errors"][0]["message"] == f"Couldn't resolve id: {id}."
+    assert content["data"]["product"]["imageById"] is None
+
+
+def test_product_with_collections(
+    staff_api_client, product, published_collection, permission_manage_products
+):
+    query = """
+        query getProduct($productID: ID!) {
+            product(id: $productID) {
+                collections {
+                    name
+                }
+            }
+        }
+        """
+    product.collections.add(published_collection)
+    product.save()
+    product_id = graphene.Node.to_global_id("Product", product.id)
+
+    variables = {"productID": product_id}
+    staff_api_client.user.user_permissions.add(permission_manage_products)
+    response = staff_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["product"]
+    assert data["collections"][0]["name"] == published_collection.name
+    assert len(data["collections"]) == 1
+
+
+QUERY_PRODUCT_MEDIA_BY_ID = """
+    query productMediaById(
+        $mediaId: ID!,
+        $productId: ID!,
+        $channel: String,
+        $size: Int,
+        $format: ThumbnailFormatEnum,
+    ) {
+        product(id: $productId, channel: $channel) {
+            mediaById(id: $mediaId) {
+                id
+                url(size: $size, format: $format)
+            }
+        }
+    }
+"""
+
+
+def test_query_product_media_by_id(user_api_client, product_with_image, channel_USD):
+    query = QUERY_PRODUCT_MEDIA_BY_ID
+    media = product_with_image.media.first()
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "mediaId": graphene.Node.to_global_id("ProductMedia", media.pk),
+        "channel": channel_USD.slug,
+    }
+
+    response = user_api_client.post_graphql(query, variables)
+
+    content = get_graphql_content(response)
+    assert content["data"]["product"]["mediaById"]["id"]
+    assert content["data"]["product"]["mediaById"]["url"]
+
+
+def test_query_product_media_by_id_missing_id(
+    user_api_client, product_with_image, channel_USD
+):
+    query = QUERY_PRODUCT_MEDIA_BY_ID
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "mediaId": graphene.Node.to_global_id("ProductMedia", -1),
+        "channel": channel_USD.slug,
+    }
+
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    assert content["data"]["product"]["mediaById"] is None
+
+
+def test_query_product_media_by_id_not_media_id(
+    user_api_client, product_with_image, channel_USD
+):
+    query = QUERY_PRODUCT_MEDIA_BY_ID
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "mediaId": graphene.Node.to_global_id("Product", -1),
+        "channel": channel_USD.slug,
+    }
+
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    assert content["data"]["product"]["mediaById"] is None
+
+
+def test_query_product_media_by_invalid_id(
+    user_api_client, product_with_image, channel_USD
+):
+    query = QUERY_PRODUCT_MEDIA_BY_ID
+    id = "sks"
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "mediaId": id,
+        "channel": channel_USD.slug,
+    }
+
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content_from_response(response)
+    assert len(content["errors"]) == 1
+    assert content["errors"][0]["message"] == f"Couldn't resolve id: {id}."
+    assert content["data"]["product"]["mediaById"] is None
+
+
+def test_query_product_media_by_id_with_size_and_format_proxy_url_returned(
+    user_api_client, product_with_image, channel_USD, site_settings
+):
+    query = QUERY_PRODUCT_MEDIA_BY_ID
+    media = product_with_image.media.first()
+
+    format = ThumbnailFormatEnum.WEBP.name
+    media_id = graphene.Node.to_global_id("ProductMedia", media.pk)
+
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "mediaId": media_id,
+        "channel": channel_USD.slug,
+        "size": 120,
+        "format": format,
+    }
+
+    response = user_api_client.post_graphql(query, variables)
+
+    content = get_graphql_content(response)
+    assert content["data"]["product"]["mediaById"]["id"]
+    domain = site_settings.site.domain
+    assert (
+        content["data"]["product"]["mediaById"]["url"]
+        == f"http://{domain}/thumbnail/{media_id}/128/{format.lower()}/"
+    )
+
+
+def test_query_product_media_by_id_with_size_proxy_url_returned(
+    user_api_client, product_with_image, channel_USD, site_settings
+):
+    query = QUERY_PRODUCT_MEDIA_BY_ID
+    media = product_with_image.media.first()
+
+    media_id = graphene.Node.to_global_id("ProductMedia", media.pk)
+
+    variables = {
+        "productId": graphene.Node.to_global_id("Product", product_with_image.pk),
+        "mediaId": media_id,
+        "channel": channel_USD.slug,
+        "size": 120,
+    }
+
+    response = user_api_client.post_graphql(query, variables)
+
+    content = get_graphql_content(response)
+    assert content["data"]["product"]["mediaById"]["id"]
+    assert (
+        content["data"]["product"]["mediaById"]["url"]
+        == f"http://{site_settings.site.domain}/thumbnail/{media_id}/128/"
+    )
+
+
+def test_query_product_media_by_id_with_size_thumbnail_url_returned(
+    user_api_client, pr
