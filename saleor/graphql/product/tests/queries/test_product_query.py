@@ -2386,4 +2386,97 @@ def test_fetch_all_products_with_availability_data(
     product_2_stock = product_2.variants.first().stocks.first()
     product_2_stock.quantity = product_2_qty
     product_2_stock.save(update_fields=["quantity"])
-    all
+    allocations.append(
+        Allocation(
+            order_line=order_line,
+            stock=product_2_stock,
+            quantity_allocated=product_2_qty_allocated,
+        )
+    )
+
+    product_3_qty = 10
+    product_3_qty_allocated = 0
+    product_3_stock = product_3.variants.first().stocks.first()
+    product_3_stock.quantity = product_3_qty
+    product_3_stock.save(update_fields=["quantity"])
+
+    Allocation.objects.bulk_create(allocations)
+
+    variables = {"channel": channel_USD.slug}
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_PRODUCTS_AVAILABILITY,
+        variables,
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+
+    # then
+    content = get_graphql_content(response)
+    num_products = Product.objects.count()
+    assert content["data"]["products"]["totalCount"] == num_products
+    product_data = content["data"]["products"]["edges"]
+    assert len(product_data) == num_products
+    for product, quantity, quantity_allocated in zip(
+        product_list,
+        [product_1_qty, product_2_qty, product_3_qty],
+        [product_1_qty_allocated, product_2_qty_allocated, product_3_qty_allocated],
+    ):
+        data = {
+            "node": {
+                "id": graphene.Node.to_global_id("Product", product.id),
+                "name": product.name,
+                "isAvailable": quantity > 0,
+                "variants": [
+                    {
+                        "quantityAvailable": max(quantity - quantity_allocated, 0),
+                        "stocks": [{"quantity": quantity}],
+                    }
+                ],
+            }
+        }
+        assert data in product_data
+
+
+QUERY_PRODUCT_BY_EXTERNAL_REFERENCE = """
+    query ($id: ID, $externalReference: String, $slug: String, $channel:String){
+        product(
+            id: $id,
+            slug: $slug,
+            externalReference: $externalReference,
+            channel: $channel
+        ) {
+            id
+            name
+            externalReference
+        }
+    }
+"""
+
+
+def test_product_query_by_external_reference(
+    staff_api_client, permission_manage_products, product, channel_USD
+):
+    # given
+    product.external_reference = "test-ext-id"
+    product.save(update_fields=["external_reference"])
+    variables = {
+        "externalReference": product.external_reference,
+        "channel": channel_USD.slug,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        QUERY_PRODUCT_BY_EXTERNAL_REFERENCE,
+        variables=variables,
+        permissions=(permission_manage_products,),
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+
+    # then
+    product_data = content["data"]["product"]
+    assert product_data is not None
+    assert product_data["name"] == product.name
+    assert product_data["externalReference"] == product.external_reference
