@@ -50,4 +50,213 @@ def clean_extension_url(extension: dict, manifest_data: dict):
     """Clean assigned extension url.
 
     Make sure that format of url is correct based on the rest of manifest fields.
-    - url can start with 
+    - url can start with '/' when one of these conditions is true:
+        a) extension.target == APP_PAGE
+        b) appUrl is provided
+    - url cannot start with protocol when target == "APP_PAGE"
+    """
+    extension_url = extension["url"]
+    target = extension.get("target") or AppExtensionTarget.POPUP
+    if extension_url.startswith("/"):
+        _clean_extension_url_with_only_path(manifest_data, target, extension_url)
+    elif target == AppExtensionTarget.APP_PAGE:
+        msg = "Url cannot start with protocol when target == APP_PAGE"
+        logger.warning(msg)
+        raise ValidationError(msg)
+    else:
+        _clean_app_url(extension_url)
+
+
+def clean_manifest_url(manifest_url):
+    try:
+        _clean_app_url(manifest_url)
+    except (ValidationError, AttributeError):
+        msg = "Enter a valid URL."
+        code = AppErrorCode.INVALID_URL_FORMAT.value
+        raise ValidationError({"manifest_url": ValidationError(msg, code=code)})
+
+
+def clean_permissions(
+    required_permissions: List[str], saleor_permissions: Iterable[Permission]
+) -> List[Permission]:
+    missing_permissions = []
+    all_permissions = {perm[0]: perm[1] for perm in get_permissions_enum_list()}
+    for perm in required_permissions:
+        if not all_permissions.get(perm):
+            missing_permissions.append(perm)
+    if missing_permissions:
+        error_msg = "Given permissions don't exist."
+        code = AppErrorCode.INVALID_PERMISSION.value
+        params = {"permissions": missing_permissions}
+        raise ValidationError(error_msg, code=code, params=params)
+
+    permissions = [all_permissions[perm] for perm in required_permissions]
+    permissions = split_permission_codename(permissions)
+    return [p for p in saleor_permissions if p.codename in permissions]
+
+
+def clean_manifest_data(manifest_data):
+    errors: T_ERRORS = defaultdict(list)
+
+    validate_required_fields(manifest_data, errors)
+    try:
+        if "tokenTargetUrl" in manifest_data:
+            _clean_app_url(manifest_data["tokenTargetUrl"])
+    except (ValidationError, AttributeError):
+        errors["tokenTargetUrl"].append(
+            ValidationError(
+                "Incorrect format.",
+                code=AppErrorCode.INVALID_URL_FORMAT.value,
+            )
+        )
+
+    saleor_permissions = get_permissions().annotate(
+        formated_codename=Concat("content_type__app_label", Value("."), "codename")
+    )
+    try:
+        app_permissions = clean_permissions(
+            manifest_data.get("permissions", []), saleor_permissions
+        )
+    except ValidationError as e:
+        errors["permissions"].append(e)
+        app_permissions = []
+
+    manifest_data["permissions"] = app_permissions
+
+    if not errors:
+        clean_extensions(manifest_data, app_permissions, errors)
+        clean_webhooks(manifest_data, errors)
+
+    if errors:
+        raise ValidationError(errors)
+
+
+def _clean_extension_permissions(extension, app_permissions, errors):
+    permissions_data = extension.get("permissions", [])
+    try:
+        extension_permissions = clean_permissions(permissions_data, app_permissions)
+    except ValidationError as e:
+        if e.params is None:
+            e.params = {}
+        e.params["label"] = extension.get("label")
+        errors["extensions"].append(e)
+        return
+
+    if len(extension_permissions) != len(permissions_data):
+        errors["extensions"].append(
+            ValidationError(
+                "Extension permission must be listed in App's permissions.",
+                code=AppErrorCode.OUT_OF_SCOPE_PERMISSION.value,
+            )
+        )
+
+    extension["permissions"] = extension_permissions
+
+
+def clean_extension_enum_field(enum, field_name, extension, errors):
+    if extension[field_name] in [code.upper() for code, _ in enum.CHOICES]:
+        extension[field_name] = getattr(enum, extension[field_name])
+    else:
+        errors["extensions"].append(
+            ValidationError(
+                f"Incorrect value for field: {field_name}",
+                code=AppErrorCode.INVALID.value,
+            )
+        )
+
+
+def clean_extensions(manifest_data, app_permissions, errors):
+    extensions = manifest_data.get("extensions", [])
+    for extension in extensions:
+        if "target" not in extension:
+            extension["target"] = AppExtensionTarget.POPUP
+        else:
+            clean_extension_enum_field(AppExtensionTarget, "target", extension, errors)
+        clean_extension_enum_field(AppExtensionMount, "mount", extension, errors)
+
+        try:
+            clean_extension_url(extension, manifest_data)
+        except (ValidationError, AttributeError):
+            errors["extensions"].append(
+                ValidationError(
+                    "Incorrect value for field: url.",
+                    code=AppErrorCode.INVALID_URL_FORMAT.value,
+                )
+            )
+        _clean_extension_permissions(extension, app_permissions, errors)
+
+
+def clean_webhooks(manifest_data, errors):
+    webhooks = manifest_data.get("webhooks", [])
+
+    async_types = {
+        str_to_enum(e_type[0]): e_type[0] for e_type in WebhookEventAsyncType.CHOICES
+    }
+    sync_types = {
+        str_to_enum(e_type[0]): e_type[0] for e_type in WebhookEventSyncType.CHOICES
+    }
+
+    target_url_validator = AppURLValidator(
+        schemes=["http", "https", "awssqs", "gcpubsub"]
+    )
+
+    for webhook in webhooks:
+        webhook["events"] = []
+        for e_type in webhook.get("asyncEvents", []):
+            try:
+                webhook["events"].append(async_types[e_type])
+            except KeyError:
+                errors["webhooks"].append(
+                    ValidationError(
+                        "Invalid asynchronous event.",
+                        code=AppErrorCode.INVALID.value,
+                    )
+                )
+        for e_type in webhook.get("syncEvents", []):
+            try:
+                webhook["events"].append(sync_types[e_type])
+            except KeyError:
+                errors["webhooks"].append(
+                    ValidationError(
+                        "Invalid synchronous event.",
+                        code=AppErrorCode.INVALID.value,
+                    )
+                )
+
+        subscription_query = SubscriptionQuery(webhook["query"])
+        if not subscription_query.is_valid:
+            errors["webhooks"].append(
+                ValidationError(
+                    "Subscription query is not valid: " + subscription_query.error_msg,
+                    code=AppErrorCode.INVALID.value,
+                )
+            )
+
+        if not webhook["events"]:
+            webhook["events"] = subscription_query.events
+
+        try:
+            target_url_validator(webhook["targetUrl"])
+        except ValidationError:
+            errors["webhooks"].append(
+                ValidationError(
+                    "Invalid target url.",
+                    code=AppErrorCode.INVALID_URL_FORMAT.value,
+                )
+            )
+
+        if custom_headers := webhook.get("customHeaders"):
+            try:
+                webhook["customHeaders"] = custom_headers_validator(custom_headers)
+            except ValidationError as err:
+                errors["webhooks"].append(
+                    ValidationError(
+                        f"Invalid custom headers: {err.message}",
+                        code=AppErrorCode.INVALID_CUSTOM_HEADERS.value,
+                    )
+                )
+
+
+def validate_required_fields(manifest_data, errors):
+    manifest_required_fields = {"id", "version", "name", "tokenTargetUrl"}
+    extension_required_fields = {"label", 
