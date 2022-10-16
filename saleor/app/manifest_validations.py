@@ -259,4 +259,35 @@ def clean_webhooks(manifest_data, errors):
 
 def validate_required_fields(manifest_data, errors):
     manifest_required_fields = {"id", "version", "name", "tokenTargetUrl"}
-    extension_required_fields = {"label", 
+    extension_required_fields = {"label", "url", "mount"}
+    webhook_required_fields = {"name", "targetUrl", "query"}
+
+    if manifest_missing_fields := manifest_required_fields.difference(manifest_data):
+        for missing_field in manifest_missing_fields:
+            errors[missing_field].append(
+                ValidationError("Field required.", code=AppErrorCode.REQUIRED.value)
+            )
+
+    app_extensions_data = manifest_data.get("extensions", [])
+    for extension in app_extensions_data:
+        extension_fields = set(extension.keys())
+        if missing_fields := extension_required_fields.difference(extension_fields):
+            errors["extensions"].append(
+                ValidationError(
+                    "Missing required fields for app extension: "
+                    f'{", ".join(missing_fields)}.',
+                    code=AppErrorCode.REQUIRED.value,
+                )
+            )
+
+    webhooks = manifest_data.get("webhooks", [])
+    for webhook in webhooks:
+        webhook_fields = set(webhook.keys())
+        if missing_fields := webhook_required_fields.difference(webhook_fields):
+            errors["webhooks"].append(
+                ValidationError(
+                    f"Missing required fields for webhook: "
+                    f'{", ".join(missing_fields)}.',
+                    code=AppErrorCode.REQUIRED.value,
+                )
+            )
