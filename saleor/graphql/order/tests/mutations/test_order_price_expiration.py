@@ -261,4 +261,54 @@ def test_order_line_update_invalidate_prices(
     query = ORDER_LINE_UPDATE_MUTATION
     order = order_with_lines
     line = order.lines.first()
-    variables = {"lineId": Node.to_gl
+    variables = {"lineId": Node.to_global_id("OrderLine", line.id), "quantity": 1}
+
+    # when
+    content = get_graphql_content(
+        staff_api_client.post_graphql(
+            query, variables, permissions=[permission_manage_orders]
+        )
+    )
+
+    # then
+    assert not content["data"]["orderLineUpdate"]["errors"]
+    order.refresh_from_db()
+    assert order.should_refresh_prices
+
+
+ORDER_LINE_DELETE_MUTATION = """
+mutation OrderLineDelete(
+  $id: ID!
+) {
+  orderLineDelete(
+    id: $id
+  ) {
+    errors {
+      field
+      message
+    }
+  }
+}
+"""
+
+
+def test_order_line_remove(
+    order_with_lines, permission_manage_orders, staff_api_client
+):
+    # given
+    order = order_with_lines
+    line = order.lines.first()
+    query = ORDER_LINE_DELETE_MUTATION
+    variables = {"id": Node.to_global_id("OrderLine", line.id)}
+
+    # when
+    content = get_graphql_content(
+        staff_api_client.post_graphql(
+            query, variables, permissions=[permission_manage_orders]
+        )
+    )
+
+    # then
+    assert not content["data"]["orderLineDelete"]["errors"]
+    order.refresh_from_db()
+    assert order.should_refresh_prices
