@@ -790,4 +790,12 @@ class Migration(migrations.Migration):
                     ("zh-hant", "Chinese (Traditional)"),
                     ("zh-hant-hk", "Chinese (Traditional, Hong Kong SAR China)"),
                     ("zh-hant-mo", "Chinese (Traditional, Macao SAR China)"),
-                    ("zh-hant-tw", "Chinese (Traditional, Taiwan)
+                    ("zh-hant-tw", "Chinese (Traditional, Taiwan)"),
+                    ("zu", "Zulu"),
+                    ("zu-za", "Zulu (South Africa)"),
+                ],
+                default="en",
+                max_length=35,
+            ),
+        ),
+    ]
