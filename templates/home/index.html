@@ -172,4 +172,44 @@
             </p>
 
             <div class="tile__container">
-              {% if dashbo
+              {% if dashboard_url %}
+              <a href="{{dashboard_url}}" target="_blank">
+                <button class="btn tile">
+                  {% include "home/images/dashboard.svg" %}
+                  <span class="tile__label" href="#">Dashboard</span>
+                </button>
+              </a>
+              {% endif %} {% if storefront_url %}
+              <a href="{{storefront_url}}" target="_blank">
+                <button class="btn tile">
+                  {% include "home/images/storefront.svg" %}
+                  <span class="tile__label" href="#">Storefront</span>
+                </button>
+              </a>
+              {% endif %}
+
+              <a href={% url "api" %}  target="_blank">
+                <button class="btn tile">
+                  {% include "home/images/playground.svg" %}
+                  <span class="tile__label" href="#">GraphQL Playground</span>
+                </button>
+              </a>
+            </div>
+
+            {% if not storefront_url and not dashboard_url %}
+            <p>
+              It looks like you're only running the Saleor core. If you're
+              looking for an easy way to run all services locally, check out
+              <a
+                href="https://github.com/mirumee/saleor-platform"
+                target="_blank"
+                >Saleor Platform.</a
+              >
+            </p>
+            {% endif %}
+          </main>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
