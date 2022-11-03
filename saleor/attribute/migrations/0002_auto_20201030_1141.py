@@ -48,4 +48,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterModelTable(
             name="attributevariant",
-            table=Non
+            table=None,
+        ),
+    ]
