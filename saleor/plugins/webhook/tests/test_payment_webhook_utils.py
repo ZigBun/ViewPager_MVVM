@@ -229,4 +229,41 @@ def test_parse_payment_action_response_parse_amount(
     gateway_response = parse_payment_action_response(
         dummy_webhook_app_payment_data, payment_action_response, TransactionKind.AUTH
     )
-    assert gateway_response.amou
+    assert gateway_response.amount == dummy_webhook_app_payment_data.amount
+
+
+def test_clear_successful_delivery(event_delivery):
+    # given
+    assert EventDelivery.objects.filter(pk=event_delivery.pk).exists()
+    event_delivery.status = EventDeliveryStatus.SUCCESS
+    event_delivery.save()
+    event_payload = event_delivery.payload
+    # when
+    clear_successful_delivery(event_delivery)
+    # then
+    assert not EventDelivery.objects.filter(pk=event_delivery.pk).exists()
+    assert not EventPayload.objects.filter(pk=event_payload.pk).exists()
+
+
+def test_clear_successful_delivery_when_payload_in_multiple_deliveries(event_delivery):
+    # given
+    assert EventDelivery.objects.filter(pk=event_delivery.pk).exists()
+    event_delivery.status = EventDeliveryStatus.SUCCESS
+    event_delivery.save()
+    event_payload = event_delivery.payload
+    EventDelivery.objects.create(payload=event_payload, webhook=event_delivery.webhook)
+    # when
+    clear_successful_delivery(event_delivery)
+    # then
+    assert not EventDelivery.objects.filter(pk=event_delivery.pk).exists()
+    assert EventPayload.objects.filter(pk=event_payload.pk).exists()
+
+
+def test_clear_successful_delivery_on_failed_delivery(event_delivery):
+    # given
+    event_delivery.status = EventDeliveryStatus.FAILED
+    event_delivery.save()
+    # when
+    clear_successful_delivery(event_delivery)
+    # then
+    assert EventDelivery.objects.filter(pk=event_delivery.pk).exists()
