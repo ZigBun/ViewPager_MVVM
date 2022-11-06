@@ -415,4 +415,247 @@ def test_query_customer_user_app(
 
     Group.objects.create(name="empty group")
 
-    q
+    query = FULL_USER_QUERY
+    ID = graphene.Node.to_global_id("User", customer_user.id)
+    variables = {"id": ID}
+    app.permissions.add(
+        permission_manage_staff, permission_manage_users, permission_manage_orders
+    )
+    response = app_api_client.post_graphql(query, variables)
+
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+    assert data["email"] == user.email
+
+
+def test_query_customer_user_with_orders_by_app_no_manage_orders_perm(
+    app_api_client,
+    customer_user,
+    order_list,
+    permission_manage_users,
+):
+    # given
+    query = FULL_USER_QUERY
+    order_unfulfilled = order_list[0]
+    order_unfulfilled.user = customer_user
+
+    order_unconfirmed = order_list[1]
+    order_unconfirmed.status = OrderStatus.UNCONFIRMED
+    order_unconfirmed.user = customer_user
+
+    order_draft = order_list[2]
+    order_draft.status = OrderStatus.DRAFT
+    order_draft.user = customer_user
+
+    Order.objects.bulk_update(
+        [order_unconfirmed, order_draft, order_unfulfilled], ["user", "status"]
+    )
+
+    id = graphene.Node.to_global_id("User", customer_user.id)
+    variables = {"id": id}
+
+    # when
+    response = app_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_users]
+    )
+
+    # then
+    assert_no_permission(response)
+
+
+def test_query_staff_user(
+    staff_api_client,
+    staff_user,
+    address,
+    permission_manage_users,
+    media_root,
+    permission_manage_orders,
+    permission_manage_products,
+    permission_manage_staff,
+    permission_manage_menus,
+):
+    staff_user.user_permissions.add(permission_manage_orders, permission_manage_staff)
+
+    groups = Group.objects.bulk_create(
+        [
+            Group(name="manage users"),
+            Group(name="another user group"),
+            Group(name="another group"),
+            Group(name="empty group"),
+        ]
+    )
+    group1, group2, group3, group4 = groups
+
+    group1.permissions.add(permission_manage_users, permission_manage_products)
+
+    # user groups
+    staff_user.groups.add(group1, group2)
+
+    # another group (not user group) with permission_manage_users
+    group3.permissions.add(permission_manage_users, permission_manage_menus)
+
+    avatar_mock = MagicMock(spec=File)
+    avatar_mock.name = "image2.jpg"
+    staff_user.avatar = avatar_mock
+    staff_user.save()
+
+    query = FULL_USER_QUERY
+    user_id = graphene.Node.to_global_id("User", staff_user.pk)
+    variables = {"id": user_id}
+    response = staff_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+
+    assert data["email"] == staff_user.email
+    assert data["firstName"] == staff_user.first_name
+    assert data["lastName"] == staff_user.last_name
+    assert data["isStaff"] == staff_user.is_staff
+    assert data["isActive"] == staff_user.is_active
+    assert data["orders"]["totalCount"] == staff_user.orders.count()
+    assert data["avatar"]["url"]
+
+    assert len(data["permissionGroups"]) == 2
+    assert {group_data["name"] for group_data in data["permissionGroups"]} == {
+        group1.name,
+        group2.name,
+    }
+    assert len(data["userPermissions"]) == 4
+    assert len(data["editableGroups"]) == Group.objects.count() - 1
+    assert {data_group["name"] for data_group in data["editableGroups"]} == {
+        group1.name,
+        group2.name,
+        group4.name,
+    }
+
+    formated_user_permissions_result = [
+        {
+            "code": perm["code"].lower(),
+            "groups": {group["name"] for group in perm["sourcePermissionGroups"]},
+        }
+        for perm in data["userPermissions"]
+    ]
+    all_permissions = group1.permissions.all() | staff_user.user_permissions.all()
+    for perm in all_permissions:
+        source_groups = {group.name for group in perm.group_set.filter(user=staff_user)}
+        expected_data = {"code": perm.codename, "groups": source_groups}
+        assert expected_data in formated_user_permissions_result
+
+
+def test_query_staff_user_with_order_and_without_manage_orders_perm(
+    staff_api_client,
+    staff_user,
+    order_list,
+    permission_manage_staff,
+):
+    # given
+    staff_user.user_permissions.add(permission_manage_staff)
+
+    order_unfulfilled = order_list[0]
+    order_unfulfilled.user = staff_user
+
+    order_unconfirmed = order_list[1]
+    order_unconfirmed.status = OrderStatus.UNCONFIRMED
+    order_unconfirmed.user = staff_user
+
+    order_draft = order_list[2]
+    order_draft.status = OrderStatus.DRAFT
+    order_draft.user = staff_user
+
+    Order.objects.bulk_update(
+        [order_unconfirmed, order_draft, order_unfulfilled], ["user", "status"]
+    )
+
+    query = FULL_USER_QUERY
+    user_id = graphene.Node.to_global_id("User", staff_user.pk)
+    variables = {"id": user_id}
+    response = staff_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+
+    assert data["email"] == staff_user.email
+    assert data["orders"]["totalCount"] == 2
+    assert {node["node"]["id"] for node in data["orders"]["edges"]} == {
+        graphene.Node.to_global_id("Order", order.pk)
+        for order in [order_unfulfilled, order_unconfirmed]
+    }
+
+
+def test_query_staff_user_with_orders_and_manage_orders_perm(
+    staff_api_client,
+    staff_user,
+    order_list,
+    permission_manage_staff,
+    permission_manage_orders,
+):
+    # given
+    staff_user.user_permissions.add(permission_manage_staff, permission_manage_orders)
+
+    order_unfulfilled = order_list[0]
+    order_unfulfilled.user = staff_user
+
+    order_unconfirmed = order_list[1]
+    order_unconfirmed.status = OrderStatus.UNCONFIRMED
+    order_unconfirmed.user = staff_user
+
+    order_draft = order_list[2]
+    order_draft.status = OrderStatus.DRAFT
+    order_draft.user = staff_user
+
+    Order.objects.bulk_update(
+        [order_unconfirmed, order_draft, order_unfulfilled], ["user", "status"]
+    )
+
+    query = FULL_USER_QUERY
+    user_id = graphene.Node.to_global_id("User", staff_user.pk)
+    variables = {"id": user_id}
+    response = staff_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+
+    assert data["email"] == staff_user.email
+    assert data["orders"]["totalCount"] == 3
+    assert {node["node"]["id"] for node in data["orders"]["edges"]} == {
+        graphene.Node.to_global_id("Order", order.pk)
+        for order in [order_unfulfilled, order_unconfirmed, order_draft]
+    }
+
+
+USER_QUERY = """
+    query User($id: ID $email: String, $externalReference: String) {
+        user(id: $id, email: $email, externalReference: $externalReference) {
+            id
+            email
+            externalReference
+        }
+    }
+"""
+
+
+def test_query_user_by_email_address(
+    user_api_client, customer_user, permission_manage_users
+):
+    email = customer_user.email
+    variables = {"email": email}
+    response = user_api_client.post_graphql(
+        USER_QUERY, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+    assert customer_user.email == data["email"]
+
+
+def test_query_user_by_external_reference(
+    user_api_client, customer_user, permission_manage_users
+):
+    # given
+    user = customer_user
+    ext_ref = "test-ext-ref"
+    user.external_reference = ext_ref
+    user.save(update_fields=["external_reference"])
+    variables = {"externalReference": ext_ref}
+
+    # when
+    response = user_api_client.post_graphql(
+        USER_QUERY, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(res
