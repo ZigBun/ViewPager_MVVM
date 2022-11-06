@@ -658,4 +658,242 @@ def test_query_user_by_external_reference(
     response = user_api_client.post_graphql(
         USER_QUERY, variables, permissions=[permission_manage_users]
     )
-    content = get_graphql_content(res
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["user"]
+    assert data["externalReference"] == user.external_reference
+
+
+def test_query_user_by_id_and_email(
+    user_api_client, customer_user, permission_manage_users
+):
+    email = customer_user.email
+    id = graphene.Node.to_global_id("User", customer_user.id)
+    variables = {
+        "id": id,
+        "email": email,
+    }
+    response = user_api_client.post_graphql(
+        USER_QUERY, variables, permissions=[permission_manage_users]
+    )
+    assert_graphql_error_with_message(
+        response, "Argument 'id' cannot be combined with 'email'"
+    )
+
+
+def test_customer_can_not_see_other_users_data(user_api_client, staff_user):
+    id = graphene.Node.to_global_id("User", staff_user.id)
+    variables = {"id": id}
+    response = user_api_client.post_graphql(USER_QUERY, variables)
+    assert_no_permission(response)
+
+
+def test_user_query_anonymous_user(api_client):
+    variables = {"id": ""}
+    response = api_client.post_graphql(USER_QUERY, variables)
+    assert_no_permission(response)
+
+
+def test_user_query_permission_manage_users_get_customer(
+    staff_api_client, customer_user, permission_manage_users
+):
+    customer_id = graphene.Node.to_global_id("User", customer_user.pk)
+    variables = {"id": customer_id}
+    response = staff_api_client.post_graphql(
+        USER_QUERY, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+    assert customer_user.email == data["email"]
+
+
+def test_user_query_as_app(app_api_client, customer_user, permission_manage_users):
+    customer_id = graphene.Node.to_global_id("User", customer_user.pk)
+    variables = {"id": customer_id}
+    response = app_api_client.post_graphql(
+        USER_QUERY, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+    assert customer_user.email == data["email"]
+
+
+def test_user_query_permission_manage_users_get_staff(
+    staff_api_client, staff_user, permission_manage_users
+):
+    staff_id = graphene.Node.to_global_id("User", staff_user.pk)
+    variables = {"id": staff_id}
+    response = staff_api_client.post_graphql(
+        USER_QUERY, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    assert not content["data"]["user"]
+
+
+def test_user_query_permission_manage_staff_get_customer(
+    staff_api_client, customer_user, permission_manage_staff
+):
+    customer_id = graphene.Node.to_global_id("User", customer_user.pk)
+    variables = {"id": customer_id}
+    response = staff_api_client.post_graphql(
+        USER_QUERY, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    assert not content["data"]["user"]
+
+
+def test_user_query_permission_manage_staff_get_staff(
+    staff_api_client, staff_user, permission_manage_staff
+):
+    staff_id = graphene.Node.to_global_id("User", staff_user.pk)
+    variables = {"id": staff_id}
+    response = staff_api_client.post_graphql(
+        USER_QUERY, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+    assert staff_user.email == data["email"]
+
+
+@pytest.mark.parametrize("id", ["'", "abc"])
+def test_user_query_invalid_id(
+    id, staff_api_client, customer_user, permission_manage_users
+):
+    variables = {"id": id}
+    response = staff_api_client.post_graphql(
+        USER_QUERY, variables, permissions=[permission_manage_users]
+    )
+
+    content = get_graphql_content_from_response(response)
+    assert len(content["errors"]) == 1
+    assert content["errors"][0]["message"] == f"Couldn't resolve id: {id}."
+    assert content["data"]["user"] is None
+
+
+def test_user_query_object_with_given_id_does_not_exist(
+    staff_api_client, permission_manage_users
+):
+    id = graphene.Node.to_global_id("User", -1)
+    variables = {"id": id}
+    response = staff_api_client.post_graphql(
+        USER_QUERY, variables, permissions=[permission_manage_users]
+    )
+
+    content = get_graphql_content(response)
+    assert content["data"]["user"] is None
+
+
+def test_user_query_object_with_invalid_object_type(
+    staff_api_client, customer_user, permission_manage_users
+):
+    id = graphene.Node.to_global_id("Order", customer_user.pk)
+    variables = {"id": id}
+    response = staff_api_client.post_graphql(
+        USER_QUERY, variables, permissions=[permission_manage_users]
+    )
+
+    content = get_graphql_content(response)
+    assert content["data"]["user"] is None
+
+
+USER_AVATAR_QUERY = """
+    query User($id: ID, $size: Int, $format: ThumbnailFormatEnum) {
+        user(id: $id) {
+            id
+            avatar(size: $size, format: $format) {
+                url
+                alt
+            }
+        }
+    }
+"""
+
+
+def test_query_user_avatar_with_size_and_format_proxy_url_returned(
+    staff_api_client, media_root, permission_manage_staff, site_settings
+):
+    # given
+    user = staff_api_client.user
+    avatar_mock = MagicMock(spec=File)
+    avatar_mock.name = "image.jpg"
+    user.avatar = avatar_mock
+    user.save(update_fields=["avatar"])
+
+    format = ThumbnailFormatEnum.WEBP.name
+
+    user_id = graphene.Node.to_global_id("User", user.id)
+    user_uuid = graphene.Node.to_global_id("User", user.uuid)
+    variables = {"id": user_id, "size": 120, "format": format}
+
+    # when
+    response = staff_api_client.post_graphql(
+        USER_AVATAR_QUERY, variables, permissions=[permission_manage_staff]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+    domain = site_settings.site.domain
+    assert (
+        data["avatar"]["url"]
+        == f"http://{domain}/thumbnail/{user_uuid}/128/{format.lower()}/"
+    )
+
+
+def test_query_user_avatar_with_size_proxy_url_returned(
+    staff_api_client, media_root, permission_manage_staff, site_settings
+):
+    # given
+    user = staff_api_client.user
+    avatar_mock = MagicMock(spec=File)
+    avatar_mock.name = "image.jpg"
+    user.avatar = avatar_mock
+    user.save(update_fields=["avatar"])
+
+    user_id = graphene.Node.to_global_id("User", user.id)
+    user_uuid = graphene.Node.to_global_id("User", user.uuid)
+    variables = {"id": user_id, "size": 120}
+
+    # when
+    response = staff_api_client.post_graphql(
+        USER_AVATAR_QUERY, variables, permissions=[permission_manage_staff]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+    assert (
+        data["avatar"]["url"]
+        == f"http://{site_settings.site.domain}/thumbnail/{user_uuid}/128/"
+    )
+
+
+def test_query_user_avatar_with_size_thumbnail_url_returned(
+    staff_api_client, media_root, permission_manage_staff, site_settings
+):
+    # given
+    user = staff_api_client.user
+    avatar_mock = MagicMock(spec=File)
+    avatar_mock.name = "image.jpg"
+    user.avatar = avatar_mock
+    user.save(update_fields=["avatar"])
+
+    thumbnail_mock = MagicMock(spec=File)
+    thumbnail_mock.name = "thumbnail_image.jpg"
+    Thumbnail.objects.create(user=user, size=128, image=thumbnail_mock)
+
+    id = graphene.Node.to_global_id("User", user.pk)
+    variables = {"id": id, "size": 120}
+
+    # when
+    response = staff_api_client.post_graphql(
+        USER_AVATAR_QUERY, variables, permissions=[permission_manage_staff]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+    assert (
+        data["avatar"]["url"]
+        == f"http://{site_settings.site.domain}/media/thumbnails/{
