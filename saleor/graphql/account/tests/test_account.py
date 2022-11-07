@@ -896,4 +896,270 @@ def test_query_user_avatar_with_size_thumbnail_url_returned(
     data = content["data"]["user"]
     assert (
         data["avatar"]["url"]
-        == f"http://{site_settings.site.domain}/media/thumbnails/{
+        == f"http://{site_settings.site.domain}/media/thumbnails/{thumbnail_mock.name}"
+    )
+
+
+def test_query_user_avatar_original_size_custom_format_provided_original_image_returned(
+    staff_api_client, media_root, permission_manage_staff, site_settings
+):
+    # given
+    user = staff_api_client.user
+    avatar_mock = MagicMock(spec=File)
+    avatar_mock.name = "image.jpg"
+    user.avatar = avatar_mock
+    user.save(update_fields=["avatar"])
+
+    format = ThumbnailFormatEnum.WEBP.name
+
+    id = graphene.Node.to_global_id("User", user.pk)
+    variables = {"id": id, "format": format, "size": 0}
+
+    # when
+    response = staff_api_client.post_graphql(
+        USER_AVATAR_QUERY, variables, permissions=[permission_manage_staff]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+    assert (
+        data["avatar"]["url"]
+        == f"http://{site_settings.site.domain}/media/user-avatars/{avatar_mock.name}"
+    )
+
+
+def test_query_user_avatar_no_size_value(
+    staff_api_client, media_root, permission_manage_staff, site_settings
+):
+    # given
+    user = staff_api_client.user
+    avatar_mock = MagicMock(spec=File)
+    avatar_mock.name = "image.jpg"
+    user.avatar = avatar_mock
+    user.save(update_fields=["avatar"])
+
+    id = graphene.Node.to_global_id("User", user.pk)
+    variables = {"id": id}
+
+    user_uuid = graphene.Node.to_global_id("User", user.uuid)
+
+    # when
+    response = staff_api_client.post_graphql(
+        USER_AVATAR_QUERY, variables, permissions=[permission_manage_staff]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+    assert (
+        data["avatar"]["url"]
+        == f"http://{site_settings.site.domain}/thumbnail/{user_uuid}/4096/"
+    )
+
+
+def test_query_user_avatar_no_image(staff_api_client, permission_manage_staff):
+    # given
+    user = staff_api_client.user
+
+    id = graphene.Node.to_global_id("User", user.pk)
+    variables = {"id": id}
+
+    # when
+    response = staff_api_client.post_graphql(
+        USER_AVATAR_QUERY, variables, permissions=[permission_manage_staff]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["user"]
+    assert data["id"]
+    assert not data["avatar"]
+
+
+def test_query_customers(staff_api_client, user_api_client, permission_manage_users):
+    query = """
+    query Users {
+        customers(first: 20) {
+            totalCount
+            edges {
+                node {
+                    isStaff
+                }
+            }
+        }
+    }
+    """
+    variables = {}
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    users = content["data"]["customers"]["edges"]
+    assert users
+    assert all([not user["node"]["isStaff"] for user in users])
+
+    # check permissions
+    response = user_api_client.post_graphql(query, variables)
+    assert_no_permission(response)
+
+
+def test_query_staff(
+    staff_api_client, user_api_client, staff_user, admin_user, permission_manage_staff
+):
+    query = """
+    {
+        staffUsers(first: 20) {
+            edges {
+                node {
+                    email
+                    isStaff
+                }
+            }
+        }
+    }
+    """
+    variables = {}
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffUsers"]["edges"]
+    assert len(data) == 2
+    staff_emails = [user["node"]["email"] for user in data]
+    assert sorted(staff_emails) == [admin_user.email, staff_user.email]
+    assert all([user["node"]["isStaff"] for user in data])
+
+    # check permissions
+    response = user_api_client.post_graphql(query, variables)
+    assert_no_permission(response)
+
+
+def test_who_can_see_user(
+    staff_user, customer_user, staff_api_client, permission_manage_users
+):
+    query = """
+    query Users {
+        customers {
+            totalCount
+        }
+    }
+    """
+
+    # Random person (even staff) can't see users data without permissions
+    ID = graphene.Node.to_global_id("User", customer_user.id)
+    variables = {"id": ID}
+    response = staff_api_client.post_graphql(USER_QUERY, variables)
+    assert_no_permission(response)
+
+    response = staff_api_client.post_graphql(query)
+    assert_no_permission(response)
+
+    # Add permission and ensure staff can see user(s)
+    staff_user.user_permissions.add(permission_manage_users)
+    response = staff_api_client.post_graphql(USER_QUERY, variables)
+    content = get_graphql_content(response)
+    assert content["data"]["user"]["email"] == customer_user.email
+
+    response = staff_api_client.post_graphql(query)
+    content = get_graphql_content(response)
+    assert content["data"]["customers"]["totalCount"] == 1
+
+
+ME_QUERY = """
+    query Me {
+        me {
+            id
+            email
+            checkout {
+                token
+            }
+            userPermissions {
+                code
+                name
+            }
+            checkouts(first: 10) {
+                edges {
+                    node {
+                        id
+                    }
+                }
+                totalCount
+            }
+        }
+    }
+"""
+
+
+def test_me_query(user_api_client):
+    response = user_api_client.post_graphql(ME_QUERY)
+    content = get_graphql_content(response)
+    data = content["data"]["me"]
+    assert data["email"] == user_api_client.user.email
+
+
+def test_me_user_permissions_query(
+    user_api_client, permission_manage_users, permission_group_manage_users
+):
+    user = user_api_client.user
+    user.user_permissions.add(permission_manage_users)
+    user.groups.add(permission_group_manage_users)
+    response = user_api_client.post_graphql(ME_QUERY)
+    content = get_graphql_content(response)
+    user_permissions = content["data"]["me"]["userPermissions"]
+
+    assert len(user_permissions) == 1
+    assert user_permissions[0]["code"] == permission_manage_users.codename.upper()
+
+
+def test_me_query_anonymous_client(api_client):
+    response = api_client.post_graphql(ME_QUERY)
+    content = get_graphql_content(response)
+    assert content["data"]["me"] is None
+
+
+def test_me_query_customer_can_not_see_note(
+    staff_user, staff_api_client, permission_manage_users
+):
+    query = """
+    query Me {
+        me {
+            id
+            email
+            note
+        }
+    }
+    """
+    # Random person (even staff) can't see own note without permissions
+    response = staff_api_client.post_graphql(query)
+    assert_no_permission(response)
+
+    # Add permission and ensure staff can see own note
+    response = staff_api_client.post_graphql(
+        query, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["me"]
+    assert data["email"] == staff_api_client.user.email
+    assert data["note"] == staff_api_client.user.note
+
+
+def test_me_query_checkout(user_api_client, checkout):
+    user = user_api_client.user
+    checkout.user = user
+    checkout.save()
+
+    response = user_api_client.post_graphql(ME_QUERY)
+    content = get_graphql_content(response)
+    data = content["data"]["me"]
+    assert data["checkout"]["token"] == str(checkout.token)
+    assert data["checkouts"]["edges"][0]["node"]["id"] == graphene.Node.to_global_id(
+        "Checkout", checkout.pk
+    )
+
+
+def test_me_query_checkout_with_inactive_channel(user_api_client, checkout):
+    user = user_api_client.user
+    channel = checkout.channel
+    channel.is_active = False
+    
