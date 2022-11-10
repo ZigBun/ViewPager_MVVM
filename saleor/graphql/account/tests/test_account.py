@@ -1162,4 +1162,276 @@ def test_me_query_checkout_with_inactive_channel(user_api_client, checkout):
     user = user_api_client.user
     channel = checkout.channel
     channel.is_active = False
-    
+    channel.save()
+    checkout.user = user
+    checkout.save()
+
+    response = user_api_client.post_graphql(ME_QUERY)
+    content = get_graphql_content(response)
+    data = content["data"]["me"]
+    assert not data["checkout"]
+    assert not data["checkouts"]["edges"]
+
+
+def test_me_query_checkouts_with_channel(user_api_client, checkout, checkout_JPY):
+    query = """
+        query Me($channel: String) {
+            me {
+                checkouts(first: 10, channel: $channel) {
+                    edges {
+                        node {
+                            id
+                            channel {
+                                slug
+                            }
+                        }
+                    }
+                    totalCount
+                }
+            }
+        }
+    """
+
+    user = user_api_client.user
+    checkout.user = checkout_JPY.user = user
+    checkout.save()
+    checkout_JPY.save()
+
+    response = user_api_client.post_graphql(query, {"channel": checkout.channel.slug})
+
+    content = get_graphql_content(response)
+    data = content["data"]["me"]["checkouts"]
+    assert data["edges"][0]["node"]["id"] == graphene.Node.to_global_id(
+        "Checkout", checkout.pk
+    )
+    assert data["totalCount"] == 1
+    assert data["edges"][0]["node"]["channel"]["slug"] == checkout.channel.slug
+
+
+QUERY_ME_CHECKOUT_TOKENS = """
+query getCheckoutTokens($channel: String) {
+  me {
+    checkoutTokens(channel: $channel)
+  }
+}
+"""
+
+
+def test_me_checkout_tokens_without_channel_param(
+    user_api_client, checkouts_assigned_to_customer
+):
+    # given
+    checkouts = checkouts_assigned_to_customer
+
+    # when
+    response = user_api_client.post_graphql(QUERY_ME_CHECKOUT_TOKENS)
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["me"]
+    assert len(data["checkoutTokens"]) == len(checkouts)
+    for checkout in checkouts:
+        assert str(checkout.token) in data["checkoutTokens"]
+
+
+def test_me_checkout_tokens_without_channel_param_inactive_channel(
+    user_api_client, channel_PLN, checkouts_assigned_to_customer
+):
+    # given
+    channel_PLN.is_active = False
+    channel_PLN.save()
+    checkouts = checkouts_assigned_to_customer
+
+    # when
+    response = user_api_client.post_graphql(QUERY_ME_CHECKOUT_TOKENS)
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["me"]
+    assert str(checkouts[0].token) in data["checkoutTokens"]
+    assert str(checkouts[1].token) not in data["checkoutTokens"]
+
+
+def test_me_checkout_tokens_with_channel(
+    user_api_client, channel_USD, checkouts_assigned_to_customer
+):
+    # given
+    checkouts = checkouts_assigned_to_customer
+
+    # when
+    response = user_api_client.post_graphql(
+        QUERY_ME_CHECKOUT_TOKENS, {"channel": channel_USD.slug}
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["me"]
+    assert str(checkouts[0].token) in data["checkoutTokens"]
+    assert str(checkouts[1].token) not in data["checkoutTokens"]
+
+
+def test_me_checkout_tokens_with_inactive_channel(
+    user_api_client, channel_USD, checkouts_assigned_to_customer
+):
+    # given
+    channel_USD.is_active = False
+    channel_USD.save()
+
+    # when
+    response = user_api_client.post_graphql(
+        QUERY_ME_CHECKOUT_TOKENS, {"channel": channel_USD.slug}
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["me"]
+    assert not data["checkoutTokens"]
+
+
+def test_me_checkout_tokens_with_not_existing_channel(
+    user_api_client, checkouts_assigned_to_customer
+):
+    # given
+
+    # when
+    response = user_api_client.post_graphql(
+        QUERY_ME_CHECKOUT_TOKENS, {"channel": "Not-existing"}
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["me"]
+    assert not data["checkoutTokens"]
+
+
+def test_me_with_cancelled_fulfillments(
+    user_api_client, fulfilled_order_with_cancelled_fulfillment
+):
+    query = """
+    query Me {
+        me {
+            orders (first: 1) {
+                edges {
+                    node {
+                        id
+                        fulfillments {
+                            status
+                        }
+                    }
+                }
+            }
+        }
+    }
+    """
+    response = user_api_client.post_graphql(query)
+    content = get_graphql_content(response)
+    order_id = graphene.Node.to_global_id(
+        "Order", fulfilled_order_with_cancelled_fulfillment.id
+    )
+    data = content["data"]["me"]
+    order = data["orders"]["edges"][0]["node"]
+    assert order["id"] == order_id
+    fulfillments = order["fulfillments"]
+    assert len(fulfillments) == 1
+    assert fulfillments[0]["status"] == FulfillmentStatus.FULFILLED.upper()
+
+
+def test_user_with_cancelled_fulfillments(
+    staff_api_client,
+    customer_user,
+    permission_manage_users,
+    permission_manage_orders,
+    fulfilled_order_with_cancelled_fulfillment,
+):
+    query = """
+    query User($id: ID!) {
+        user(id: $id) {
+            orders (first: 1) {
+                edges {
+                    node {
+                        id
+                        fulfillments {
+                            status
+                        }
+                    }
+                }
+            }
+        }
+    }
+    """
+    user_id = graphene.Node.to_global_id("User", customer_user.id)
+    variables = {"id": user_id}
+    staff_api_client.user.user_permissions.add(
+        permission_manage_users, permission_manage_orders
+    )
+    response = staff_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    order_id = graphene.Node.to_global_id(
+        "Order", fulfilled_order_with_cancelled_fulfillment.id
+    )
+    data = content["data"]["user"]
+    order = data["orders"]["edges"][0]["node"]
+    assert order["id"] == order_id
+    fulfillments = order["fulfillments"]
+    assert len(fulfillments) == 2
+    assert fulfillments[0]["status"] == FulfillmentStatus.FULFILLED.upper()
+    assert fulfillments[1]["status"] == FulfillmentStatus.CANCELED.upper()
+
+
+ACCOUNT_REGISTER_MUTATION = """
+    mutation RegisterAccount(
+        $password: String!,
+        $email: String!,
+        $firstName: String,
+        $lastName: String,
+        $redirectUrl: String,
+        $languageCode: LanguageCodeEnum
+        $metadata: [MetadataInput!],
+        $channel: String
+    ) {
+        accountRegister(
+            input: {
+                password: $password,
+                email: $email,
+                firstName: $firstName,
+                lastName: $lastName,
+                redirectUrl: $redirectUrl,
+                languageCode: $languageCode,
+                metadata: $metadata,
+                channel: $channel
+            }
+        ) {
+            errors {
+                field
+                message
+                code
+            }
+            user {
+                id
+                email
+            }
+        }
+    }
+"""
+
+
+@override_settings(
+    ENABLE_ACCOUNT_CONFIRMATION_BY_EMAIL=True, ALLOWED_CLIENT_HOSTS=["localhost"]
+)
+@patch("saleor.account.notifications.default_token_generator.make_token")
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_customer_register(
+    mocked_notify,
+    mocked_generator,
+    api_client,
+    channel_PLN,
+    order,
+    site_settings,
+):
+    mocked_generator.return_value = "token"
+    email = "customer@example.com"
+
+    redirect_url = "http://localhost:3000"
+    variables = {
+        "email": email,
+     
