@@ -2123,4 +2123,238 @@ def test_customer_update_generates_event_when_deactivating(
         query, variables, permissions=[permission_manage_users]
     )
 
-    account_deactivated_event = account_events.CustomerEvent.
+    account_deactivated_event = account_events.CustomerEvent.objects.get()
+    assert (
+        account_deactivated_event.type
+        == account_events.CustomerEvents.ACCOUNT_DEACTIVATED
+    )
+    assert account_deactivated_event.user.pk == staff_user.pk
+    assert account_deactivated_event.parameters == {"account_id": customer_user.id}
+
+
+def test_customer_update_generates_event_when_activating(
+    staff_api_client, staff_user, customer_user, address, permission_manage_users
+):
+    customer_user.is_active = False
+    customer_user.save(update_fields=["is_active"])
+
+    query = UPDATE_CUSTOMER_IS_ACTIVE_MUTATION
+
+    user_id = graphene.Node.to_global_id("User", customer_user.id)
+
+    variables = {"id": user_id, "isActive": True}
+    staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_users]
+    )
+
+    account_activated_event = account_events.CustomerEvent.objects.get()
+    assert (
+        account_activated_event.type == account_events.CustomerEvents.ACCOUNT_ACTIVATED
+    )
+    assert account_activated_event.user.pk == staff_user.pk
+    assert account_activated_event.parameters == {"account_id": customer_user.id}
+
+
+def test_customer_update_generates_event_when_deactivating_as_app(
+    app_api_client, staff_user, customer_user, address, permission_manage_users
+):
+    query = UPDATE_CUSTOMER_IS_ACTIVE_MUTATION
+
+    user_id = graphene.Node.to_global_id("User", customer_user.id)
+
+    variables = {"id": user_id, "isActive": False}
+    app_api_client.post_graphql(query, variables, permissions=[permission_manage_users])
+
+    account_deactivated_event = account_events.CustomerEvent.objects.get()
+    assert (
+        account_deactivated_event.type
+        == account_events.CustomerEvents.ACCOUNT_DEACTIVATED
+    )
+    assert account_deactivated_event.user is None
+    assert account_deactivated_event.app.pk == app_api_client.app.pk
+    assert account_deactivated_event.parameters == {"account_id": customer_user.id}
+
+
+def test_customer_update_generates_event_when_activating_as_app(
+    app_api_client, staff_user, customer_user, address, permission_manage_users
+):
+    customer_user.is_active = False
+    customer_user.save(update_fields=["is_active"])
+
+    query = UPDATE_CUSTOMER_IS_ACTIVE_MUTATION
+
+    user_id = graphene.Node.to_global_id("User", customer_user.id)
+
+    variables = {"id": user_id, "isActive": True}
+    app_api_client.post_graphql(query, variables, permissions=[permission_manage_users])
+
+    account_activated_event = account_events.CustomerEvent.objects.get()
+    assert (
+        account_activated_event.type == account_events.CustomerEvents.ACCOUNT_ACTIVATED
+    )
+    assert account_activated_event.user is None
+    assert account_activated_event.app.pk == app_api_client.app.pk
+    assert account_activated_event.parameters == {"account_id": customer_user.id}
+
+
+def test_customer_update_without_any_changes_generates_no_event(
+    staff_api_client, customer_user, address, permission_manage_users
+):
+    query = UPDATE_CUSTOMER_EMAIL_MUTATION
+
+    user_id = graphene.Node.to_global_id("User", customer_user.id)
+    address_data = convert_dict_keys_to_camel_case(address.as_data())
+
+    new_street_address = "Updated street address"
+    address_data["streetAddress1"] = new_street_address
+
+    variables = {
+        "id": user_id,
+        "firstName": customer_user.first_name,
+        "lastName": customer_user.last_name,
+        "email": customer_user.email,
+    }
+    staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_users]
+    )
+
+    # No event should have been generated
+    assert not account_events.CustomerEvent.objects.exists()
+
+
+def test_customer_update_generates_event_when_changing_email_by_app(
+    app_api_client, staff_user, customer_user, address, permission_manage_users
+):
+    query = UPDATE_CUSTOMER_EMAIL_MUTATION
+
+    user_id = graphene.Node.to_global_id("User", customer_user.id)
+    address_data = convert_dict_keys_to_camel_case(address.as_data())
+
+    new_street_address = "Updated street address"
+    address_data["streetAddress1"] = new_street_address
+
+    variables = {
+        "id": user_id,
+        "firstName": customer_user.first_name,
+        "lastName": customer_user.last_name,
+        "email": "mirumee@example.com",
+    }
+    app_api_client.post_graphql(query, variables, permissions=[permission_manage_users])
+
+    # The email was changed, an event should have been triggered
+    email_changed_event = account_events.CustomerEvent.objects.get()
+    assert email_changed_event.type == account_events.CustomerEvents.EMAIL_ASSIGNED
+    assert email_changed_event.user is None
+    assert email_changed_event.parameters == {"message": "mirumee@example.com"}
+
+
+def test_customer_update_assign_gift_cards_and_orders(
+    staff_api_client,
+    staff_user,
+    customer_user,
+    address,
+    gift_card,
+    order,
+    permission_manage_users,
+):
+    # given
+    query = UPDATE_CUSTOMER_EMAIL_MUTATION
+
+    user_id = graphene.Node.to_global_id("User", customer_user.id)
+    address_data = convert_dict_keys_to_camel_case(address.as_data())
+
+    new_street_address = "Updated street address"
+    address_data["streetAddress1"] = new_street_address
+    new_email = "mirumee@example.com"
+
+    gift_card.created_by = None
+    gift_card.created_by_email = new_email
+    gift_card.save(update_fields=["created_by", "created_by_email"])
+
+    order.user = None
+    order.user_email = new_email
+    order.save(update_fields=["user_email", "user"])
+
+    variables = {
+        "id": user_id,
+        "firstName": customer_user.first_name,
+        "lastName": customer_user.last_name,
+        "email": new_email,
+    }
+
+    # when
+    staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_users]
+    )
+
+    # then
+    email_changed_event = account_events.CustomerEvent.objects.get()
+    assert email_changed_event.type == account_events.CustomerEvents.EMAIL_ASSIGNED
+    gift_card.refresh_from_db()
+    customer_user.refresh_from_db()
+    assert gift_card.created_by == customer_user
+    assert gift_card.created_by_email == customer_user.email
+    order.refresh_from_db()
+    assert order.user == customer_user
+
+
+ACCOUNT_UPDATE_QUERY = """
+    mutation accountUpdate(
+        $billing: AddressInput
+        $shipping: AddressInput
+        $firstName: String,
+        $lastName: String
+        $languageCode: LanguageCodeEnum
+    ) {
+        accountUpdate(
+          input: {
+            defaultBillingAddress: $billing,
+            defaultShippingAddress: $shipping,
+            firstName: $firstName,
+            lastName: $lastName,
+            languageCode: $languageCode
+        }) {
+            errors {
+                field
+                code
+                message
+                addressType
+            }
+            user {
+                firstName
+                lastName
+                email
+                defaultBillingAddress {
+                    id
+                }
+                defaultShippingAddress {
+                    id
+                }
+                languageCode
+            }
+        }
+    }
+"""
+
+
+def test_logged_customer_updates_language_code(user_api_client):
+    language_code = "PL"
+    user = user_api_client.user
+    assert user.language_code != language_code
+    variables = {"languageCode": language_code}
+
+    response = user_api_client.post_graphql(ACCOUNT_UPDATE_QUERY, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["accountUpdate"]
+
+    assert not data["errors"]
+    assert data["user"]["languageCode"] == language_code
+    user.refresh_from_db()
+    assert user.language_code == language_code.lower()
+    assert user.search_document
+
+
+def test_logged_customer_update_names(user_api_client):
+    first_name = "first"
+    last_name = "last"
+    user = user_api_clien
