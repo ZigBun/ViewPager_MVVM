@@ -1434,4 +1434,221 @@ def test_customer_register(
     redirect_url = "http://localhost:3000"
     variables = {
         "email": email,
-     
+        "password": "Password",
+        "redirectUrl": redirect_url,
+        "firstName": "saleor",
+        "lastName": "rocks",
+        "languageCode": "PL",
+        "metadata": [{"key": "meta", "value": "data"}],
+        "channel": channel_PLN.slug,
+    }
+    query = ACCOUNT_REGISTER_MUTATION
+    mutation_name = "accountRegister"
+
+    response = api_client.post_graphql(query, variables)
+
+    new_user = User.objects.get(email=email)
+    content = get_graphql_content(response)
+    data = content["data"][mutation_name]
+    params = urlencode({"email": email, "token": "token"})
+    confirm_url = prepare_url(params, redirect_url)
+
+    expected_payload = {
+        "user": get_default_user_payload(new_user),
+        "token": "token",
+        "confirm_url": confirm_url,
+        "recipient_email": new_user.email,
+        "channel_slug": channel_PLN.slug,
+        **get_site_context_payload(site_settings.site),
+    }
+    assert new_user.metadata == {"meta": "data"}
+    assert new_user.language_code == "pl"
+    assert new_user.first_name == variables["firstName"]
+    assert new_user.last_name == variables["lastName"]
+    assert new_user.search_document == generate_user_fields_search_document_value(
+        new_user
+    )
+    assert not data["errors"]
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ACCOUNT_CONFIRMATION,
+        payload=expected_payload,
+        channel_slug=channel_PLN.slug,
+    )
+
+    response = api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"][mutation_name]
+    assert data["errors"]
+    assert data["errors"][0]["field"] == "email"
+    assert data["errors"][0]["code"] == AccountErrorCode.UNIQUE.name
+
+    customer_creation_event = account_events.CustomerEvent.objects.get()
+    assert customer_creation_event.type == account_events.CustomerEvents.ACCOUNT_CREATED
+    assert customer_creation_event.user == new_user
+
+
+@override_settings(ENABLE_ACCOUNT_CONFIRMATION_BY_EMAIL=False)
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_customer_register_disabled_email_confirmation(mocked_notify, api_client):
+    email = "customer@example.com"
+    variables = {"email": email, "password": "Password"}
+    response = api_client.post_graphql(ACCOUNT_REGISTER_MUTATION, variables)
+    errors = response.json()["data"]["accountRegister"]["errors"]
+
+    assert errors == []
+    created_user = User.objects.get()
+    expected_payload = get_default_user_payload(created_user)
+    expected_payload["token"] = "token"
+    expected_payload["redirect_url"] = "http://localhost:3000"
+    mocked_notify.assert_not_called()
+
+
+@override_settings(ENABLE_ACCOUNT_CONFIRMATION_BY_EMAIL=True)
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_customer_register_no_redirect_url(mocked_notify, api_client):
+    variables = {"email": "customer@example.com", "password": "Password"}
+    response = api_client.post_graphql(ACCOUNT_REGISTER_MUTATION, variables)
+    errors = response.json()["data"]["accountRegister"]["errors"]
+    assert "redirectUrl" in map(lambda error: error["field"], errors)
+    mocked_notify.assert_not_called()
+
+
+@override_settings(ENABLE_ACCOUNT_CONFIRMATION_BY_EMAIL=False)
+def test_customer_register_upper_case_email(api_client):
+    # given
+    email = "CUSTOMER@example.com"
+    variables = {"email": email, "password": "Password"}
+
+    # when
+    response = api_client.post_graphql(ACCOUNT_REGISTER_MUTATION, variables)
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["accountRegister"]
+    assert not data["errors"]
+    assert data["user"]["email"].lower()
+
+
+CUSTOMER_CREATE_MUTATION = """
+    mutation CreateCustomer(
+        $email: String, $firstName: String, $lastName: String, $channel: String
+        $note: String, $billing: AddressInput, $shipping: AddressInput,
+        $redirect_url: String, $languageCode: LanguageCodeEnum,
+        $externalReference: String
+    ) {
+        customerCreate(input: {
+            email: $email,
+            firstName: $firstName,
+            lastName: $lastName,
+            note: $note,
+            defaultShippingAddress: $shipping,
+            defaultBillingAddress: $billing,
+            redirectUrl: $redirect_url,
+            languageCode: $languageCode,
+            channel: $channel,
+            externalReference: $externalReference
+        }) {
+            errors {
+                field
+                code
+                message
+            }
+            user {
+                id
+                defaultBillingAddress {
+                    id
+                }
+                defaultShippingAddress {
+                    id
+                }
+                languageCode
+                email
+                firstName
+                lastName
+                isActive
+                isStaff
+                note
+                externalReference
+            }
+        }
+    }
+"""
+
+
+@patch("saleor.account.notifications.default_token_generator.make_token")
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_customer_create(
+    mocked_notify,
+    mocked_generator,
+    staff_api_client,
+    address,
+    permission_manage_users,
+    channel_PLN,
+    site_settings,
+):
+    mocked_generator.return_value = "token"
+    email = "api_user@example.com"
+    first_name = "api_first_name"
+    last_name = "api_last_name"
+    note = "Test user"
+    address_data = convert_dict_keys_to_camel_case(address.as_data())
+    address_data.pop("metadata")
+    address_data.pop("privateMetadata")
+
+    redirect_url = "https://www.example.com"
+    external_reference = "test-ext-ref"
+    variables = {
+        "email": email,
+        "firstName": first_name,
+        "lastName": last_name,
+        "note": note,
+        "shipping": address_data,
+        "billing": address_data,
+        "redirect_url": redirect_url,
+        "languageCode": "PL",
+        "channel": channel_PLN.slug,
+        "externalReference": external_reference,
+    }
+
+    response = staff_api_client.post_graphql(
+        CUSTOMER_CREATE_MUTATION, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+
+    new_customer = User.objects.get(email=email)
+
+    shipping_address, billing_address = (
+        new_customer.default_shipping_address,
+        new_customer.default_billing_address,
+    )
+    assert shipping_address == address
+    assert billing_address == address
+    assert shipping_address.pk != billing_address.pk
+
+    data = content["data"]["customerCreate"]
+    assert data["errors"] == []
+    assert data["user"]["email"] == email
+    assert data["user"]["firstName"] == first_name
+    assert data["user"]["lastName"] == last_name
+    assert data["user"]["note"] == note
+    assert data["user"]["languageCode"] == "PL"
+    assert data["user"]["externalReference"] == external_reference
+    assert not data["user"]["isStaff"]
+    assert data["user"]["isActive"]
+
+    new_user = User.objects.get(email=email)
+    assert (
+        generate_user_fields_search_document_value(new_user) in new_user.search_document
+    )
+    assert generate_address_search_document_value(address) in new_user.search_document
+    params = urlencode({"email": new_user.email, "token": "token"})
+    password_set_url = prepare_url(params, redirect_url)
+    expected_payload = {
+        "user": get_default_user_payload(new_user),
+        "token": "token",
+        "password_set_url": password_set_url,
+        "recipient_email": new_user.email,
+        "channel_slug": channel_PLN.slug,
+        **get_site_context_payload(site_settings.site),
+    }
+    mock
