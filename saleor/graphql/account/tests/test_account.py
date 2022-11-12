@@ -2357,4 +2357,211 @@ def test_logged_customer_updates_language_code(user_api_client):
 def test_logged_customer_update_names(user_api_client):
     first_name = "first"
     last_name = "last"
-    user = user_api_clien
+    user = user_api_client.user
+    assert user.first_name != first_name
+    assert user.last_name != last_name
+
+    variables = {"firstName": first_name, "lastName": last_name}
+    response = user_api_client.post_graphql(ACCOUNT_UPDATE_QUERY, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["accountUpdate"]
+
+    user.refresh_from_db()
+    assert not data["errors"]
+    assert user.first_name == first_name
+    assert user.last_name == last_name
+
+
+def test_logged_customer_update_addresses(user_api_client, graphql_address_data):
+    # this test requires addresses to be set and checks whether new address
+    # instances weren't created, but the existing ones got updated
+    user = user_api_client.user
+    new_first_name = graphql_address_data["firstName"]
+    assert user.default_billing_address
+    assert user.default_shipping_address
+    assert user.default_billing_address.first_name != new_first_name
+    assert user.default_shipping_address.first_name != new_first_name
+
+    query = ACCOUNT_UPDATE_QUERY
+    mutation_name = "accountUpdate"
+    variables = {"billing": graphql_address_data, "shipping": graphql_address_data}
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"][mutation_name]
+    assert not data["errors"]
+
+    # check that existing instances are updated
+    billing_address_pk = user.default_billing_address.pk
+    shipping_address_pk = user.default_shipping_address.pk
+    user = User.objects.get(email=user.email)
+    assert user.default_billing_address.pk == billing_address_pk
+    assert user.default_shipping_address.pk == shipping_address_pk
+
+    assert user.default_billing_address.first_name == new_first_name
+    assert user.default_shipping_address.first_name == new_first_name
+    assert user.search_document
+
+
+def test_logged_customer_update_addresses_invalid_shipping_address(
+    user_api_client, graphql_address_data
+):
+    shipping_address = graphql_address_data.copy()
+    del shipping_address["country"]
+
+    query = ACCOUNT_UPDATE_QUERY
+    mutation_name = "accountUpdate"
+    variables = {"billing": graphql_address_data, "shipping": shipping_address}
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"][mutation_name]
+    assert len(data["errors"]) == 1
+    errors = data["errors"]
+    assert errors[0]["field"] == "country"
+    assert errors[0]["code"] == AccountErrorCode.REQUIRED.name
+    assert errors[0]["addressType"] == AddressType.SHIPPING.upper()
+
+
+def test_logged_customer_update_addresses_invalid_billing_address(
+    user_api_client, graphql_address_data
+):
+    billing_address = graphql_address_data.copy()
+    del billing_address["country"]
+
+    query = ACCOUNT_UPDATE_QUERY
+    mutation_name = "accountUpdate"
+    variables = {"billing": billing_address, "shipping": graphql_address_data}
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"][mutation_name]
+    assert len(data["errors"]) == 1
+    errors = data["errors"]
+    assert errors[0]["field"] == "country"
+    assert errors[0]["code"] == AccountErrorCode.REQUIRED.name
+    assert errors[0]["addressType"] == AddressType.BILLING.upper()
+
+
+def test_logged_customer_update_anonymous_user(api_client):
+    query = ACCOUNT_UPDATE_QUERY
+    response = api_client.post_graphql(query, {})
+    assert_no_permission(response)
+
+
+ACCOUNT_REQUEST_DELETION_MUTATION = """
+    mutation accountRequestDeletion($redirectUrl: String!, $channel: String) {
+        accountRequestDeletion(redirectUrl: $redirectUrl, channel: $channel) {
+            errors {
+                field
+                code
+                message
+            }
+        }
+    }
+"""
+
+
+@patch("saleor.account.notifications.account_delete_token_generator.make_token")
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_request_deletion(
+    mocked_notify, mocked_token, user_api_client, channel_PLN, site_settings
+):
+    mocked_token.return_value = "token"
+    user = user_api_client.user
+    redirect_url = "https://www.example.com"
+    variables = {"redirectUrl": redirect_url, "channel": channel_PLN.slug}
+    response = user_api_client.post_graphql(
+        ACCOUNT_REQUEST_DELETION_MUTATION, variables
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["accountRequestDeletion"]
+    assert not data["errors"]
+    params = urlencode({"token": "token"})
+    delete_url = prepare_url(params, redirect_url)
+    expected_payload = {
+        "user": get_default_user_payload(user),
+        "delete_url": delete_url,
+        "token": "token",
+        "recipient_email": user.email,
+        "channel_slug": channel_PLN.slug,
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ACCOUNT_DELETE,
+        payload=expected_payload,
+        channel_slug=channel_PLN.slug,
+    )
+
+
+@freeze_time("2018-05-31 12:00:01")
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_request_deletion_token_validation(
+    mocked_notify, user_api_client, channel_PLN, site_settings
+):
+    user = user_api_client.user
+    token = account_delete_token_generator.make_token(user)
+    redirect_url = "https://www.example.com"
+    variables = {"redirectUrl": redirect_url, "channel": channel_PLN.slug}
+    response = user_api_client.post_graphql(
+        ACCOUNT_REQUEST_DELETION_MUTATION, variables
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["accountRequestDeletion"]
+    assert not data["errors"]
+    params = urlencode({"token": token})
+    delete_url = prepare_url(params, redirect_url)
+    expected_payload = {
+        "user": get_default_user_payload(user),
+        "delete_url": delete_url,
+        "token": token,
+        "recipient_email": user.email,
+        "channel_slug": channel_PLN.slug,
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ACCOUNT_DELETE,
+        payload=expected_payload,
+        channel_slug=channel_PLN.slug,
+    )
+
+
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_request_deletion_anonymous_user(mocked_notify, api_client):
+    variables = {"redirectUrl": "https://www.example.com"}
+    response = api_client.post_graphql(ACCOUNT_REQUEST_DELETION_MUTATION, variables)
+    assert_no_permission(response)
+    mocked_notify.assert_not_called()
+
+
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_request_deletion_storefront_hosts_not_allowed(
+    mocked_notify, user_api_client
+):
+    variables = {"redirectUrl": "https://www.fake.com"}
+    response = user_api_client.post_graphql(
+        ACCOUNT_REQUEST_DELETION_MUTATION, variables
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["accountRequestDeletion"]
+    assert len(data["errors"]) == 1
+    assert data["errors"][0] == {
+        "field": "redirectUrl",
+        "code": AccountErrorCode.INVALID.name,
+        "message": ANY,
+    }
+    mocked_notify.assert_not_called()
+
+
+@freeze_time("2018-05-31 12:00:01")
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_request_deletion_all_storefront_hosts_allowed(
+    mocked_notify, user_api_client, settings, channel_PLN, site_settings
+):
+    user = user_api_client.user
+    user.last_login = timezone.now()
+    user.save(update_fields=["last_login"])
+
+    token = account_delete_token_generator.make_token(user)
+    settings.ALLOWED_CLIENT_HOSTS = ["*"]
+    redirect_url = "https://www.test.com"
+    variables = {"redirectUr
