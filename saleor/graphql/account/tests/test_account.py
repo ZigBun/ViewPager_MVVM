@@ -2564,4 +2564,228 @@ def test_account_request_deletion_all_storefront_hosts_allowed(
     token = account_delete_token_generator.make_token(user)
     settings.ALLOWED_CLIENT_HOSTS = ["*"]
     redirect_url = "https://www.test.com"
-    variables = {"redirectUr
+    variables = {"redirectUrl": redirect_url, "channel": channel_PLN.slug}
+    response = user_api_client.post_graphql(
+        ACCOUNT_REQUEST_DELETION_MUTATION, variables
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["accountRequestDeletion"]
+    assert not data["errors"]
+
+    params = urlencode({"token": token})
+    delete_url = prepare_url(params, redirect_url)
+    expected_payload = {
+        "user": get_default_user_payload(user),
+        "delete_url": delete_url,
+        "token": token,
+        "recipient_email": user.email,
+        "channel_slug": channel_PLN.slug,
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ACCOUNT_DELETE,
+        payload=expected_payload,
+        channel_slug=channel_PLN.slug,
+    )
+
+
+@freeze_time("2018-05-31 12:00:01")
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_request_deletion_subdomain(
+    mocked_notify, user_api_client, settings, channel_PLN, site_settings
+):
+    user = user_api_client.user
+    token = account_delete_token_generator.make_token(user)
+    settings.ALLOWED_CLIENT_HOSTS = [".example.com"]
+    redirect_url = "https://sub.example.com"
+    variables = {"redirectUrl": redirect_url, "channel": channel_PLN.slug}
+    response = user_api_client.post_graphql(
+        ACCOUNT_REQUEST_DELETION_MUTATION, variables
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["accountRequestDeletion"]
+    assert not data["errors"]
+    params = urlencode({"token": token})
+    delete_url = prepare_url(params, redirect_url)
+    expected_payload = {
+        "user": get_default_user_payload(user),
+        "delete_url": delete_url,
+        "token": token,
+        "recipient_email": user.email,
+        "channel_slug": channel_PLN.slug,
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ACCOUNT_DELETE,
+        payload=expected_payload,
+        channel_slug=channel_PLN.slug,
+    )
+
+
+ACCOUNT_DELETE_MUTATION = """
+    mutation AccountDelete($token: String!){
+        accountDelete(token: $token){
+            errors{
+                field
+                message
+            }
+        }
+    }
+"""
+
+
+@patch("saleor.core.tasks.delete_from_storage_task.delay")
+@freeze_time("2018-05-31 12:00:01")
+def test_account_delete(delete_from_storage_task_mock, user_api_client, media_root):
+    # given
+    thumbnail_mock = MagicMock(spec=File)
+    thumbnail_mock.name = "image.jpg"
+
+    user = user_api_client.user
+    user.last_login = timezone.now()
+    user.save(update_fields=["last_login"])
+
+    user_id = user.id
+
+    # create thumbnail
+    thumbnail = Thumbnail.objects.create(user=user, size=128, image=thumbnail_mock)
+    assert user.thumbnails.all()
+    img_path = thumbnail.image.name
+
+    token = account_delete_token_generator.make_token(user)
+    variables = {"token": token}
+
+    # when
+    response = user_api_client.post_graphql(ACCOUNT_DELETE_MUTATION, variables)
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["accountDelete"]
+    assert not data["errors"]
+    assert not User.objects.filter(pk=user.id).exists()
+    # ensure all related thumbnails have been deleted
+    assert not Thumbnail.objects.filter(user_id=user_id).exists()
+    delete_from_storage_task_mock.assert_called_once_with(img_path)
+
+
+@freeze_time("2018-05-31 12:00:01")
+def test_account_delete_user_never_log_in(user_api_client):
+    user = user_api_client.user
+    token = account_delete_token_generator.make_token(user)
+    variables = {"token": token}
+
+    response = user_api_client.post_graphql(ACCOUNT_DELETE_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["accountDelete"]
+    assert not data["errors"]
+    assert not User.objects.filter(pk=user.id).exists()
+
+
+@freeze_time("2018-05-31 12:00:01")
+def test_account_delete_log_out_after_deletion_request(user_api_client):
+    user = user_api_client.user
+    user.last_login = timezone.now()
+    user.save(update_fields=["last_login"])
+
+    token = account_delete_token_generator.make_token(user)
+
+    # simulate re-login
+    user.last_login = timezone.now() + datetime.timedelta(hours=1)
+    user.save(update_fields=["last_login"])
+
+    variables = {"token": token}
+
+    response = user_api_client.post_graphql(ACCOUNT_DELETE_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["accountDelete"]
+    assert not data["errors"]
+    assert not User.objects.filter(pk=user.id).exists()
+
+
+def test_account_delete_invalid_token(user_api_client):
+    user = user_api_client.user
+    variables = {"token": "invalid"}
+
+    response = user_api_client.post_graphql(ACCOUNT_DELETE_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["accountDelete"]
+    assert len(data["errors"]) == 1
+    assert data["errors"][0]["message"] == "Invalid or expired token."
+    assert User.objects.filter(pk=user.id).exists()
+
+
+def test_account_delete_anonymous_user(api_client):
+    variables = {"token": "invalid"}
+
+    response = api_client.post_graphql(ACCOUNT_DELETE_MUTATION, variables)
+    assert_no_permission(response)
+
+
+def test_account_delete_staff_user(staff_api_client):
+    user = staff_api_client.user
+    variables = {"token": "invalid"}
+
+    response = staff_api_client.post_graphql(ACCOUNT_DELETE_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["accountDelete"]
+    assert len(data["errors"]) == 1
+    assert data["errors"][0]["message"] == "Cannot delete a staff account."
+    assert User.objects.filter(pk=user.id).exists()
+
+
+@freeze_time("2018-05-31 12:00:01")
+def test_account_delete_other_customer_token(user_api_client):
+    user = user_api_client.user
+    other_user = User.objects.create(email="temp@example.com")
+    token = account_delete_token_generator.make_token(other_user)
+    variables = {"token": token}
+
+    response = user_api_client.post_graphql(ACCOUNT_DELETE_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["accountDelete"]
+    assert len(data["errors"]) == 1
+    assert data["errors"][0]["message"] == "Invalid or expired token."
+    assert User.objects.filter(pk=user.id).exists()
+    assert User.objects.filter(pk=other_user.id).exists()
+
+
+CUSTOMER_DELETE_MUTATION = """
+    mutation CustomerDelete($id: ID, $externalReference: String) {
+        customerDelete(id: $id, externalReference: $externalReference) {
+            errors {
+                field
+                message
+            }
+            user {
+                id
+                externalReference
+            }
+        }
+    }
+"""
+
+
+@patch("saleor.account.signals.delete_from_storage_task.delay")
+@patch("saleor.graphql.account.utils.account_events.customer_deleted_event")
+def test_customer_delete(
+    mocked_deletion_event,
+    delete_from_storage_task_mock,
+    staff_api_client,
+    staff_user,
+    customer_user,
+    image,
+    permission_manage_users,
+    media_root,
+):
+    """Ensure deleting a customer actually deletes the customer and creates proper
+    related events"""
+
+    query = CUSTOMER_DELETE_MUTATION
+    customer_id = graphene.Node.to_global_id("User", customer_user.pk)
+    customer_user.avatar = image
+    customer_user.save(update_fields=["avatar"])
+    variables = {"id": customer_id}
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_users]
