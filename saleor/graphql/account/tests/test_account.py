@@ -3275,4 +3275,243 @@ def test_staff_create_out_of_scope_group(
 
     assert staff_user.is_staff
 
-    expected
+    expected_groups = [
+        {
+            "name": group.name,
+            "permissions": [{"code": permission_manage_users.codename.upper()}],
+        },
+        {
+            "name": group2.name,
+            "permissions": [{"code": permission_manage_staff.codename.upper()}],
+        },
+    ]
+    groups = data["user"]["permissionGroups"]
+    assert len(groups) == 2
+    for group in expected_groups:
+        assert group in groups
+    token = default_token_generator.make_token(staff_user)
+    params = urlencode({"email": email, "token": token})
+    password_set_url = prepare_url(params, redirect_url)
+    expected_payload = {
+        "user": get_default_user_payload(staff_user),
+        "password_set_url": password_set_url,
+        "token": token,
+        "recipient_email": staff_user.email,
+        "channel_slug": None,
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ACCOUNT_SET_STAFF_PASSWORD,
+        payload=expected_payload,
+        channel_slug=None,
+    )
+
+
+@freeze_time("2018-05-31 12:00:01")
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_staff_create_send_password_with_url(
+    mocked_notify, staff_api_client, media_root, permission_manage_staff, site_settings
+):
+    email = "api_user@example.com"
+    redirect_url = "https://www.example.com"
+    variables = {"email": email, "redirect_url": redirect_url}
+
+    response = staff_api_client.post_graphql(
+        STAFF_CREATE_MUTATION, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffCreate"]
+    assert not data["errors"]
+
+    staff_user = User.objects.get(email=email)
+    assert staff_user.is_staff
+
+    token = default_token_generator.make_token(staff_user)
+    params = urlencode({"email": email, "token": token})
+    password_set_url = prepare_url(params, redirect_url)
+    expected_payload = {
+        "user": get_default_user_payload(staff_user),
+        "password_set_url": password_set_url,
+        "token": token,
+        "recipient_email": staff_user.email,
+        "channel_slug": None,
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ACCOUNT_SET_STAFF_PASSWORD,
+        payload=expected_payload,
+        channel_slug=None,
+    )
+
+
+def test_staff_create_without_send_password(
+    staff_api_client, media_root, permission_manage_staff
+):
+    email = "api_user@example.com"
+    variables = {"email": email}
+    response = staff_api_client.post_graphql(
+        STAFF_CREATE_MUTATION, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffCreate"]
+    assert not data["errors"]
+    User.objects.get(email=email)
+
+
+def test_staff_create_with_invalid_url(
+    staff_api_client, media_root, permission_manage_staff
+):
+    email = "api_user@example.com"
+    variables = {"email": email, "redirect_url": "invalid"}
+    response = staff_api_client.post_graphql(
+        STAFF_CREATE_MUTATION, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffCreate"]
+    assert data["errors"][0] == {
+        "field": "redirectUrl",
+        "code": AccountErrorCode.INVALID.name,
+        "permissions": None,
+        "groups": None,
+    }
+    staff_user = User.objects.filter(email=email)
+    assert not staff_user
+
+
+def test_staff_create_with_not_allowed_url(
+    staff_api_client, media_root, permission_manage_staff
+):
+    email = "api_userrr@example.com"
+    variables = {"email": email, "redirect_url": "https://www.fake.com"}
+    response = staff_api_client.post_graphql(
+        STAFF_CREATE_MUTATION, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffCreate"]
+    assert data["errors"][0] == {
+        "field": "redirectUrl",
+        "code": AccountErrorCode.INVALID.name,
+        "permissions": None,
+        "groups": None,
+    }
+    staff_user = User.objects.filter(email=email)
+    assert not staff_user
+
+
+def test_staff_create_with_upper_case_email(
+    staff_api_client, media_root, permission_manage_staff
+):
+    # given
+    email = "api_user@example.com"
+    variables = {"email": email}
+
+    # when
+    response = staff_api_client.post_graphql(
+        STAFF_CREATE_MUTATION, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["staffCreate"]
+    assert not data["errors"]
+    assert data["user"]["email"] == email.lower()
+
+
+STAFF_UPDATE_MUTATIONS = """
+    mutation UpdateStaff(
+            $id: ID!, $input: StaffUpdateInput!) {
+        staffUpdate(
+                id: $id,
+                input: $input) {
+            errors {
+                field
+                code
+                message
+                permissions
+                groups
+            }
+            user {
+                userPermissions {
+                    code
+                }
+                permissionGroups {
+                    name
+                }
+                isActive
+                email
+            }
+        }
+    }
+"""
+
+
+def test_staff_update(staff_api_client, permission_manage_staff, media_root):
+    query = STAFF_UPDATE_MUTATIONS
+    staff_user = User.objects.create(email="staffuser@example.com", is_staff=True)
+    assert not staff_user.search_document
+    id = graphene.Node.to_global_id("User", staff_user.id)
+    variables = {"id": id, "input": {"isActive": False}}
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    assert data["errors"] == []
+    assert data["user"]["userPermissions"] == []
+    assert not data["user"]["isActive"]
+    staff_user.refresh_from_db()
+    assert not staff_user.search_document
+
+
+@freeze_time("2018-05-31 12:00:01")
+@patch("saleor.plugins.webhook.plugin.get_webhooks_for_event")
+@patch("saleor.plugins.webhook.plugin.trigger_webhooks_async")
+def test_staff_update_trigger_webhook(
+    mocked_webhook_trigger,
+    mocked_get_webhooks_for_event,
+    any_webhook,
+    staff_api_client,
+    permission_manage_staff,
+    media_root,
+    settings,
+):
+    # given
+    mocked_get_webhooks_for_event.return_value = [any_webhook]
+    settings.PLUGINS = ["saleor.plugins.webhook.plugin.WebhookPlugin"]
+
+    staff_user = User.objects.create(email="staffuser@example.com", is_staff=True)
+    assert not staff_user.search_document
+    id = graphene.Node.to_global_id("User", staff_user.id)
+    variables = {"id": id, "input": {"isActive": False}}
+
+    # when
+    response = staff_api_client.post_graphql(
+        STAFF_UPDATE_MUTATIONS, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+
+    # then
+    assert not data["errors"]
+    assert data["user"]
+    mocked_webhook_trigger.assert_called_once_with(
+        json.dumps(
+            {
+                "id": graphene.Node.to_global_id("User", staff_user.id),
+                "email": staff_user.email,
+                "meta": generate_meta(
+                    requestor_data=generate_requestor(
+                        SimpleLazyObject(lambda: staff_api_client.user)
+                    )
+                ),
+            },
+            cls=CustomJsonEncoder,
+        ),
+        WebhookEventAsyncType.STAFF_UPDATED,
+        [any_webhook],
+        staff_user,
+        SimpleLazyObject(lambda: staff_ap
