@@ -3514,4 +3514,229 @@ def test_staff_update_trigger_webhook(
         WebhookEventAsyncType.STAFF_UPDATED,
         [any_webhook],
         staff_user,
-        SimpleLazyObject(lambda: staff_ap
+        SimpleLazyObject(lambda: staff_api_client.user),
+    )
+
+
+def test_staff_update_email(staff_api_client, permission_manage_staff, media_root):
+    query = STAFF_UPDATE_MUTATIONS
+    staff_user = User.objects.create(email="staffuser@example.com", is_staff=True)
+    assert not staff_user.search_document
+    id = graphene.Node.to_global_id("User", staff_user.id)
+    new_email = "test@email.com"
+    variables = {"id": id, "input": {"email": new_email}}
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    assert data["errors"] == []
+    assert data["user"]["userPermissions"] == []
+    assert data["user"]["isActive"]
+    staff_user.refresh_from_db()
+    assert staff_user.search_document == f"{new_email}\n"
+
+
+@pytest.mark.parametrize("field", ["firstName", "lastName"])
+def test_staff_update_name_field(
+    field, staff_api_client, permission_manage_staff, media_root
+):
+    query = STAFF_UPDATE_MUTATIONS
+    email = "staffuser@example.com"
+    staff_user = User.objects.create(email=email, is_staff=True)
+    assert not staff_user.search_document
+    id = graphene.Node.to_global_id("User", staff_user.id)
+    value = "Name"
+    variables = {"id": id, "input": {field: value}}
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    assert data["errors"] == []
+    assert data["user"]["userPermissions"] == []
+    assert data["user"]["isActive"]
+    staff_user.refresh_from_db()
+    assert staff_user.search_document == f"{email}\n{value.lower()}\n"
+
+
+def test_staff_update_app_no_permission(
+    app_api_client, permission_manage_staff, media_root
+):
+    query = STAFF_UPDATE_MUTATIONS
+    staff_user = User.objects.create(email="staffuser@example.com", is_staff=True)
+    id = graphene.Node.to_global_id("User", staff_user.id)
+    variables = {"id": id, "input": {"isActive": False}}
+
+    response = app_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+
+    assert_no_permission(response)
+
+
+def test_staff_update_groups_and_permissions(
+    staff_api_client,
+    media_root,
+    permission_manage_staff,
+    permission_manage_users,
+    permission_manage_orders,
+    permission_manage_products,
+):
+    query = STAFF_UPDATE_MUTATIONS
+    groups = Group.objects.bulk_create(
+        [Group(name="manage users"), Group(name="manage orders"), Group(name="empty")]
+    )
+    group1, group2, group3 = groups
+    group1.permissions.add(permission_manage_users)
+    group2.permissions.add(permission_manage_orders)
+
+    staff_user = User.objects.create(email="staffuser@example.com", is_staff=True)
+    staff_user.groups.add(group1)
+
+    id = graphene.Node.to_global_id("User", staff_user.id)
+    variables = {
+        "id": id,
+        "input": {
+            "addGroups": [
+                graphene.Node.to_global_id("Group", gr.pk) for gr in [group2, group3]
+            ],
+            "removeGroups": [graphene.Node.to_global_id("Group", group1.pk)],
+        },
+    }
+
+    staff_api_client.user.user_permissions.add(
+        permission_manage_users, permission_manage_orders, permission_manage_products
+    )
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    assert data["errors"] == []
+    assert {perm["code"].lower() for perm in data["user"]["userPermissions"]} == {
+        permission_manage_orders.codename,
+    }
+    assert {group["name"] for group in data["user"]["permissionGroups"]} == {
+        group2.name,
+        group3.name,
+    }
+
+
+def test_staff_update_out_of_scope_user(
+    staff_api_client,
+    superuser_api_client,
+    permission_manage_staff,
+    permission_manage_orders,
+    media_root,
+):
+    """Ensure that staff user cannot update user with wider scope of permission.
+    Ensure superuser pass restrictions.
+    """
+    query = STAFF_UPDATE_MUTATIONS
+    staff_user = User.objects.create(email="staffuser@example.com", is_staff=True)
+    staff_user.user_permissions.add(permission_manage_orders)
+    id = graphene.Node.to_global_id("User", staff_user.id)
+    variables = {"id": id, "input": {"isActive": False}}
+
+    # for staff user
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    assert not data["user"]
+    assert len(data["errors"]) == 1
+    assert data["errors"][0]["field"] == "id"
+    assert data["errors"][0]["code"] == AccountErrorCode.OUT_OF_SCOPE_USER.name
+
+    # for superuser
+    response = superuser_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    assert data["user"]["email"] == staff_user.email
+    assert data["user"]["isActive"] is False
+    assert not data["errors"]
+
+
+def test_staff_update_out_of_scope_groups(
+    staff_api_client,
+    superuser_api_client,
+    permission_manage_staff,
+    media_root,
+    permission_manage_users,
+    permission_manage_orders,
+    permission_manage_products,
+):
+    """Ensure that staff user cannot add to groups which permission scope is wider
+    than user's scope.
+    Ensure superuser pass restrictions.
+    """
+    query = STAFF_UPDATE_MUTATIONS
+
+    groups = Group.objects.bulk_create(
+        [
+            Group(name="manage users"),
+            Group(name="manage orders"),
+            Group(name="manage products"),
+        ]
+    )
+    group1, group2, group3 = groups
+
+    group1.permissions.add(permission_manage_users)
+    group2.permissions.add(permission_manage_orders)
+    group3.permissions.add(permission_manage_products)
+
+    staff_user = User.objects.create(email="staffuser@example.com", is_staff=True)
+    staff_api_client.user.user_permissions.add(permission_manage_orders)
+    id = graphene.Node.to_global_id("User", staff_user.id)
+    variables = {
+        "id": id,
+        "input": {
+            "isActive": False,
+            "addGroups": [
+                graphene.Node.to_global_id("Group", gr.pk) for gr in [group1, group2]
+            ],
+            "removeGroups": [graphene.Node.to_global_id("Group", group3.pk)],
+        },
+    }
+
+    # for staff user
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    errors = data["errors"]
+    assert not data["user"]
+    assert len(errors) == 2
+
+    expected_errors = [
+        {
+            "field": "addGroups",
+            "code": AccountErrorCode.OUT_OF_SCOPE_GROUP.name,
+            "permissions": None,
+            "groups": [graphene.Node.to_global_id("Group", group1.pk)],
+        },
+        {
+            "field": "removeGroups",
+            "code": AccountErrorCode.OUT_OF_SCOPE_GROUP.name,
+            "permissions": None,
+            "groups": [graphene.Node.to_global_id("Group", group3.pk)],
+        },
+    ]
+    for error in errors:
+        error.pop("message")
+        assert error in expected_errors
+
+    # for superuser
+    response = superuser_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    errors = data["errors"]
+    assert no
