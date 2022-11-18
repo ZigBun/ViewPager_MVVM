@@ -3739,4 +3739,253 @@ def test_staff_update_out_of_scope_groups(
     content = get_graphql_content(response)
     data = content["data"]["staffUpdate"]
     errors = data["errors"]
-    assert no
+    assert not errors
+    assert data["user"]["email"] == staff_user.email
+    assert {group["name"] for group in data["user"]["permissionGroups"]} == {
+        group1.name,
+        group2.name,
+    }
+
+
+def test_staff_update_duplicated_input_items(
+    staff_api_client,
+    permission_manage_staff,
+    media_root,
+    permission_manage_orders,
+    permission_manage_users,
+):
+    query = STAFF_UPDATE_MUTATIONS
+
+    groups = Group.objects.bulk_create(
+        [Group(name="manage users"), Group(name="manage orders"), Group(name="empty")]
+    )
+    group1, group2, group3 = groups
+
+    group1.permissions.add(permission_manage_users)
+    group2.permissions.add(permission_manage_orders)
+
+    staff_user = User.objects.create(email="staffuser@example.com", is_staff=True)
+    staff_api_client.user.user_permissions.add(
+        permission_manage_orders, permission_manage_users
+    )
+    id = graphene.Node.to_global_id("User", staff_user.id)
+    variables = {
+        "id": id,
+        "input": {
+            "addGroups": [
+                graphene.Node.to_global_id("Group", gr.pk) for gr in [group1, group2]
+            ],
+            "removeGroups": [
+                graphene.Node.to_global_id("Group", gr.pk)
+                for gr in [group1, group2, group3]
+            ],
+        },
+    }
+
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    errors = data["errors"]
+
+    assert len(errors) == 1
+    assert errors[0]["field"] is None
+    assert errors[0]["code"] == AccountErrorCode.DUPLICATED_INPUT_ITEM.name
+    assert set(errors[0]["groups"]) == {
+        graphene.Node.to_global_id("Group", gr.pk) for gr in [group1, group2]
+    }
+    assert errors[0]["permissions"] is None
+
+
+def test_staff_update_doesnt_change_existing_avatar(
+    staff_api_client,
+    permission_manage_staff,
+    media_root,
+    staff_users,
+):
+    query = STAFF_UPDATE_MUTATIONS
+
+    mock_file = MagicMock(spec=File)
+    mock_file.name = "image.jpg"
+
+    staff_user, staff_user1, _ = staff_users
+
+    id = graphene.Node.to_global_id("User", staff_user1.id)
+    variables = {"id": id, "input": {"isActive": False}}
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    assert data["errors"] == []
+
+    staff_user.refresh_from_db()
+    assert not staff_user.avatar
+
+
+def test_staff_update_deactivate_with_manage_staff_left_not_manageable_perms(
+    staff_api_client,
+    superuser_api_client,
+    staff_users,
+    permission_manage_users,
+    permission_manage_staff,
+    permission_manage_orders,
+    media_root,
+):
+    """Ensure that staff user can't and superuser can deactivate user where some
+    permissions will be not manageable.
+    """
+    query = STAFF_UPDATE_MUTATIONS
+    groups = Group.objects.bulk_create(
+        [
+            Group(name="manage users"),
+            Group(name="manage staff"),
+            Group(name="manage orders"),
+        ]
+    )
+    group1, group2, group3 = groups
+
+    group1.permissions.add(permission_manage_users)
+    group2.permissions.add(permission_manage_staff)
+    group3.permissions.add(permission_manage_orders)
+
+    staff_user, staff_user1, staff_user2 = staff_users
+    group1.user_set.add(staff_user1)
+    group2.user_set.add(staff_user2, staff_user1)
+    group3.user_set.add(staff_user2)
+
+    staff_user.user_permissions.add(permission_manage_users, permission_manage_orders)
+
+    id = graphene.Node.to_global_id("User", staff_user1.id)
+    variables = {"id": id, "input": {"isActive": False}}
+
+    # for staff user
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    errors = data["errors"]
+
+    assert not data["user"]
+    assert len(errors) == 1
+    assert errors[0]["field"] == "isActive"
+    assert errors[0]["code"] == AccountErrorCode.LEFT_NOT_MANAGEABLE_PERMISSION.name
+    assert len(errors[0]["permissions"]) == 1
+    assert errors[0]["permissions"][0] == AccountPermissions.MANAGE_USERS.name
+
+    # for superuser
+    response = superuser_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    errors = data["errors"]
+
+    staff_user1.refresh_from_db()
+    assert data["user"]["email"] == staff_user1.email
+    assert data["user"]["isActive"] is False
+    assert not errors
+    assert not staff_user1.is_active
+
+
+def test_staff_update_deactivate_with_manage_staff_all_perms_manageable(
+    staff_api_client,
+    staff_users,
+    permission_manage_users,
+    permission_manage_staff,
+    permission_manage_orders,
+    media_root,
+):
+    query = STAFF_UPDATE_MUTATIONS
+    groups = Group.objects.bulk_create(
+        [
+            Group(name="manage users"),
+            Group(name="manage staff"),
+            Group(name="manage orders"),
+        ]
+    )
+    group1, group2, group3 = groups
+
+    group1.permissions.add(permission_manage_users)
+    group2.permissions.add(permission_manage_staff)
+    group3.permissions.add(permission_manage_orders)
+
+    staff_user, staff_user1, staff_user2 = staff_users
+    group1.user_set.add(staff_user1, staff_user2)
+    group2.user_set.add(staff_user2, staff_user1)
+    group3.user_set.add(staff_user2)
+
+    staff_user.user_permissions.add(permission_manage_users, permission_manage_orders)
+
+    id = graphene.Node.to_global_id("User", staff_user1.id)
+    variables = {"id": id, "input": {"isActive": False}}
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    errors = data["errors"]
+
+    staff_user1.refresh_from_db()
+    assert not errors
+    assert staff_user1.is_active is False
+
+
+def test_staff_update_update_email_assign_gift_cards_and_orders(
+    staff_api_client, permission_manage_staff, gift_card, order
+):
+    # given
+    query = STAFF_UPDATE_MUTATIONS
+    staff_user = User.objects.create(email="staffuser@example.com", is_staff=True)
+
+    new_email = "testuser@example.com"
+
+    gift_card.created_by = None
+    gift_card.created_by_email = new_email
+    gift_card.save(update_fields=["created_by", "created_by_email"])
+
+    order.user = None
+    order.user_email = new_email
+    order.save(update_fields=["user_email", "user"])
+
+    id = graphene.Node.to_global_id("User", staff_user.id)
+    variables = {"id": id, "input": {"email": new_email}}
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["staffUpdate"]
+    assert data["errors"] == []
+    assert data["user"]["userPermissions"] == []
+    assert data["user"]["email"] == new_email
+    gift_card.refresh_from_db()
+    staff_user.refresh_from_db()
+    assert gift_card.created_by == staff_user
+    assert gift_card.created_by_email == staff_user.email
+    order.refresh_from_db()
+    assert order.user == staff_user
+
+
+STAFF_DELETE_MUTATION = """
+        mutation DeleteStaff($id: ID!) {
+            staffDelete(id: $id) {
+                errors {
+                    field
+                    code
+                    message
+                    permissions
+                }
+                user {
+                    id
+                }
+            }
+        }
+    """
+
+
+def test_staff_delete(staff_api_client, permission_manage_staff):
+   
