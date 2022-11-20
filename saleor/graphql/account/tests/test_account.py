@@ -4215,4 +4215,209 @@ def test_staff_delete_all_permissions_manageable(
     user_id = graphene.Node.to_global_id("User", staff_user1.id)
     variables = {"id": user_id}
 
-    staff_user.user_permissions.add(
+    staff_user.user_permissions.add(permission_manage_users, permission_manage_orders)
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_staff]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["staffDelete"]
+    errors = data["errors"]
+
+    assert len(errors) == 0
+    assert not User.objects.filter(pk=staff_user1.id).exists()
+
+
+def test_user_delete_errors(staff_user, admin_user):
+    info = Mock(context=Mock(user=staff_user))
+    with pytest.raises(ValidationError) as e:
+        UserDelete.clean_instance(info, staff_user)
+
+    msg = "You cannot delete your own account."
+    assert e.value.error_dict["id"][0].message == msg
+
+    info = Mock(context=Mock(user=staff_user))
+    with pytest.raises(ValidationError) as e:
+        UserDelete.clean_instance(info, admin_user)
+
+    msg = "Cannot delete this account."
+    assert e.value.error_dict["id"][0].message == msg
+
+
+def test_staff_delete_errors(staff_user, customer_user, admin_user):
+    info = Mock(context=Mock(user=staff_user, app=None))
+    with pytest.raises(ValidationError) as e:
+        StaffDelete.clean_instance(info, customer_user)
+    msg = "Cannot delete a non-staff users."
+    assert e.value.error_dict["id"][0].message == msg
+
+    # should not raise any errors
+    info = Mock(context=Mock(user=admin_user, app=None))
+    StaffDelete.clean_instance(info, staff_user)
+
+
+def test_staff_update_errors(staff_user, customer_user, admin_user):
+    errors = defaultdict(list)
+    input = {"is_active": None}
+    StaffUpdate.clean_is_active(input, customer_user, staff_user, errors)
+    assert not errors["is_active"]
+
+    input["is_active"] = False
+    StaffUpdate.clean_is_active(input, staff_user, staff_user, errors)
+    assert len(errors["is_active"]) == 1
+    assert (
+        errors["is_active"][0].code.upper()
+        == AccountErrorCode.DEACTIVATE_OWN_ACCOUNT.name
+    )
+
+    errors = defaultdict(list)
+    StaffUpdate.clean_is_active(input, admin_user, staff_user, errors)
+    assert len(errors["is_active"]) == 2
+    assert {error.code.upper() for error in errors["is_active"]} == {
+        AccountErrorCode.DEACTIVATE_SUPERUSER_ACCOUNT.name,
+        AccountErrorCode.LEFT_NOT_MANAGEABLE_PERMISSION.name,
+    }
+
+    errors = defaultdict(list)
+    # should not raise any errors
+    StaffUpdate.clean_is_active(input, customer_user, staff_user, errors)
+    assert not errors["is_active"]
+
+
+SET_PASSWORD_MUTATION = """
+    mutation SetPassword($email: String!, $token: String!, $password: String!) {
+        setPassword(email: $email, token: $token, password: $password) {
+            errors {
+                field
+                message
+            }
+            errors {
+                field
+                message
+                code
+            }
+            user {
+                id
+            }
+            token
+            refreshToken
+        }
+    }
+"""
+
+
+@freeze_time("2018-05-31 12:00:01")
+def test_set_password(user_api_client, customer_user):
+    token = default_token_generator.make_token(customer_user)
+    password = "spanish-inquisition"
+
+    variables = {"email": customer_user.email, "password": password, "token": token}
+    response = user_api_client.post_graphql(SET_PASSWORD_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["setPassword"]
+    assert data["user"]["id"]
+    assert data["token"]
+
+    customer_user.refresh_from_db()
+    assert customer_user.check_password(password)
+
+    password_resent_event = account_events.CustomerEvent.objects.get()
+    assert password_resent_event.type == account_events.CustomerEvents.PASSWORD_RESET
+    assert password_resent_event.user == customer_user
+
+
+def test_set_password_invalid_token(user_api_client, customer_user):
+    variables = {"email": customer_user.email, "password": "pass", "token": "token"}
+    response = user_api_client.post_graphql(SET_PASSWORD_MUTATION, variables)
+    content = get_graphql_content(response)
+    errors = content["data"]["setPassword"]["errors"]
+    assert errors[0]["message"] == INVALID_TOKEN
+
+    account_errors = content["data"]["setPassword"]["errors"]
+    assert account_errors[0]["message"] == INVALID_TOKEN
+    assert account_errors[0]["code"] == AccountErrorCode.INVALID.name
+
+
+def test_set_password_invalid_email(user_api_client):
+    variables = {"email": "fake@example.com", "password": "pass", "token": "token"}
+    response = user_api_client.post_graphql(SET_PASSWORD_MUTATION, variables)
+    content = get_graphql_content(response)
+    errors = content["data"]["setPassword"]["errors"]
+    assert len(errors) == 1
+    assert errors[0]["field"] == "email"
+
+    account_errors = content["data"]["setPassword"]["errors"]
+    assert len(account_errors) == 1
+    assert account_errors[0]["field"] == "email"
+    assert account_errors[0]["code"] == AccountErrorCode.NOT_FOUND.name
+
+
+@freeze_time("2018-05-31 12:00:01")
+def test_set_password_invalid_password(user_api_client, customer_user, settings):
+    settings.AUTH_PASSWORD_VALIDATORS = [
+        {
+            "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+            "OPTIONS": {"min_length": 5},
+        },
+        {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+    ]
+
+    token = default_token_generator.make_token(customer_user)
+    variables = {"email": customer_user.email, "password": "1234", "token": token}
+    response = user_api_client.post_graphql(SET_PASSWORD_MUTATION, variables)
+    content = get_graphql_content(response)
+    errors = content["data"]["setPassword"]["errors"]
+    assert len(errors) == 2
+    assert (
+        errors[0]["message"]
+        == "This password is too short. It must contain at least 5 characters."
+    )
+    assert errors[1]["message"] == "This password is entirely numeric."
+
+    account_errors = content["data"]["setPassword"]["errors"]
+    assert account_errors[0]["code"] == str_to_enum("password_too_short")
+    assert account_errors[1]["code"] == str_to_enum("password_entirely_numeric")
+
+
+CHANGE_PASSWORD_MUTATION = """
+    mutation PasswordChange($oldPassword: String, $newPassword: String!) {
+        passwordChange(oldPassword: $oldPassword, newPassword: $newPassword) {
+            errors {
+                field
+                message
+            }
+            user {
+                email
+            }
+        }
+    }
+"""
+
+
+def test_password_change(user_api_client):
+    customer_user = user_api_client.user
+    new_password = "spanish-inquisition"
+
+    variables = {"oldPassword": "password", "newPassword": new_password}
+    response = user_api_client.post_graphql(CHANGE_PASSWORD_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["passwordChange"]
+    assert not data["errors"]
+    assert data["user"]["email"] == customer_user.email
+
+    customer_user.refresh_from_db()
+    assert customer_user.check_password(new_password)
+
+    password_change_event = account_events.CustomerEvent.objects.get()
+    assert password_change_event.type == account_events.CustomerEvents.PASSWORD_CHANGED
+    assert password_change_event.user == customer_user
+
+
+def test_password_change_incorrect_old_password(user_api_client):
+    customer_user = user_api_client.user
+    variables = {"oldPassword": "incorrect", "newPassword": ""}
+    response = user_api_client.post_graphql(CHANGE_PASSWORD_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["passwordChange"]
+    customer_user.refresh_from_db()
+    assert customer_user.check_password("password")
+    assert data["errors"]
