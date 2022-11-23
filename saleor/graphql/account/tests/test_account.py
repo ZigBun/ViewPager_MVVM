@@ -4651,4 +4651,245 @@ def test_create_address_validation_fails(
     address,
 ):
     # given
-    query
+    query = ADDRESS_CREATE_MUTATION
+    address_data = graphql_address_data
+    user_id = graphene.Node.to_global_id("User", customer_user.id)
+    address_data["postalCode"] = "wrong postal code"
+    variables = {"user": user_id, "address": graphql_address_data}
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["addressCreate"]
+    assert len(data["errors"]) == 1
+    assert data["errors"][0]["field"] == "postalCode"
+    assert data["address"] is None
+
+
+ADDRESS_UPDATE_MUTATION = """
+    mutation updateUserAddress($addressId: ID!, $address: AddressInput!) {
+        addressUpdate(id: $addressId, input: $address) {
+            address {
+                city
+            }
+            user {
+                id
+            }
+        }
+    }
+"""
+
+
+def test_address_update_mutation(
+    staff_api_client, customer_user, permission_manage_users, graphql_address_data
+):
+    query = ADDRESS_UPDATE_MUTATION
+    address_obj = customer_user.addresses.first()
+    assert staff_api_client.user not in address_obj.user_addresses.all()
+    variables = {
+        "addressId": graphene.Node.to_global_id("Address", address_obj.id),
+        "address": graphql_address_data,
+    }
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["addressUpdate"]
+    assert data["address"]["city"] == graphql_address_data["city"].upper()
+    address_obj.refresh_from_db()
+    assert address_obj.city == graphql_address_data["city"].upper()
+    customer_user.refresh_from_db()
+    assert (
+        generate_address_search_document_value(address_obj)
+        in customer_user.search_document
+    )
+
+
+@freeze_time("2022-05-12 12:00:00")
+@patch("saleor.plugins.webhook.plugin.get_webhooks_for_event")
+@patch("saleor.plugins.webhook.plugin.trigger_webhooks_async")
+def test_address_update_mutation_trigger_webhook(
+    mocked_webhook_trigger,
+    mocked_get_webhooks_for_event,
+    any_webhook,
+    staff_api_client,
+    customer_user,
+    permission_manage_users,
+    graphql_address_data,
+    settings,
+):
+    # given
+    mocked_get_webhooks_for_event.return_value = [any_webhook]
+    settings.PLUGINS = ["saleor.plugins.webhook.plugin.WebhookPlugin"]
+
+    address = customer_user.addresses.first()
+    assert staff_api_client.user not in address.user_addresses.all()
+    variables = {
+        "addressId": graphene.Node.to_global_id("Address", address.id),
+        "address": graphql_address_data,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        ADDRESS_UPDATE_MUTATION, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    address.refresh_from_db()
+
+    # then
+    assert content["data"]["addressUpdate"]
+    mocked_webhook_trigger.assert_called_with(
+        *generate_address_webhook_call_args(
+            address,
+            WebhookEventAsyncType.ADDRESS_UPDATED,
+            staff_api_client.user,
+            any_webhook,
+        )
+    )
+
+
+@patch("saleor.graphql.account.mutations.base.prepare_user_search_document_value")
+def test_address_update_mutation_no_user_assigned(
+    prepare_user_search_document_value_mock,
+    staff_api_client,
+    address,
+    permission_manage_users,
+    graphql_address_data,
+):
+    # given
+    query = ADDRESS_UPDATE_MUTATION
+
+    variables = {
+        "addressId": graphene.Node.to_global_id("Address", address.id),
+        "address": graphql_address_data,
+    }
+
+    # when
+    response = staff_api_client.post_graphql(
+        query, variables, permissions=[permission_manage_users]
+    )
+
+    # then
+    content = get_graphql_content(response)
+    data = content["data"]["addressUpdate"]
+    assert data["address"]["city"] == graphql_address_data["city"].upper()
+    prepare_user_search_document_value_mock.assert_not_called()
+
+
+ACCOUNT_ADDRESS_UPDATE_MUTATION = """
+    mutation updateAccountAddress($addressId: ID!, $address: AddressInput!) {
+        accountAddressUpdate(id: $addressId, input: $address) {
+            address {
+                city
+            }
+            user {
+                id
+            }
+        }
+    }
+"""
+
+
+def test_customer_update_own_address(
+    user_api_client, customer_user, graphql_address_data
+):
+    query = ACCOUNT_ADDRESS_UPDATE_MUTATION
+    address_obj = customer_user.addresses.first()
+    address_data = graphql_address_data
+    address_data["city"] = "Poznań"
+    assert address_data["city"] != address_obj.city
+    user = user_api_client.user
+
+    variables = {
+        "addressId": graphene.Node.to_global_id("Address", address_obj.id),
+        "address": address_data,
+    }
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["accountAddressUpdate"]
+    assert data["address"]["city"] == address_data["city"].upper()
+    address_obj.refresh_from_db()
+    assert address_obj.city == address_data["city"].upper()
+    user.refresh_from_db()
+    assert generate_address_search_document_value(address_obj) in user.search_document
+
+
+@freeze_time("2022-05-12 12:00:00")
+@patch("saleor.plugins.webhook.plugin.get_webhooks_for_event")
+@patch("saleor.plugins.webhook.plugin.trigger_webhooks_async")
+def test_customer_address_update_trigger_webhook(
+    mocked_webhook_trigger,
+    mocked_get_webhooks_for_event,
+    any_webhook,
+    user_api_client,
+    customer_user,
+    graphql_address_data,
+    settings,
+):
+    # given
+    mocked_get_webhooks_for_event.return_value = [any_webhook]
+    settings.PLUGINS = ["saleor.plugins.webhook.plugin.WebhookPlugin"]
+
+    address = customer_user.addresses.first()
+    address_data = graphql_address_data
+    address_data["city"] = "Poznań"
+    assert address_data["city"] != address.city
+
+    variables = {
+        "addressId": graphene.Node.to_global_id("Address", address.id),
+        "address": graphql_address_data,
+    }
+
+    # when
+    response = user_api_client.post_graphql(ACCOUNT_ADDRESS_UPDATE_MUTATION, variables)
+    content = get_graphql_content(response)
+    address.refresh_from_db()
+
+    # then
+    assert content["data"]["accountAddressUpdate"]
+    mocked_webhook_trigger.assert_called_once_with(
+        *generate_address_webhook_call_args(
+            address,
+            WebhookEventAsyncType.ADDRESS_UPDATED,
+            user_api_client.user,
+            any_webhook,
+        )
+    )
+
+
+def test_update_address_as_anonymous_user(
+    api_client, customer_user, graphql_address_data
+):
+    query = ACCOUNT_ADDRESS_UPDATE_MUTATION
+    address_obj = customer_user.addresses.first()
+
+    variables = {
+        "addressId": graphene.Node.to_global_id("Address", address_obj.id),
+        "address": graphql_address_data,
+    }
+    response = api_client.post_graphql(query, variables)
+    assert_no_permission(response)
+
+
+def test_customer_update_own_address_not_updated_when_validation_fails(
+    user_api_client, customer_user, graphql_address_data
+):
+    query = ACCOUNT_ADDRESS_UPDATE_MUTATION
+    address_obj = customer_user.addresses.first()
+    address_data = graphql_address_data
+    address_data["city"] = "Poznań"
+    address_data["postalCode"] = "wrong postal code"
+    assert address_data["city"] != address_obj.city
+
+    variables = {
+        "addressId": graphene.Node.to_global_id("Address", address_obj.id),
+        "address": address_data,
+    }
+    user_api_client.post_graphql(query, variables)
+    address_obj.refresh_from_db()
+    assert address_obj.city != address_data["city"]
+    assert 
