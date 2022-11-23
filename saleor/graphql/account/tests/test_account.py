@@ -5134,4 +5134,252 @@ def test_set_default_address(
     response = staff_api_client.post_graphql(SET_DEFAULT_ADDRESS_MUTATION, variables)
     content = get_graphql_content(response)
     data = content["data"]["addressSetDefault"]
-    assert data["user"]["defaultShippingAddress"]["id"] == addre
+    assert data["user"]["defaultShippingAddress"]["id"] == address_id
+
+
+GET_ADDRESS_VALIDATION_RULES_QUERY = """
+    query getValidator(
+        $country_code: CountryCode!, $country_area: String, $city_area: String) {
+        addressValidationRules(
+                countryCode: $country_code,
+                countryArea: $country_area,
+                cityArea: $city_area) {
+            countryCode
+            countryName
+            addressFormat
+            addressLatinFormat
+            allowedFields
+            requiredFields
+            upperFields
+            countryAreaType
+            countryAreaChoices {
+                verbose
+                raw
+            }
+            cityType
+            cityChoices {
+                raw
+                verbose
+            }
+            cityAreaType
+            cityAreaChoices {
+                raw
+                verbose
+            }
+            postalCodeType
+            postalCodeMatchers
+            postalCodeExamples
+            postalCodePrefix
+        }
+    }
+"""
+
+
+def test_address_validation_rules(user_api_client):
+    query = GET_ADDRESS_VALIDATION_RULES_QUERY
+    variables = {"country_code": "PL", "country_area": None, "city_area": None}
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["addressValidationRules"]
+    assert data["countryCode"] == "PL"
+    assert data["countryName"] == "POLAND"
+    assert data["addressFormat"] is not None
+    assert data["addressLatinFormat"] is not None
+    assert data["cityType"] == "city"
+    assert data["cityAreaType"] == "suburb"
+    matcher = data["postalCodeMatchers"][0]
+    matcher = re.compile(matcher)
+    assert matcher.match("00-123")
+    assert not data["cityAreaChoices"]
+    assert not data["cityChoices"]
+    assert not data["countryAreaChoices"]
+    assert data["postalCodeExamples"]
+    assert data["postalCodeType"] == "postal"
+    assert set(data["allowedFields"]) == {
+        "companyName",
+        "city",
+        "postalCode",
+        "streetAddress1",
+        "name",
+        "streetAddress2",
+    }
+    assert set(data["requiredFields"]) == {"postalCode", "streetAddress1", "city"}
+    assert set(data["upperFields"]) == {"city"}
+
+
+def test_address_validation_rules_with_country_area(user_api_client):
+    query = GET_ADDRESS_VALIDATION_RULES_QUERY
+    variables = {
+        "country_code": "CN",
+        "country_area": "Fujian Sheng",
+        "city_area": None,
+    }
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["addressValidationRules"]
+    assert data["countryCode"] == "CN"
+    assert data["countryName"] == "CHINA"
+    assert data["countryAreaType"] == "province"
+    assert data["countryAreaChoices"]
+    assert data["cityType"] == "city"
+    assert data["cityChoices"]
+    assert data["cityAreaType"] == "district"
+    assert not data["cityAreaChoices"]
+    assert data["cityChoices"]
+    assert data["countryAreaChoices"]
+    assert data["postalCodeExamples"]
+    assert data["postalCodeType"] == "postal"
+    assert set(data["allowedFields"]) == {
+        "city",
+        "postalCode",
+        "streetAddress1",
+        "name",
+        "streetAddress2",
+        "countryArea",
+        "companyName",
+        "cityArea",
+    }
+    assert set(data["requiredFields"]) == {
+        "postalCode",
+        "streetAddress1",
+        "city",
+        "countryArea",
+    }
+    assert set(data["upperFields"]) == {"countryArea"}
+
+
+def test_address_validation_rules_fields_in_camel_case(user_api_client):
+    query = """
+    query getValidator(
+        $country_code: CountryCode!) {
+        addressValidationRules(countryCode: $country_code) {
+            requiredFields
+            allowedFields
+        }
+    }
+    """
+    variables = {"country_code": "PL"}
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["addressValidationRules"]
+    required_fields = data["requiredFields"]
+    allowed_fields = data["allowedFields"]
+    assert "streetAddress1" in required_fields
+    assert "streetAddress2" not in required_fields
+    assert "streetAddress1" in allowed_fields
+    assert "streetAddress2" in allowed_fields
+
+
+REQUEST_PASSWORD_RESET_MUTATION = """
+    mutation RequestPasswordReset(
+        $email: String!, $redirectUrl: String!, $channel: String) {
+        requestPasswordReset(
+            email: $email, redirectUrl: $redirectUrl, channel: $channel) {
+            errors {
+                field
+                message
+                code
+            }
+        }
+    }
+"""
+
+CONFIRM_ACCOUNT_MUTATION = """
+    mutation ConfirmAccount($email: String!, $token: String!) {
+        confirmAccount(email: $email, token: $token) {
+            errors {
+                field
+                code
+            }
+            user {
+                id
+                email
+            }
+        }
+    }
+"""
+
+
+@freeze_time("2018-05-31 12:00:01")
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_reset_password(
+    mocked_notify,
+    user_api_client,
+    customer_user,
+    channel_PLN,
+    channel_USD,
+    site_settings,
+):
+    redirect_url = "https://www.example.com"
+    variables = {
+        "email": customer_user.email,
+        "redirectUrl": redirect_url,
+        "channel": channel_PLN.slug,
+    }
+    response = user_api_client.post_graphql(REQUEST_PASSWORD_RESET_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["requestPasswordReset"]
+    assert not data["errors"]
+    token = default_token_generator.make_token(customer_user)
+    params = urlencode({"email": customer_user.email, "token": token})
+    reset_url = prepare_url(params, redirect_url)
+    expected_payload = {
+        "user": get_default_user_payload(customer_user),
+        "reset_url": reset_url,
+        "token": token,
+        "recipient_email": customer_user.email,
+        "channel_slug": channel_PLN.slug,
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ACCOUNT_PASSWORD_RESET,
+        payload=expected_payload,
+        channel_slug=channel_PLN.slug,
+    )
+
+
+@freeze_time("2018-05-31 12:00:01")
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_reset_password_with_upper_case_email(
+    mocked_notify,
+    user_api_client,
+    customer_user,
+    channel_PLN,
+    channel_USD,
+    site_settings,
+):
+    redirect_url = "https://www.example.com"
+    variables = {
+        "email": customer_user.email.upper(),
+        "redirectUrl": redirect_url,
+        "channel": channel_PLN.slug,
+    }
+    response = user_api_client.post_graphql(REQUEST_PASSWORD_RESET_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["requestPasswordReset"]
+    assert not data["errors"]
+    token = default_token_generator.make_token(customer_user)
+    params = urlencode({"email": customer_user.email, "token": token})
+    reset_url = prepare_url(params, redirect_url)
+    expected_payload = {
+        "user": get_default_user_payload(customer_user),
+        "reset_url": reset_url,
+        "token": token,
+        "recipient_email": customer_user.email,
+        "channel_slug": channel_PLN.slug,
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ACCOUNT_PASSWORD_RESET,
+        payload=expected_payload,
+        channel_slug=channel_PLN.slug,
+    )
+
+
+@freeze_time("2018-05-31 12:00:01")
+@patch("saleor.graphql.account.mutations.base.assign_user_gift_cards")
+@patch("saleor.graphql.account.mutations.base.match_orders_with_new_user")
+def test_account_confirmation(
+    match_orders_wi
