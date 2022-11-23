@@ -5382,4 +5382,219 @@ def test_account_reset_password_with_upper_case_email(
 @patch("saleor.graphql.account.mutations.base.assign_user_gift_cards")
 @patch("saleor.graphql.account.mutations.base.match_orders_with_new_user")
 def test_account_confirmation(
-    match_orders_wi
+    match_orders_with_new_user_mock,
+    assign_gift_cards_mock,
+    api_client,
+    customer_user,
+    channel_USD,
+):
+    customer_user.is_active = False
+    customer_user.save()
+
+    variables = {
+        "email": customer_user.email,
+        "token": default_token_generator.make_token(customer_user),
+        "channel": channel_USD.slug,
+    }
+    response = api_client.post_graphql(CONFIRM_ACCOUNT_MUTATION, variables)
+    content = get_graphql_content(response)
+    assert not content["data"]["confirmAccount"]["errors"]
+    assert content["data"]["confirmAccount"]["user"]["email"] == customer_user.email
+    customer_user.refresh_from_db()
+    match_orders_with_new_user_mock.assert_called_once_with(customer_user)
+    assign_gift_cards_mock.assert_called_once_with(customer_user)
+    assert customer_user.is_active is True
+
+
+@freeze_time("2018-05-31 12:00:01")
+@patch("saleor.graphql.account.mutations.base.assign_user_gift_cards")
+@patch("saleor.graphql.account.mutations.base.match_orders_with_new_user")
+def test_account_confirmation_invalid_user(
+    match_orders_with_new_user_mock,
+    assign_gift_cards_mock,
+    user_api_client,
+    customer_user,
+    channel_USD,
+):
+    variables = {
+        "email": "non-existing@example.com",
+        "token": default_token_generator.make_token(customer_user),
+        "channel": channel_USD.slug,
+    }
+    response = user_api_client.post_graphql(CONFIRM_ACCOUNT_MUTATION, variables)
+    content = get_graphql_content(response)
+    assert content["data"]["confirmAccount"]["errors"][0]["field"] == "email"
+    assert (
+        content["data"]["confirmAccount"]["errors"][0]["code"]
+        == AccountErrorCode.NOT_FOUND.name
+    )
+    match_orders_with_new_user_mock.assert_not_called()
+    assign_gift_cards_mock.assert_not_called()
+
+
+@patch("saleor.graphql.account.mutations.base.assign_user_gift_cards")
+@patch("saleor.graphql.account.mutations.base.match_orders_with_new_user")
+def test_account_confirmation_invalid_token(
+    match_orders_with_new_user_mock,
+    assign_gift_cards_mock,
+    user_api_client,
+    customer_user,
+    channel_USD,
+):
+    variables = {
+        "email": customer_user.email,
+        "token": "invalid_token",
+        "channel": channel_USD.slug,
+    }
+    response = user_api_client.post_graphql(CONFIRM_ACCOUNT_MUTATION, variables)
+    content = get_graphql_content(response)
+    assert content["data"]["confirmAccount"]["errors"][0]["field"] == "token"
+    assert (
+        content["data"]["confirmAccount"]["errors"][0]["code"]
+        == AccountErrorCode.INVALID.name
+    )
+    match_orders_with_new_user_mock.assert_not_called()
+    assign_gift_cards_mock.assert_not_called()
+
+
+@freeze_time("2018-05-31 12:00:01")
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_request_password_reset_email_for_staff(
+    mocked_notify, staff_api_client, channel_USD, site_settings
+):
+    redirect_url = "https://www.example.com"
+    variables = {"email": staff_api_client.user.email, "redirectUrl": redirect_url}
+    response = staff_api_client.post_graphql(REQUEST_PASSWORD_RESET_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["requestPasswordReset"]
+    assert not data["errors"]
+    token = default_token_generator.make_token(staff_api_client.user)
+    params = urlencode({"email": staff_api_client.user.email, "token": token})
+    reset_url = prepare_url(params, redirect_url)
+    expected_payload = {
+        "user": get_default_user_payload(staff_api_client.user),
+        "reset_url": reset_url,
+        "token": token,
+        "recipient_email": staff_api_client.user.email,
+        "channel_slug": None,
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ACCOUNT_STAFF_RESET_PASSWORD,
+        payload=expected_payload,
+        channel_slug=None,
+    )
+
+
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_reset_password_invalid_email(
+    mocked_notify, user_api_client, channel_USD
+):
+    variables = {
+        "email": "non-existing-email@email.com",
+        "redirectUrl": "https://www.example.com",
+        "channel": channel_USD.slug,
+    }
+    response = user_api_client.post_graphql(REQUEST_PASSWORD_RESET_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["requestPasswordReset"]
+    assert len(data["errors"]) == 1
+    mocked_notify.assert_not_called()
+
+
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_reset_password_user_is_inactive(
+    mocked_notify, user_api_client, customer_user, channel_USD
+):
+    user = customer_user
+    user.is_active = False
+    user.save()
+
+    variables = {
+        "email": customer_user.email,
+        "redirectUrl": "https://www.example.com",
+        "channel": channel_USD.slug,
+    }
+    response = user_api_client.post_graphql(REQUEST_PASSWORD_RESET_MUTATION, variables)
+    results = response.json()
+    assert "errors" in results
+    assert (
+        results["errors"][0]["message"]
+        == "Invalid token. User does not exist or is inactive."
+    )
+    assert not mocked_notify.called
+
+
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_reset_password_storefront_hosts_not_allowed(
+    mocked_notify, user_api_client, customer_user, channel_USD
+):
+    variables = {
+        "email": customer_user.email,
+        "redirectUrl": "https://www.fake.com",
+        "channel": channel_USD.slug,
+    }
+    response = user_api_client.post_graphql(REQUEST_PASSWORD_RESET_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["requestPasswordReset"]
+    assert len(data["errors"]) == 1
+    assert data["errors"][0]["field"] == "redirectUrl"
+    mocked_notify.assert_not_called()
+
+
+@freeze_time("2018-05-31 12:00:01")
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_reset_password_all_storefront_hosts_allowed(
+    mocked_notify,
+    user_api_client,
+    customer_user,
+    settings,
+    channel_PLN,
+    channel_USD,
+    site_settings,
+):
+    settings.ALLOWED_CLIENT_HOSTS = ["*"]
+    redirect_url = "https://www.test.com"
+    variables = {
+        "email": customer_user.email,
+        "redirectUrl": redirect_url,
+        "channel": channel_PLN.slug,
+    }
+    response = user_api_client.post_graphql(REQUEST_PASSWORD_RESET_MUTATION, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["requestPasswordReset"]
+    assert not data["errors"]
+
+    token = default_token_generator.make_token(customer_user)
+    params = urlencode({"email": customer_user.email, "token": token})
+    reset_url = prepare_url(params, redirect_url)
+    expected_payload = {
+        "user": get_default_user_payload(customer_user),
+        "reset_url": reset_url,
+        "token": token,
+        "recipient_email": customer_user.email,
+        "channel_slug": channel_PLN.slug,
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ACCOUNT_PASSWORD_RESET,
+        payload=expected_payload,
+        channel_slug=channel_PLN.slug,
+    )
+
+
+@freeze_time("2018-05-31 12:00:01")
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_reset_password_subdomain(
+    mocked_notify, user_api_client, customer_user, settings, channel_PLN, site_settings
+):
+    settings.ALLOWED_CLIENT_HOSTS = [".example.com"]
+    redirect_url = "https://sub.example.com"
+    variables = {
+        "email": customer_user.email,
+        "redirectUrl": redirect_url,
+        "channel": channel_PLN.slug,
+    }
+    respons
