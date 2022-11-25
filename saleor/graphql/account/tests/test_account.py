@@ -5827,4 +5827,255 @@ def test_customer_set_address_as_default(user_api_client):
     mutation_name = "accountSetDefaultAddress"
 
     variables = {
-        "id": graphene.Nod
+        "id": graphene.Node.to_global_id("Address", address.id),
+        "type": AddressType.SHIPPING.upper(),
+    }
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"][mutation_name]
+    assert not data["errors"]
+
+    user.refresh_from_db()
+    assert user.default_shipping_address == address
+
+    variables["type"] = AddressType.BILLING.upper()
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"][mutation_name]
+    assert not data["errors"]
+
+    user.refresh_from_db()
+    assert user.default_billing_address == address
+
+
+def test_customer_change_default_address(user_api_client, address_other_country):
+    user = user_api_client.user
+    assert user.default_billing_address
+    assert user.default_billing_address
+    address = user.default_shipping_address
+    assert address in user.addresses.all()
+    assert address_other_country not in user.addresses.all()
+
+    user.default_shipping_address = address_other_country
+    user.save()
+    user.refresh_from_db()
+    assert address_other_country not in user.addresses.all()
+
+    query = ACCOUNT_SET_DEFAULT_ADDRESS_MUTATION
+    mutation_name = "accountSetDefaultAddress"
+
+    variables = {
+        "id": graphene.Node.to_global_id("Address", address.id),
+        "type": AddressType.SHIPPING.upper(),
+    }
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    data = content["data"][mutation_name]
+    assert not data["errors"]
+
+    user.refresh_from_db()
+    assert user.default_shipping_address == address
+    assert address_other_country in user.addresses.all()
+
+
+def test_customer_change_default_address_invalid_address(
+    user_api_client, address_other_country
+):
+    user = user_api_client.user
+    assert address_other_country not in user.addresses.all()
+
+    query = ACCOUNT_SET_DEFAULT_ADDRESS_MUTATION
+    mutation_name = "accountSetDefaultAddress"
+
+    variables = {
+        "id": graphene.Node.to_global_id("Address", address_other_country.id),
+        "type": AddressType.SHIPPING.upper(),
+    }
+    response = user_api_client.post_graphql(query, variables)
+    content = get_graphql_content(response)
+    assert content["data"][mutation_name]["errors"][0]["field"] == "id"
+
+
+USER_AVATAR_UPDATE_MUTATION = """
+    mutation userAvatarUpdate($image: Upload!) {
+        userAvatarUpdate(image: $image) {
+            user {
+                avatar(size: 0) {
+                    url
+                }
+            }
+        }
+    }
+"""
+
+
+def test_user_avatar_update_mutation_permission(api_client):
+    """Should raise error if user is not staff."""
+
+    query = USER_AVATAR_UPDATE_MUTATION
+
+    image_file, image_name = create_image("avatar")
+    variables = {"image": image_name}
+    body = get_multipart_request_body(query, variables, image_file, image_name)
+    response = api_client.post_multipart(body)
+
+    assert_no_permission(response)
+
+
+def test_user_avatar_update_mutation(
+    monkeypatch, staff_api_client, media_root, site_settings
+):
+    query = USER_AVATAR_UPDATE_MUTATION
+
+    user = staff_api_client.user
+
+    image_file, image_name = create_image("avatar")
+    variables = {"image": image_name}
+    body = get_multipart_request_body(query, variables, image_file, image_name)
+
+    # when
+    response = staff_api_client.post_multipart(body)
+
+    # then
+    content = get_graphql_content(response)
+
+    data = content["data"]["userAvatarUpdate"]
+    user.refresh_from_db()
+
+    assert user.avatar
+    assert data["user"]["avatar"]["url"].startswith(
+        f"http://{site_settings.site.domain}/media/user-avatars/avatar"
+    )
+    img_name, format = os.path.splitext(image_file._name)
+    file_name = user.avatar.name
+    assert file_name != image_file._name
+    assert file_name.startswith(f"user-avatars/{img_name}")
+    assert file_name.endswith(format)
+
+
+def test_user_avatar_update_mutation_image_exists(
+    staff_api_client, media_root, site_settings
+):
+    query = USER_AVATAR_UPDATE_MUTATION
+
+    user = staff_api_client.user
+    avatar_mock = MagicMock(spec=File)
+    avatar_mock.name = "image.jpg"
+    user.avatar = avatar_mock
+    user.save()
+
+    # create thumbnail for old avatar
+    Thumbnail.objects.create(user=staff_api_client.user, size=128)
+    assert user.thumbnails.exists()
+
+    image_file, image_name = create_image("new_image")
+    variables = {"image": image_name}
+    body = get_multipart_request_body(query, variables, image_file, image_name)
+
+    # when
+    response = staff_api_client.post_multipart(body)
+
+    # then
+    content = get_graphql_content(response)
+
+    data = content["data"]["userAvatarUpdate"]
+    user.refresh_from_db()
+
+    assert user.avatar != avatar_mock
+    assert data["user"]["avatar"]["url"].startswith(
+        f"http://{site_settings.site.domain}/media/user-avatars/new_image"
+    )
+    assert not user.thumbnails.exists()
+
+
+USER_AVATAR_DELETE_MUTATION = """
+    mutation userAvatarDelete {
+        userAvatarDelete {
+            user {
+                avatar {
+                    url
+                }
+            }
+        }
+    }
+"""
+
+
+def test_user_avatar_delete_mutation_permission(api_client):
+    """Should raise error if user is not staff."""
+
+    query = USER_AVATAR_DELETE_MUTATION
+
+    response = api_client.post_graphql(query)
+
+    assert_no_permission(response)
+
+
+def test_user_avatar_delete_mutation(staff_api_client):
+    # given
+    query = USER_AVATAR_DELETE_MUTATION
+
+    user = staff_api_client.user
+    Thumbnail.objects.create(user=staff_api_client.user, size=128)
+    assert user.thumbnails.all()
+
+    # when
+    response = staff_api_client.post_graphql(query)
+    content = get_graphql_content(response)
+
+    # then
+    user.refresh_from_db()
+
+    assert not user.avatar
+    assert not content["data"]["userAvatarDelete"]["user"]["avatar"]
+    assert not user.thumbnails.exists()
+
+
+@pytest.mark.parametrize(
+    "customer_filter, count",
+    [
+        ({"placedOrders": {"gte": "2019-04-18"}}, 1),
+        ({"placedOrders": {"lte": "2012-01-14"}}, 1),
+        ({"placedOrders": {"lte": "2012-01-14", "gte": "2012-01-13"}}, 1),
+        ({"placedOrders": {"gte": "2012-01-14"}}, 2),
+    ],
+)
+def test_query_customers_with_filter_placed_orders(
+    customer_filter,
+    count,
+    query_customer_with_filter,
+    staff_api_client,
+    permission_manage_users,
+    customer_user,
+    channel_USD,
+):
+    Order.objects.create(user=customer_user, channel=channel_USD)
+    second_customer = User.objects.create(email="second_example@example.com")
+    with freeze_time("2012-01-14 11:00:00"):
+        Order.objects.create(user=second_customer, channel=channel_USD)
+    variables = {"filter": customer_filter}
+    response = staff_api_client.post_graphql(
+        query_customer_with_filter, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    users = content["data"]["customers"]["edges"]
+
+    assert len(users) == count
+
+
+@pytest.mark.parametrize(
+    "customer_filter, count",
+    [
+        ({"dateJoined": {"gte": "2019-04-18"}}, 1),
+        ({"dateJoined": {"lte": "2012-01-14"}}, 1),
+        ({"dateJoined": {"lte": "2012-01-14", "gte": "2012-01-13"}}, 1),
+        ({"dateJoined": {"gte": "2012-01-14"}}, 2),
+        ({"updatedAt": {"gte": "2012-01-14T10:59:00+00:00"}}, 2),
+        ({"updatedAt": {"gte": "2012-01-14T11:01:00+00:00"}}, 1),
+        ({"updatedAt": {"lte": "2012-01-14T12:00:00+00:00"}}, 1),
+        ({"updatedAt": {"lte": "2011-01-14T10:59:00+00:00"}}, 0),
+        (
+            {
+                "updatedAt": {
+                    "lte": "2012-01-14T12:00:00+00:00",
+                    "gte": "2012-01-14T10:00:00+00:
