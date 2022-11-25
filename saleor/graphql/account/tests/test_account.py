@@ -6078,4 +6078,230 @@ def test_query_customers_with_filter_placed_orders(
             {
                 "updatedAt": {
                     "lte": "2012-01-14T12:00:00+00:00",
-                    "gte": "2012-01-14T10:00:00+00:
+                    "gte": "2012-01-14T10:00:00+00:00",
+                }
+            },
+            1,
+        ),
+        ({"updatedAt": {"gte": "2012-01-14T10:00:00+00:00"}}, 2),
+    ],
+)
+def test_query_customers_with_filter_date_joined_and_updated_at(
+    customer_filter,
+    count,
+    query_customer_with_filter,
+    staff_api_client,
+    permission_manage_users,
+    customer_user,
+):
+    with freeze_time("2012-01-14 11:00:00"):
+        User.objects.create(email="second_example@example.com")
+    variables = {"filter": customer_filter}
+    response = staff_api_client.post_graphql(
+        query_customer_with_filter, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    users = content["data"]["customers"]["edges"]
+    assert len(users) == count
+
+
+@pytest.mark.parametrize(
+    "customer_filter, count",
+    [
+        ({"numberOfOrders": {"gte": 0, "lte": 1}}, 1),
+        ({"numberOfOrders": {"gte": 1, "lte": 3}}, 2),
+        ({"numberOfOrders": {"gte": 0}}, 2),
+        ({"numberOfOrders": {"lte": 3}}, 2),
+    ],
+)
+def test_query_customers_with_filter_placed_orders_(
+    customer_filter,
+    count,
+    query_customer_with_filter,
+    staff_api_client,
+    permission_manage_users,
+    customer_user,
+    channel_USD,
+):
+    Order.objects.bulk_create(
+        [
+            Order(user=customer_user, channel=channel_USD),
+            Order(user=customer_user, channel=channel_USD),
+            Order(user=customer_user, channel=channel_USD),
+        ]
+    )
+    second_customer = User.objects.create(email="second_example@example.com")
+    with freeze_time("2012-01-14 11:00:00"):
+        Order.objects.create(user=second_customer, channel=channel_USD)
+    variables = {"filter": customer_filter}
+    response = staff_api_client.post_graphql(
+        query_customer_with_filter, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    users = content["data"]["customers"]["edges"]
+
+    assert len(users) == count
+
+
+def test_query_customers_with_filter_metadata(
+    query_customer_with_filter,
+    staff_api_client,
+    permission_manage_users,
+    customer_user,
+    channel_USD,
+):
+    second_customer = User.objects.create(email="second_example@example.com")
+    second_customer.store_value_in_metadata({"metakey": "metavalue"})
+    second_customer.save()
+
+    variables = {"filter": {"metadata": [{"key": "metakey", "value": "metavalue"}]}}
+    response = staff_api_client.post_graphql(
+        query_customer_with_filter, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    users = content["data"]["customers"]["edges"]
+    assert len(users) == 1
+    user = users[0]
+    _, user_id = graphene.Node.from_global_id(user["node"]["id"])
+    assert second_customer.id == int(user_id)
+
+
+def test_query_customers_search_without_duplications(
+    query_customer_with_filter,
+    staff_api_client,
+    permission_manage_users,
+    permission_manage_orders,
+):
+    customer = User.objects.create(email="david@example.com")
+    customer.addresses.create(first_name="David")
+    customer.addresses.create(first_name="David")
+    customer.search_document = prepare_user_search_document_value(customer)
+    customer.save(update_fields=["search_document"])
+
+    variables = {"filter": {"search": "David"}}
+    response = staff_api_client.post_graphql(
+        query_customer_with_filter, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    users = content["data"]["customers"]["edges"]
+    assert len(users) == 1
+
+    response = staff_api_client.post_graphql(
+        query_customer_with_filter,
+        variables,
+        permissions=[permission_manage_orders],
+        check_no_permissions=False,
+    )
+    content = get_graphql_content(response)
+    users = content["data"]["customers"]["edges"]
+    assert len(users) == 1
+
+
+def test_query_customers_with_permission_manage_orders(
+    query_customer_with_filter,
+    customer_user,
+    staff_api_client,
+    permission_manage_orders,
+):
+    variables = {"filter": {}}
+
+    response = staff_api_client.post_graphql(
+        query_customer_with_filter,
+        variables,
+        permissions=[permission_manage_orders],
+    )
+    content = get_graphql_content(response)
+    users = content["data"]["customers"]["totalCount"]
+    assert users == 1
+
+
+QUERY_CUSTOMERS_WITH_SORT = """
+    query ($sort_by: UserSortingInput!) {
+        customers(first:5, sortBy: $sort_by) {
+                edges{
+                    node{
+                        firstName
+                    }
+                }
+            }
+        }
+"""
+
+
+@pytest.mark.parametrize(
+    "customer_sort, result_order",
+    [
+        ({"field": "FIRST_NAME", "direction": "ASC"}, ["Joe", "John", "Leslie"]),
+        ({"field": "FIRST_NAME", "direction": "DESC"}, ["Leslie", "John", "Joe"]),
+        ({"field": "LAST_NAME", "direction": "ASC"}, ["John", "Joe", "Leslie"]),
+        ({"field": "LAST_NAME", "direction": "DESC"}, ["Leslie", "Joe", "John"]),
+        ({"field": "EMAIL", "direction": "ASC"}, ["John", "Leslie", "Joe"]),
+        ({"field": "EMAIL", "direction": "DESC"}, ["Joe", "Leslie", "John"]),
+        ({"field": "ORDER_COUNT", "direction": "ASC"}, ["John", "Leslie", "Joe"]),
+        ({"field": "ORDER_COUNT", "direction": "DESC"}, ["Joe", "Leslie", "John"]),
+        ({"field": "CREATED_AT", "direction": "ASC"}, ["John", "Joe", "Leslie"]),
+        ({"field": "CREATED_AT", "direction": "DESC"}, ["Leslie", "Joe", "John"]),
+        ({"field": "LAST_MODIFIED_AT", "direction": "ASC"}, ["Leslie", "John", "Joe"]),
+        ({"field": "LAST_MODIFIED_AT", "direction": "DESC"}, ["Joe", "John", "Leslie"]),
+    ],
+)
+def test_query_customers_with_sort(
+    customer_sort, result_order, staff_api_client, permission_manage_users, channel_USD
+):
+    users = User.objects.bulk_create(
+        [
+            User(
+                first_name="John",
+                last_name="Allen",
+                email="allen@example.com",
+                is_staff=False,
+                is_active=True,
+            ),
+            User(
+                first_name="Joe",
+                last_name="Doe",
+                email="zordon01@example.com",
+                is_staff=False,
+                is_active=True,
+            ),
+            User(
+                first_name="Leslie",
+                last_name="Wade",
+                email="leslie@example.com",
+                is_staff=False,
+                is_active=True,
+            ),
+        ]
+    )
+
+    users[2].save()
+    users[0].save()
+    users[1].save()
+
+    Order.objects.create(
+        user=User.objects.get(email="zordon01@example.com"), channel=channel_USD
+    )
+
+    variables = {"sort_by": customer_sort}
+    staff_api_client.user.user_permissions.add(permission_manage_users)
+    response = staff_api_client.post_graphql(QUERY_CUSTOMERS_WITH_SORT, variables)
+    content = get_graphql_content(response)
+    users = content["data"]["customers"]["edges"]
+
+    for order, user_first_name in enumerate(result_order):
+        assert users[order]["node"]["firstName"] == user_first_name
+
+
+@pytest.mark.parametrize(
+    "customer_filter, count",
+    [
+        ({"search": "mirumee.com"}, 2),
+        ({"search": "Alice"}, 1),
+        ({"search": "Kowalski"}, 1),
+        ({"search": "John"}, 1),  # first_name
+        ({"search": "Doe"}, 1),  # last_name
+        ({"search": "wroc"}, 1),  # city
+        ({"search": "pl"}, 1),  # country
+        ({"search": "+48713988102"}, 1),
+        ({"search": "alice Kowalski"}, 1),
+        (
