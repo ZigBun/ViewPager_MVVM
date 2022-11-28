@@ -6806,4 +6806,264 @@ def test_address_query_invalid_id(
 ):
     id = "..afs"
     variables = {"id": id}
-    respon
+    response = staff_api_client.post_graphql(ADDRESS_QUERY, variables)
+    content = get_graphql_content_from_response(response)
+    assert len(content["errors"]) == 1
+    assert content["errors"][0]["message"] == f"Couldn't resolve id: {id}."
+    assert content["data"]["address"] is None
+
+
+def test_address_query_with_invalid_object_type(
+    staff_api_client,
+    address_other_country,
+):
+    variables = {"id": graphene.Node.to_global_id("Order", address_other_country.pk)}
+    response = staff_api_client.post_graphql(ADDRESS_QUERY, variables)
+    content = get_graphql_content(response)
+    assert content["data"]["address"] is None
+
+
+REQUEST_EMAIL_CHANGE_QUERY = """
+mutation requestEmailChange(
+    $password: String!, $new_email: String!, $redirect_url: String!, $channel:String
+) {
+    requestEmailChange(
+        password: $password,
+        newEmail: $new_email,
+        redirectUrl: $redirect_url,
+        channel: $channel
+    ) {
+        user {
+            email
+        }
+        errors {
+            code
+            message
+            field
+        }
+  }
+}
+"""
+
+
+@freeze_time("2018-05-31 12:00:01")
+@patch("saleor.plugins.manager.PluginsManager.notify")
+def test_account_request_email_change_with_upper_case_email(
+    mocked_notify,
+    user_api_client,
+    customer_user,
+    site_settings,
+    channel_PLN,
+):
+    # given
+    new_email = "NEW_EMAIL@example.com"
+    redirect_url = "https://www.example.com"
+    variables = {
+        "new_email": new_email,
+        "redirect_url": redirect_url,
+        "password": "password",
+        "channel": channel_PLN.slug,
+    }
+    token_payload = {
+        "old_email": customer_user.email,
+        "new_email": new_email.lower(),
+        "user_pk": customer_user.pk,
+    }
+    token = create_token(token_payload, settings.JWT_TTL_REQUEST_EMAIL_CHANGE)
+
+    # when
+    response = user_api_client.post_graphql(REQUEST_EMAIL_CHANGE_QUERY, variables)
+    content = get_graphql_content(response)
+
+    # then
+    data = content["data"]["requestEmailChange"]
+    assert not data["errors"]
+
+    params = urlencode({"token": token})
+    redirect_url = prepare_url(params, redirect_url)
+    expected_payload = {
+        "user": get_default_user_payload(customer_user),
+        "recipient_email": new_email.lower(),
+        "token": token,
+        "redirect_url": redirect_url,
+        "old_email": customer_user.email,
+        "new_email": new_email.lower(),
+        "channel_slug": channel_PLN.slug,
+        **get_site_context_payload(site_settings.site),
+    }
+
+    mocked_notify.assert_called_once_with(
+        NotifyEventType.ACCOUNT_CHANGE_EMAIL_REQUEST,
+        payload=expected_payload,
+        channel_slug=channel_PLN.slug,
+    )
+
+
+def test_request_email_change(user_api_client, customer_user, channel_PLN):
+    variables = {
+        "password": "password",
+        "new_email": "new_email@example.com",
+        "redirect_url": "http://www.example.com",
+        "channel": channel_PLN.slug,
+    }
+
+    response = user_api_client.post_graphql(REQUEST_EMAIL_CHANGE_QUERY, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["requestEmailChange"]
+    assert data["user"]["email"] == customer_user.email
+
+
+def test_request_email_change_to_existing_email(
+    user_api_client, customer_user, staff_user
+):
+    variables = {
+        "password": "password",
+        "new_email": staff_user.email,
+        "redirect_url": "http://www.example.com",
+    }
+
+    response = user_api_client.post_graphql(REQUEST_EMAIL_CHANGE_QUERY, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["requestEmailChange"]
+    assert not data["user"]
+    assert data["errors"] == [
+        {
+            "code": "UNIQUE",
+            "message": "Email is used by other user.",
+            "field": "newEmail",
+        }
+    ]
+
+
+def test_request_email_change_with_invalid_redirect_url(
+    user_api_client, customer_user, staff_user
+):
+    variables = {
+        "password": "password",
+        "new_email": "new_email@example.com",
+        "redirect_url": "www.example.com",
+    }
+
+    response = user_api_client.post_graphql(REQUEST_EMAIL_CHANGE_QUERY, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["requestEmailChange"]
+    assert not data["user"]
+    assert data["errors"] == [
+        {
+            "code": "INVALID",
+            "message": "Invalid URL. Please check if URL is in RFC 1808 format.",
+            "field": "redirectUrl",
+        }
+    ]
+
+
+def test_request_email_change_with_invalid_password(user_api_client, customer_user):
+    variables = {
+        "password": "spanishinquisition",
+        "new_email": "new_email@example.com",
+        "redirect_url": "http://www.example.com",
+    }
+    response = user_api_client.post_graphql(REQUEST_EMAIL_CHANGE_QUERY, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["requestEmailChange"]
+    assert not data["user"]
+    assert data["errors"][0]["code"] == AccountErrorCode.INVALID_CREDENTIALS.name
+    assert data["errors"][0]["field"] == "password"
+
+
+EMAIL_UPDATE_QUERY = """
+mutation emailUpdate($token: String!, $channel: String) {
+    confirmEmailChange(token: $token, channel: $channel){
+        user {
+            email
+        }
+        errors {
+            code
+            message
+            field
+        }
+  }
+}
+"""
+
+
+@patch("saleor.graphql.account.mutations.account.match_orders_with_new_user")
+@patch("saleor.graphql.account.mutations.account.assign_user_gift_cards")
+def test_email_update(
+    assign_gift_cards_mock,
+    assign_orders_mock,
+    user_api_client,
+    customer_user,
+    channel_PLN,
+):
+    new_email = "new_email@example.com"
+    payload = {
+        "old_email": customer_user.email,
+        "new_email": new_email,
+        "user_pk": customer_user.pk,
+    }
+    user = user_api_client.user
+
+    token = create_token(payload, timedelta(hours=1))
+    variables = {"token": token, "channel": channel_PLN.slug}
+
+    response = user_api_client.post_graphql(EMAIL_UPDATE_QUERY, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["confirmEmailChange"]
+    assert data["user"]["email"] == new_email
+    user.refresh_from_db()
+    assert new_email in user.search_document
+    assign_gift_cards_mock.assert_called_once_with(customer_user)
+    assign_orders_mock.assert_called_once_with(customer_user)
+
+
+def test_email_update_to_existing_email(user_api_client, customer_user, staff_user):
+    payload = {
+        "old_email": customer_user.email,
+        "new_email": staff_user.email,
+        "user_pk": customer_user.pk,
+    }
+    token = create_token(payload, timedelta(hours=1))
+    variables = {"token": token}
+
+    response = user_api_client.post_graphql(EMAIL_UPDATE_QUERY, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["confirmEmailChange"]
+    assert not data["user"]
+    assert data["errors"] == [
+        {
+            "code": "UNIQUE",
+            "message": "Email is used by other user.",
+            "field": "newEmail",
+        }
+    ]
+
+
+USER_FEDERATION_QUERY = """
+  query GetUserInFederation($representations: [_Any]) {
+    _entities(representations: $representations) {
+      __typename
+      ... on User {
+        id
+        email
+      }
+    }
+  }
+"""
+
+
+def test_staff_query_user_by_id_for_federation(
+    staff_api_client, customer_user, permission_manage_users
+):
+    customer_user_id = graphene.Node.to_global_id("User", customer_user.pk)
+    variables = {
+        "representations": [
+            {
+                "__typename": "User",
+                "id": customer_user_id,
+            },
+        ],
+    }
+
+    response = staff_api_client.post_graphql(
+        USER_FEDERATI
