@@ -6574,4 +6574,236 @@ QUERY_STAFF_USERS_WITH_SORT = """
         staffUsers(first:5, sortBy: $sort_by) {
                 edges{
                     node{
-                       
+                        firstName
+                    }
+                }
+            }
+        }
+"""
+
+
+@pytest.mark.parametrize(
+    "customer_sort, result_order",
+    [
+        # Empty string in result is first_name for staff_api_client.
+        ({"field": "FIRST_NAME", "direction": "ASC"}, ["", "Joe", "John", "Leslie"]),
+        ({"field": "FIRST_NAME", "direction": "DESC"}, ["Leslie", "John", "Joe", ""]),
+        ({"field": "LAST_NAME", "direction": "ASC"}, ["", "John", "Joe", "Leslie"]),
+        ({"field": "LAST_NAME", "direction": "DESC"}, ["Leslie", "Joe", "John", ""]),
+        ({"field": "EMAIL", "direction": "ASC"}, ["John", "Leslie", "", "Joe"]),
+        ({"field": "EMAIL", "direction": "DESC"}, ["Joe", "", "Leslie", "John"]),
+        ({"field": "ORDER_COUNT", "direction": "ASC"}, ["John", "Leslie", "", "Joe"]),
+        ({"field": "ORDER_COUNT", "direction": "DESC"}, ["Joe", "", "Leslie", "John"]),
+    ],
+)
+def test_query_staff_members_with_sort(
+    customer_sort, result_order, staff_api_client, permission_manage_staff, channel_USD
+):
+    User.objects.bulk_create(
+        [
+            User(
+                first_name="John",
+                last_name="Allen",
+                email="allen@example.com",
+                is_staff=True,
+                is_active=True,
+            ),
+            User(
+                first_name="Joe",
+                last_name="Doe",
+                email="zordon01@example.com",
+                is_staff=True,
+                is_active=True,
+            ),
+            User(
+                first_name="Leslie",
+                last_name="Wade",
+                email="leslie@example.com",
+                is_staff=True,
+                is_active=True,
+            ),
+        ]
+    )
+    Order.objects.create(
+        user=User.objects.get(email="zordon01@example.com"), channel=channel_USD
+    )
+    variables = {"sort_by": customer_sort}
+    staff_api_client.user.user_permissions.add(permission_manage_staff)
+    response = staff_api_client.post_graphql(QUERY_STAFF_USERS_WITH_SORT, variables)
+    content = get_graphql_content(response)
+    users = content["data"]["staffUsers"]["edges"]
+
+    for order, user_first_name in enumerate(result_order):
+        assert users[order]["node"]["firstName"] == user_first_name
+
+
+USER_CHANGE_ACTIVE_STATUS_MUTATION = """
+    mutation userChangeActiveStatus($ids: [ID!]!, $is_active: Boolean!) {
+        userBulkSetActive(ids: $ids, isActive: $is_active) {
+            count
+            errors {
+                field
+                message
+            }
+        }
+    }
+    """
+
+
+def test_staff_bulk_set_active(
+    staff_api_client, user_list_not_active, permission_manage_users
+):
+    users = user_list_not_active
+    active_status = True
+    variables = {
+        "ids": [graphene.Node.to_global_id("User", user.id) for user in users],
+        "is_active": active_status,
+    }
+    response = staff_api_client.post_graphql(
+        USER_CHANGE_ACTIVE_STATUS_MUTATION,
+        variables,
+        permissions=[permission_manage_users],
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["userBulkSetActive"]
+    assert data["count"] == users.count()
+    users = User.objects.filter(pk__in=[user.pk for user in users])
+    assert all(user.is_active for user in users)
+
+
+def test_staff_bulk_set_not_active(
+    staff_api_client, user_list, permission_manage_users
+):
+    users = user_list
+    active_status = False
+    variables = {
+        "ids": [graphene.Node.to_global_id("User", user.id) for user in users],
+        "is_active": active_status,
+    }
+    response = staff_api_client.post_graphql(
+        USER_CHANGE_ACTIVE_STATUS_MUTATION,
+        variables,
+        permissions=[permission_manage_users],
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["userBulkSetActive"]
+    assert data["count"] == len(users)
+    users = User.objects.filter(pk__in=[user.pk for user in users])
+    assert not any(user.is_active for user in users)
+
+
+def test_change_active_status_for_superuser(
+    staff_api_client, superuser, permission_manage_users
+):
+    users = [superuser]
+    superuser_id = graphene.Node.to_global_id("User", superuser.id)
+    active_status = False
+    variables = {
+        "ids": [graphene.Node.to_global_id("User", user.id) for user in users],
+        "is_active": active_status,
+    }
+    response = staff_api_client.post_graphql(
+        USER_CHANGE_ACTIVE_STATUS_MUTATION,
+        variables,
+        permissions=[permission_manage_users],
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["userBulkSetActive"]
+    assert data["errors"][0]["field"] == superuser_id
+    assert (
+        data["errors"][0]["message"] == "Cannot activate or deactivate "
+        "superuser's account."
+    )
+
+
+def test_change_active_status_for_himself(staff_api_client, permission_manage_users):
+    users = [staff_api_client.user]
+    user_id = graphene.Node.to_global_id("User", staff_api_client.user.id)
+    active_status = False
+    variables = {
+        "ids": [graphene.Node.to_global_id("User", user.id) for user in users],
+        "is_active": active_status,
+    }
+    response = staff_api_client.post_graphql(
+        USER_CHANGE_ACTIVE_STATUS_MUTATION,
+        variables,
+        permissions=[permission_manage_users],
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["userBulkSetActive"]
+    assert data["errors"][0]["field"] == user_id
+    assert (
+        data["errors"][0]["message"] == "Cannot activate or deactivate "
+        "your own account."
+    )
+
+
+ADDRESS_QUERY = """
+query address($id: ID!) {
+    address(id: $id) {
+        postalCode
+        lastName
+        firstName
+        city
+        country {
+          code
+        }
+    }
+}
+"""
+
+
+def test_address_query_as_owner(user_api_client, customer_user):
+    address = customer_user.addresses.first()
+    variables = {"id": graphene.Node.to_global_id("Address", address.pk)}
+    response = user_api_client.post_graphql(ADDRESS_QUERY, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["address"]
+    assert data["country"]["code"] == address.country.code
+
+
+def test_address_query_as_not_owner(
+    user_api_client, customer_user, address_other_country
+):
+    variables = {"id": graphene.Node.to_global_id("Address", address_other_country.pk)}
+    response = user_api_client.post_graphql(ADDRESS_QUERY, variables)
+    content = get_graphql_content(response)
+    data = content["data"]["address"]
+    assert not data
+
+
+def test_address_query_as_app_with_permission(
+    app_api_client,
+    address_other_country,
+    permission_manage_users,
+):
+    variables = {"id": graphene.Node.to_global_id("Address", address_other_country.pk)}
+    response = app_api_client.post_graphql(
+        ADDRESS_QUERY, variables, permissions=[permission_manage_users]
+    )
+    content = get_graphql_content(response)
+    data = content["data"]["address"]
+    assert data["country"]["code"] == address_other_country.country.code
+
+
+def test_address_query_as_app_without_permission(
+    app_api_client, app, address_other_country
+):
+    variables = {"id": graphene.Node.to_global_id("Address", address_other_country.pk)}
+    response = app_api_client.post_graphql(ADDRESS_QUERY, variables)
+    assert_no_permission(response)
+
+
+def test_address_query_as_anonymous_user(api_client, address_other_country):
+    variables = {"id": graphene.Node.to_global_id("Address", address_other_country.pk)}
+    response = api_client.post_graphql(ADDRESS_QUERY, variables)
+    assert_no_permission(response)
+
+
+def test_address_query_invalid_id(
+    staff_api_client,
+    address_other_country,
+):
+    id = "..afs"
+    variables = {"id": id}
+    respon
