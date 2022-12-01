@@ -1,0 +1,17 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - Stripe/v1 PythonBindings/2.33.0
+      X-Stripe-Client-Telemetry:
+      - '{"last_request_metrics": {"request_id": "req_ABPCzNFuuArBtR", "request_duration_ms":
+        4}}'
+      X-Stripe-Client-User-Agent:
+      - '{"bindings_version": "2.33.0", "lang": "python", "publisher": "strip
