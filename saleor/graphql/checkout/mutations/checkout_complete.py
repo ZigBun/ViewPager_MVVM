@@ -280,4 +280,9 @@ class CheckoutComplete(BaseMutation, I18nMixin):
         )
 
         # If gateway returns information that additional steps are required we need
-    
+        # to inform the frontend and pass all required data
+        return CheckoutComplete(
+            order=order,
+            confirmation_needed=action_required,
+            confirmation_data=action_data,
+        )
