@@ -277,4 +277,29 @@ def test_sort_export_files_query_by_updated_at_date(
     nodes = content["data"]["exportFiles"]["edges"]
 
     assert len(nodes) == 2
-    ass
+    assert nodes[0]["node"]["id"] == graphene.Node.to_global_id(
+        "ExportFile", user_export_file.pk
+    )
+
+
+def test_sort_export_files_query_by_status(
+    staff_api_client,
+    export_file_list,
+    permission_manage_products,
+    permission_manage_apps,
+    staff_user,
+):
+    query = SORT_EXPORT_FILES_QUERY
+    variables = {"sortBy": {"field": "STATUS", "direction": "ASC"}}
+
+    response = staff_api_client.post_graphql(
+        query,
+        variables=variables,
+        permissions=[permission_manage_products, permission_manage_apps],
+    )
+    content = get_graphql_content(response)
+    nodes = content["data"]["exportFiles"]["edges"]
+
+    assert len(nodes) == 5
+    status_result = [node["node"]["status"] for node in nodes]
+    assert status_result == ["FAILED", "PENDING", "PENDING", "SUCCESS", "SUCCESS"]
