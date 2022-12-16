@@ -360,4 +360,218 @@ def test_category_updated(
 
     # then
     assert deliveries[0].payload.payload == json.dumps(expected_payload)
-    assert l
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_category_deleted(category, subscription_category_deleted_webhook):
+    # given
+    webhooks = [subscription_category_deleted_webhook]
+
+    category_query = Category.objects.filter(pk=category.id)
+    category_instances = [cat for cat in category_query]
+    category_query.delete()
+
+    event_type = WebhookEventAsyncType.CATEGORY_DELETED
+    category_id = graphene.Node.to_global_id("Category", category_instances[0].id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(
+        event_type, category_instances[0], webhooks
+    )
+
+    # then
+    expected_payload = json.dumps({"category": {"id": category_id}})
+    assert category_instances[0].id is not None
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_channel_created(channel_USD, subscription_channel_created_webhook):
+    # given
+    webhooks = [subscription_channel_created_webhook]
+    event_type = WebhookEventAsyncType.CHANNEL_CREATED
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, channel_USD, webhooks)
+
+    # then
+    expected_payload = json.dumps({"channel": {"id": channel_id}})
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_channel_updated(channel_USD, subscription_channel_updated_webhook):
+    # given
+    webhooks = [subscription_channel_updated_webhook]
+    event_type = WebhookEventAsyncType.CHANNEL_UPDATED
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, channel_USD, webhooks)
+
+    # then
+    expected_payload = json.dumps({"channel": {"id": channel_id}})
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_channel_deleted(channel_USD, subscription_channel_deleted_webhook):
+    # given
+    webhooks = [subscription_channel_deleted_webhook]
+
+    channel_query = Channel.objects.filter(pk=channel_USD.id)
+    channel_instances = [channel for channel in channel_query]
+    channel_query.delete()
+
+    event_type = WebhookEventAsyncType.CHANNEL_DELETED
+    channel_id = graphene.Node.to_global_id("Channel", channel_instances[0].id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(
+        event_type, channel_instances[0], webhooks
+    )
+
+    # then
+    expected_payload = json.dumps({"channel": {"id": channel_id}})
+    assert channel_instances[0].id is not None
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+@pytest.mark.parametrize("status", [True, False])
+def test_channel_status_changed(
+    status, channel_USD, subscription_channel_status_changed_webhook
+):
+    # given
+    webhooks = [subscription_channel_status_changed_webhook]
+
+    channel_USD.is_active = status
+    channel_USD.save(update_fields=["is_active"])
+
+    event_type = WebhookEventAsyncType.CHANNEL_STATUS_CHANGED
+    channel_id = graphene.Node.to_global_id("Channel", channel_USD.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, channel_USD, webhooks)
+
+    # then
+    expected_payload = json.dumps({"channel": {"id": channel_id, "isActive": status}})
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_gift_card_created(gift_card, subscription_gift_card_created_webhook):
+    # given
+    webhooks = [subscription_gift_card_created_webhook]
+    event_type = WebhookEventAsyncType.GIFT_CARD_CREATED
+    gift_card_id = graphene.Node.to_global_id("GiftCard", gift_card.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, gift_card, webhooks)
+
+    # then
+    expected_payload = generate_gift_card_payload(gift_card, gift_card_id)
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_gift_card_updated(gift_card, subscription_gift_card_updated_webhook):
+    # given
+    webhooks = [subscription_gift_card_updated_webhook]
+    event_type = WebhookEventAsyncType.GIFT_CARD_UPDATED
+    gift_card_id = graphene.Node.to_global_id("GiftCard", gift_card.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, gift_card, webhooks)
+
+    # then
+    expected_payload = generate_gift_card_payload(gift_card, gift_card_id)
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_gift_card_deleted(gift_card, subscription_gift_card_deleted_webhook):
+    # given
+    webhooks = [subscription_gift_card_deleted_webhook]
+
+    gift_card_query = GiftCard.objects.filter(pk=gift_card.id)
+    gift_card_instances = [card for card in gift_card_query]
+    gift_card_query.delete()
+
+    event_type = WebhookEventAsyncType.GIFT_CARD_DELETED
+    gift_card_id = graphene.Node.to_global_id("GiftCard", gift_card_instances[0].id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(
+        event_type, gift_card_instances[0], webhooks
+    )
+
+    # then
+    expected_payload = generate_gift_card_payload(gift_card, gift_card_id)
+    assert gift_card_instances[0].id is not None
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+@pytest.mark.parametrize("status", [True, False])
+def test_gift_card_status_changed(
+    status, gift_card, subscription_gift_card_status_changed_webhook
+):
+    # given
+    webhooks = [subscription_gift_card_status_changed_webhook]
+
+    gift_card.is_active = status
+    gift_card.save(update_fields=["is_active"])
+
+    event_type = WebhookEventAsyncType.GIFT_CARD_STATUS_CHANGED
+    gift_card_id = graphene.Node.to_global_id("GiftCard", gift_card.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, gift_card, webhooks)
+
+    # then
+    expected_payload = generate_gift_card_payload(gift_card, gift_card_id)
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_gift_card_metadata_updated(
+    gift_card, subscription_gift_card_metadata_updated_webhook
+):
+    # given
+    webhooks = [subscription_gift_card_metadata_updated_webhook]
+    event_type = WebhookEventAsyncType.GIFT_CARD_METADATA_UPDATED
+    gift_card_id = graphene.Node.to_global_id("GiftCard", gift_card.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, gift_card, webhooks)
+
+    # then
+    expected_payload = generate_gift_card_payload(gift_card, gift_card_id)
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_menu_created(menu, subscription_menu_created_webhook):
+    # given
+    webhooks = [subscription_menu_created_webhook]
+    event_type = WebhookEventAsyncType.MENU_CREATED
+    menu_id = graphene.Node.to_global_id("Menu", menu.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, menu, webhooks)
+
+    # then
+    expecte
