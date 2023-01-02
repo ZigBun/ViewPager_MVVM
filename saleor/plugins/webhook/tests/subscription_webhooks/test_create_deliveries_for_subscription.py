@@ -1378,4 +1378,215 @@ def test_fulfillment_canceled(fulfillment, subscription_fulfillment_canceled_web
     # given
     webhooks = [subscription_fulfillment_canceled_webhook]
     event_type = WebhookEventAsyncType.FULFILLMENT_CANCELED
-    expected_payload = generate_fulfillment_payload
+    expected_payload = generate_fulfillment_payload(fulfillment)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, fulfillment, webhooks)
+
+    # then
+    assert deliveries[0].payload.payload == json.dumps(expected_payload)
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_fulfillment_approved(fulfillment, subscription_fulfillment_approved_webhook):
+    # given
+    webhooks = [subscription_fulfillment_approved_webhook]
+    event_type = WebhookEventAsyncType.FULFILLMENT_APPROVED
+    expected_payload = generate_fulfillment_payload(fulfillment)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, fulfillment, webhooks)
+
+    # then
+    assert deliveries[0].payload.payload == json.dumps(expected_payload)
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_fulfillment_metadata_updated(
+    fulfillment, subscription_fulfillment_metadata_updated_webhook
+):
+    # given
+    webhooks = [subscription_fulfillment_metadata_updated_webhook]
+    event_type = WebhookEventAsyncType.FULFILLMENT_METADATA_UPDATED
+    expected_payload = generate_fulfillment_payload(fulfillment)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, fulfillment, webhooks)
+
+    # then
+    assert deliveries[0].payload.payload == json.dumps(expected_payload)
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_customer_created(customer_user, subscription_customer_created_webhook):
+    # given
+    webhooks = [subscription_customer_created_webhook]
+    event_type = WebhookEventAsyncType.CUSTOMER_CREATED
+    expected_payload = json.dumps(generate_customer_payload(customer_user))
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(
+        event_type, customer_user, webhooks
+    )
+
+    # then
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_customer_updated(customer_user, subscription_customer_updated_webhook):
+    # given
+    webhooks = [subscription_customer_updated_webhook]
+    event_type = WebhookEventAsyncType.CUSTOMER_UPDATED
+    expected_payload = json.dumps(generate_customer_payload(customer_user))
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(
+        event_type, customer_user, webhooks
+    )
+
+    # then
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_customer_deleted(customer_user, subscription_customer_created_webhook):
+    # given
+    customer_user_id = customer_user.id
+    customer_user.delete()
+    customer_user.id = customer_user_id
+
+    webhooks = [subscription_customer_created_webhook]
+    event_type = WebhookEventAsyncType.CUSTOMER_CREATED
+    expected_payload = json.dumps(generate_customer_payload(customer_user))
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(
+        event_type, customer_user, webhooks
+    )
+
+    # then
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_customer_metadata_updated(
+    customer_user, subscription_customer_metadata_updated_webhook
+):
+    # given
+    webhooks = [subscription_customer_metadata_updated_webhook]
+    event_type = WebhookEventAsyncType.CUSTOMER_METADATA_UPDATED
+    expected_payload = json.dumps(generate_customer_payload(customer_user))
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(
+        event_type, customer_user, webhooks
+    )
+
+    # then
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_collection_created(
+    collection_with_products, subscription_collection_created_webhook
+):
+    # given
+    collection = collection_with_products[0].collections.first()
+    webhooks = [subscription_collection_created_webhook]
+    event_type = WebhookEventAsyncType.COLLECTION_CREATED
+    expected_payload = generate_collection_payload(collection)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, collection, webhooks)
+
+    # then
+    assert deliveries[0].payload.payload == json.dumps(expected_payload)
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_collection_updated(
+    collection_with_products, subscription_collection_updated_webhook
+):
+    # given
+    webhooks = [subscription_collection_updated_webhook]
+    collection = collection_with_products[0].collections.first()
+    event_type = WebhookEventAsyncType.COLLECTION_UPDATED
+    expected_payload = generate_collection_payload(collection)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, collection, webhooks)
+
+    # then
+    assert deliveries[0].payload.payload == json.dumps(expected_payload)
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_collection_deleted(
+    collection_with_products, subscription_collection_deleted_webhook
+):
+    # given
+    webhooks = [subscription_collection_deleted_webhook]
+    collection = collection_with_products[0].collections.first()
+    event_type = WebhookEventAsyncType.COLLECTION_DELETED
+    expected_payload = generate_collection_payload(collection)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, collection, webhooks)
+
+    # then
+    assert deliveries[0].payload.payload == json.dumps(expected_payload)
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_collection_metadata_updated(
+    collection_with_products, subscription_collection_metadata_updated_webhook
+):
+    # given
+    webhooks = [subscription_collection_metadata_updated_webhook]
+    collection = collection_with_products[0].collections.first()
+    event_type = WebhookEventAsyncType.COLLECTION_METADATA_UPDATED
+    expected_payload = generate_collection_payload(collection)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, collection, webhooks)
+
+    # then
+    assert deliveries[0].payload.payload == json.dumps(expected_payload)
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_checkout_create(checkout, subscription_checkout_created_webhook):
+    webhooks = [subscription_checkout_created_webhook]
+    event_type = WebhookEventAsyncType.CHECKOUT_CREATED
+    checkout_id = graphene.Node.to_global_id("Checkout", checkout.pk)
+    deliveries = create_deliveries_for_subscriptions(event_type, checkout, webhooks)
+    expected_payload = json.dumps(
+        {"checkout": {"id": checkout_id, "totalPrice": {"currency": "USD"}}}
+    )
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_checkout_update(checkout, subscription_checkout_updated_webhook):
+    webhooks = [subscription_checkout_updated_webhook]
+    event_type = WebhookEventAsyncType.CHECKOUT_UPDATED
+    checkout_id = graphene.Node.to_global_id("Checkout", checkout.pk)
+    deliveries = create_deliveries_for_subscriptions(event_type, checkout, webhooks)
+    expected_payload = json.dumps({"checkout": {"id": checkout_id}})
+
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webho
