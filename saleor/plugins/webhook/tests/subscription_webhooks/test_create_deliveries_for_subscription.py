@@ -1801,4 +1801,217 @@ def test_warehouse_updated(warehouse, subscription_warehouse_updated_webhook):
     # then
     expected_payload = generate_warehouse_payload(warehouse, warehouse_id)
     assert deliveries[0].payload.payload == expected_payload
-    assert len(deliveries) == len(webh
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_warehouse_deleted(warehouse, subscription_warehouse_deleted_webhook):
+    # given
+    webhooks = [subscription_warehouse_deleted_webhook]
+
+    warehouse_id = warehouse.id
+    warehouse.delete()
+    warehouse.id = warehouse_id
+    warehouse.is_object_deleted = True
+
+    event_type = WebhookEventAsyncType.WAREHOUSE_DELETED
+    warehouse_global_id = graphene.Node.to_global_id("Warehouse", warehouse.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, warehouse, webhooks)
+
+    # then
+    expected_payload = generate_warehouse_payload(warehouse, warehouse_global_id)
+
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_warehouse_metadata_updated(
+    warehouse, subscription_warehouse_metadata_updated_webhook
+):
+    # given
+    webhooks = [subscription_warehouse_metadata_updated_webhook]
+    event_type = WebhookEventAsyncType.WAREHOUSE_METADATA_UPDATED
+    warehouse_id = graphene.Node.to_global_id("Warehouse", warehouse.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, warehouse, webhooks)
+
+    # then
+    expected_payload = generate_warehouse_payload(warehouse, warehouse_id)
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_voucher_created(voucher, subscription_voucher_created_webhook):
+    # given
+    webhooks = [subscription_voucher_created_webhook]
+    event_type = WebhookEventAsyncType.VOUCHER_CREATED
+    voucher_id = graphene.Node.to_global_id("Voucher", voucher.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, voucher, webhooks)
+
+    # then
+    expected_payload = generate_voucher_payload(voucher, voucher_id)
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_voucher_updated(voucher, subscription_voucher_updated_webhook):
+    # given
+    webhooks = [subscription_voucher_updated_webhook]
+    event_type = WebhookEventAsyncType.VOUCHER_UPDATED
+    voucher_id = graphene.Node.to_global_id("Voucher", voucher.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, voucher, webhooks)
+
+    # then
+    expected_payload = generate_voucher_payload(voucher, voucher_id)
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_voucher_deleted(voucher, subscription_voucher_deleted_webhook):
+    # given
+    webhooks = [subscription_voucher_deleted_webhook]
+
+    voucher_id = voucher.id
+    voucher.delete()
+    voucher.id = voucher_id
+
+    event_type = WebhookEventAsyncType.VOUCHER_DELETED
+    voucher_global_id = graphene.Node.to_global_id("Voucher", voucher.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, voucher, webhooks)
+
+    # then
+    expected_payload = generate_voucher_payload(voucher, voucher_global_id)
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_voucher_metadata_updated(
+    voucher, subscription_voucher_metadata_updated_webhook
+):
+    # given
+    webhooks = [subscription_voucher_metadata_updated_webhook]
+    event_type = WebhookEventAsyncType.VOUCHER_METADATA_UPDATED
+    voucher_id = graphene.Node.to_global_id("Voucher", voucher.id)
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, voucher, webhooks)
+
+    # then
+    expected_payload = generate_voucher_payload(voucher, voucher_id)
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_transaction_item_metadata_updated(
+    transaction_item, subscription_transaction_item_metadata_updated_webhook
+):
+    # given
+    webhooks = [subscription_transaction_item_metadata_updated_webhook]
+    event_type = WebhookEventAsyncType.TRANSACTION_ITEM_METADATA_UPDATED
+    transaction_item_id = graphene.Node.to_global_id(
+        "TransactionItem", transaction_item.id
+    )
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(
+        event_type, transaction_item, webhooks
+    )
+
+    # then
+    expected_payload = json.dumps({"transaction": {"id": transaction_item_id}})
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_shipping_list_methods_for_checkout(
+    checkout_with_shipping_required,
+    subscription_shipping_list_methods_for_checkout_webhook,
+    address,
+    shipping_method,
+):
+    # given
+    checkout = checkout_with_shipping_required
+    checkout.shipping_address = address
+    checkout.shipping_method = shipping_method
+    webhooks = [subscription_shipping_list_methods_for_checkout_webhook]
+    event_type = WebhookEventSyncType.SHIPPING_LIST_METHODS_FOR_CHECKOUT
+    checkout_id = graphene.Node.to_global_id("Checkout", checkout.pk)
+    all_shipping_methods = ShippingMethod.objects.all()
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, checkout, webhooks)
+    # then
+    shipping_methods = [
+        {
+            "id": graphene.Node.to_global_id("ShippingMethod", sm.pk),
+            "name": sm.name,
+        }
+        for sm in all_shipping_methods
+    ]
+    payload = json.loads(deliveries[0].payload.payload)
+
+    assert payload["checkout"] == {"id": checkout_id}
+    for method in shipping_methods:
+        assert method in payload["shippingMethods"]
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_checkout_filter_shipping_methods(
+    checkout_with_shipping_required,
+    subscription_checkout_filter_shipping_methods_webhook,
+    address,
+    shipping_method,
+):
+    # given
+    checkout = checkout_with_shipping_required
+    checkout.shipping_address = address
+    checkout.shipping_method = shipping_method
+    webhooks = [subscription_checkout_filter_shipping_methods_webhook]
+    event_type = WebhookEventSyncType.CHECKOUT_FILTER_SHIPPING_METHODS
+    checkout_id = graphene.Node.to_global_id("Checkout", checkout.pk)
+    all_shipping_methods = ShippingMethod.objects.all()
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, checkout, webhooks)
+    # then
+    shipping_methods = [
+        {
+            "id": graphene.Node.to_global_id("ShippingMethod", sm.pk),
+            "name": sm.name,
+        }
+        for sm in all_shipping_methods
+    ]
+    payload = json.loads(deliveries[0].payload.payload)
+
+    assert payload["checkout"] == {"id": checkout_id}
+    for method in shipping_methods:
+        assert method in payload["shippingMethods"]
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_checkout_filter_shipping_methods_no_methods_in_channel(
+    checkout,
+    subscription_checkout_filter_shipping_methods_webhook,
+    address,
+    shipping_method,
+    shipping_method_channel_PLN,
+):
+    # given
+    webhooks = [subscription_checkout_filter_shipping_methods_webhook]
+    event_type = WebhookEventSyncType.CHECKOUT_FILTER_SHI
