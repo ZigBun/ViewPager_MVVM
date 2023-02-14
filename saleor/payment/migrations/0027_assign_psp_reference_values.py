@@ -26,4 +26,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(assign_psp_reference_values, migrat
+        migrations.RunPython(assign_psp_reference_values, migrations.RunPython.noop),
+    ]
