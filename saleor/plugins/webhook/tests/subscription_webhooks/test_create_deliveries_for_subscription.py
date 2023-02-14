@@ -2242,4 +2242,199 @@ def test_create_deliveries_for_subscriptions_document_executed_with_error(
     event_type = WebhookEventAsyncType.ORDER_CREATED
     mocked_backend.document_from_string.execute.errors = "errors"
     # when
-    deliveries = create_deliveries_for_s
+    deliveries = create_deliveries_for_subscriptions(event_type, product, webhooks)
+    # then
+    mocked_task_logger.assert_called_with(
+        f"No payload was generated with subscription for event: {event_type}"
+    )
+    assert len(deliveries) == 0
+
+
+def test_validate_subscription_query_valid():
+    query = SubscriptionQuery(subscription_queries.TEST_VALID_SUBSCRIPTION_QUERY)
+    assert query.is_valid
+
+
+def test_validate_subscription_query_invalid():
+    query = SubscriptionQuery("invalid_query")
+    assert not query.is_valid
+
+
+def test_validate_subscription_query_valid_with_fragment():
+    query = SubscriptionQuery(
+        subscription_queries.TEST_VALID_SUBSCRIPTION_QUERY_WITH_FRAGMENT
+    )
+    assert query.is_valid
+
+
+def test_validate_invalid_query_and_subscription():
+    query = SubscriptionQuery(subscription_queries.TEST_INVALID_QUERY_AND_SUBSCRIPTION)
+    assert not query.is_valid
+    assert (
+        "This anonymous operation must be the only defined operation" in query.error_msg
+    )
+
+
+def test_validate_invalid_subscription_and_query():
+    query = SubscriptionQuery(subscription_queries.TEST_INVALID_SUBSCRIPTION_AND_QUERY)
+    assert not query.is_valid
+    assert (
+        "This anonymous operation must be the only defined operation" in query.error_msg
+    )
+
+
+def test_validate_invalid_multiple_subscriptions():
+    query = SubscriptionQuery(subscription_queries.TEST_INVALID_MULTIPLE_SUBSCRIPTION)
+    assert not query.is_valid
+    assert (
+        "This anonymous operation must be the only defined operation" in query.error_msg
+    )
+
+
+def test_validate_valid_multiple_events_in_subscription():
+    query = SubscriptionQuery(subscription_queries.INVALID_MULTIPLE_EVENTS)
+    assert query.is_valid
+
+
+def test_validate_invalid_multiple_events_and_fragments_in_subscription():
+    query = SubscriptionQuery(
+        subscription_queries.INVALID_MULTIPLE_EVENTS_WITH_FRAGMENTS
+    )
+    assert query.is_valid
+
+
+def test_validate_query_with_multiple_fragments():
+    query = SubscriptionQuery(subscription_queries.QUERY_WITH_MULTIPLE_FRAGMENTS)
+    assert query.is_valid
+
+
+def test_generate_payload_from_subscription_return_permission_errors_in_payload(
+    gift_card, subscription_gift_card_created_webhook, permission_manage_gift_card
+):
+    # given
+    subscription_gift_card_created_webhook.app.permissions.remove(
+        permission_manage_gift_card
+    )
+    webhooks = [subscription_gift_card_created_webhook]
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(
+        WebhookEventAsyncType.GIFT_CARD_CREATED, gift_card, webhooks
+    )
+
+    # then
+    payload = json.loads(deliveries[0].payload.payload)
+    error_code = "PermissionDenied"
+
+    assert not payload["giftCard"]
+    assert payload["errors"][0]["extensions"]["exception"]["code"] == error_code
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_thumbnail_created_product_media(
+    thumbnail_product_media, subscription_thumbnail_created_webhook
+):
+    # given
+    thumbnail = thumbnail_product_media
+    webhooks = [subscription_thumbnail_created_webhook]
+    event_type = WebhookEventAsyncType.THUMBNAIL_CREATED
+    thumbnail_id = graphene.Node.to_global_id("Thumbnail", thumbnail.id)
+    setattr(thumbnail, "instance", thumbnail.product_media)
+    expected_payload = json.dumps(
+        {
+            "url": thumbnail.image.url,
+            "id": thumbnail_id,
+            "objectId": graphene.Node.to_global_id(
+                "ProductMedia", thumbnail.instance.id
+            ),
+            "mediaUrl": thumbnail.instance.image.url,
+        }
+    )
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, thumbnail, webhooks)
+
+    # then
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_thumbnail_created_category(
+    thumbnail_category, subscription_thumbnail_created_webhook
+):
+    # given
+    thumbnail = thumbnail_category
+    webhooks = [subscription_thumbnail_created_webhook]
+    event_type = WebhookEventAsyncType.THUMBNAIL_CREATED
+    thumbnail_id = graphene.Node.to_global_id("Thumbnail", thumbnail.id)
+    setattr(thumbnail, "instance", thumbnail.category)
+    expected_payload = json.dumps(
+        {
+            "url": thumbnail.image.url,
+            "id": thumbnail_id,
+            "objectId": graphene.Node.to_global_id("Category", thumbnail.instance.id),
+            "mediaUrl": thumbnail.instance.background_image.url,
+        }
+    )
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, thumbnail, webhooks)
+
+    # then
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_thumbnail_created_collection(
+    thumbnail_collection, subscription_thumbnail_created_webhook
+):
+    # given
+    thumbnail = thumbnail_collection
+    webhooks = [subscription_thumbnail_created_webhook]
+    event_type = WebhookEventAsyncType.THUMBNAIL_CREATED
+    thumbnail_id = graphene.Node.to_global_id("Thumbnail", thumbnail.id)
+    setattr(thumbnail, "instance", thumbnail.collection)
+    expected_payload = json.dumps(
+        {
+            "url": thumbnail.image.url,
+            "id": thumbnail_id,
+            "objectId": graphene.Node.to_global_id("Collection", thumbnail.instance.id),
+            "mediaUrl": thumbnail.instance.background_image.url,
+        }
+    )
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, thumbnail, webhooks)
+
+    # then
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
+
+
+def test_thumbnail_created_user(thumbnail_user, subscription_thumbnail_created_webhook):
+    # given
+    thumbnail = thumbnail_user
+    webhooks = [subscription_thumbnail_created_webhook]
+    event_type = WebhookEventAsyncType.THUMBNAIL_CREATED
+    thumbnail_id = graphene.Node.to_global_id("Thumbnail", thumbnail.id)
+    setattr(thumbnail, "instance", thumbnail.user)
+    expected_payload = json.dumps(
+        {
+            "url": thumbnail.image.url,
+            "id": thumbnail_id,
+            "objectId": graphene.Node.to_global_id("User", thumbnail.instance.id),
+            "mediaUrl": thumbnail.instance.avatar.url,
+        }
+    )
+
+    # when
+    deliveries = create_deliveries_for_subscriptions(event_type, thumbnail, webhooks)
+
+    # then
+    assert deliveries[0].payload.payload == expected_payload
+    assert len(deliveries) == len(webhooks)
+    assert deliveries[0].webhook == webhooks[0]
