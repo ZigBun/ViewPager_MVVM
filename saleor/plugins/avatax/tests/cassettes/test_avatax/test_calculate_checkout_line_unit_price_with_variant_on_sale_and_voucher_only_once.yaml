@@ -1,0 +1,8 @@
+interactions:
+- request:
+    body: '{"createTransactionModel": {"companyCode": "DEFAULT", "type": "SalesOrder",
+      "lines": [{"quantity": 3, "amount": "12.00", "taxCode": "O9999999", "taxIncluded":
+      true, "itemCode": "123", "discounted": false, "description": "Test product",
+      "ref1": "123"}, {"quantity": 1, "amount": "10.000", "taxCode": "FR000000", "taxIncluded":
+      true, "itemCode": "Shipping", "discounted": false, "description": null}], "code":
+      "1646ba43-4a26-4c99-8e5a-4ed53b5b6b45", "date": "2023-02-16", "cu

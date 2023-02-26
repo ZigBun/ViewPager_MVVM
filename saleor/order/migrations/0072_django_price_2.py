@@ -42,4 +42,14 @@ class Migration(migrations.Migration):
             field=models.CharField(
                 default=os.environ.get("DEFAULT_CURRENCY", "USD"),
                 max_length=settings.DEFAULT_CURRENCY_CODE_LENGTH,
-           
+            ),
+        ),
+        migrations.AddField(
+            model_name="orderline",
+            name="currency",
+            field=models.CharField(
+                default=os.environ.get("DEFAULT_CURRENCY", "USD"),
+                max_length=settings.DEFAULT_CURRENCY_CODE_LENGTH,
+            ),
+        ),
+    ]
